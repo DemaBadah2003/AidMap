@@ -1,27 +1,34 @@
-import { PrismaAdapter } from '@auth/prisma-adapter';
-import bcrypt from 'bcrypt';
-import { AuthOptions } from '@auth/core';
-import Credentials from '@auth/core/providers/credentials';
-import Google from '@auth/core/providers/google';
-import prisma from '@/lib/prisma';
+import bcrypt from "bcrypt";
+import type { NextAuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
+import prisma from "@/lib/prisma";
 
-const authOptions: AuthOptions = {
+export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
+
   providers: [
-    Credentials({
-      name: 'Credentials',
+    CredentialsProvider({
+      name: "Credentials",
       credentials: {
-        email: { label: 'Email', type: 'text' },
-        password: { label: 'Password', type: 'password' },
-        rememberMe: { label: 'Remember me', type: 'boolean' },
+        email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
+        rememberMe: { label: "Remember me", type: "checkbox" },
       },
+
       async authorize(credentials) {
-        if (!credentials || !credentials.email || !credentials.password) {
+        // ✅ Fix: narrow types (unknown -> string)
+        if (
+          !credentials ||
+          typeof credentials.email !== "string" ||
+          typeof credentials.password !== "string"
+        ) {
           throw new Error(
             JSON.stringify({
               code: 400,
-              message: 'Please enter both email and password.',
-            }),
+              message: "Please enter both email and password.",
+            })
           );
         }
 
@@ -33,35 +40,34 @@ const authOptions: AuthOptions = {
           throw new Error(
             JSON.stringify({
               code: 404,
-              message: 'User not found. Please register first.',
-            }),
+              message: "User not found. Please register first.",
+            })
           );
         }
 
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
-          user.password || '',
+          user.password ?? ""
         );
 
         if (!isPasswordValid) {
           throw new Error(
             JSON.stringify({
               code: 401,
-              message: 'Invalid credentials. Incorrect password.',
-            }),
+              message: "Invalid credentials. Incorrect password.",
+            })
           );
         }
 
-        if (user.status !== 'ACTIVE') {
+        if (user.status !== "ACTIVE") {
           throw new Error(
             JSON.stringify({
               code: 403,
-              message: 'Account not activated. Please verify your email.',
-            }),
+              message: "Account not activated. Please verify your email.",
+            })
           );
         }
 
-        // Update `lastSignInAt` field
         await prisma.user.update({
           where: { id: user.id },
           data: { lastSignInAt: new Date() },
@@ -69,139 +75,68 @@ const authOptions: AuthOptions = {
 
         return {
           id: user.id,
-          status: user.status,
           email: user.email,
-          name: user.name || 'Anonymous',
+          name: user.name || "Anonymous",
           roleId: user.roleId,
+          status: user.status,
           avatar: user.avatar,
-        };
+        } as any;
       },
     }),
-    Google({
+
+    GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       allowDangerousEmailAccountLinking: true,
-      async profile(profile) {
-        const existingUser = await prisma.user.findUnique({
-          where: { email: profile.email },
-          include: {
-            role: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        });
 
-        if (existingUser) {
-          // Update `lastSignInAt` field for existing users
-          await prisma.user.update({
-            where: { id: existingUser.id },
-            data: {
-              name: profile.name,
-              avatar: profile.picture || null,
-              lastSignInAt: new Date(),
-            },
-          });
-
-          return {
-            id: existingUser.id,
-            email: existingUser.email,
-            name: existingUser.name || 'Anonymous',
-            status: existingUser.status,
-            roleId: existingUser.roleId,
-            roleName: existingUser.role.name,
-            avatar: existingUser.avatar,
-          };
-        }
-
-        const defaultRole = await prisma.userRole.findFirst({
-          where: { isDefault: true },
-        });
-
-        if (!defaultRole) {
-          throw new Error(
-            'Default role not found. Unable to create a new user.',
-          );
-        }
-
-        // Create a new user and account
-        const newUser = await prisma.user.create({
-          data: {
-            email: profile.email,
-            name: profile.name,
-            password: '', // No password for OAuth users
-            avatar: profile.picture || null,
-            emailVerifiedAt: new Date(),
-            roleId: defaultRole.id,
-            status: 'ACTIVE',
-          },
-        });
-
+      profile(profile) {
+        // NextAuth يحتاج object فيه على الأقل id/email/name
         return {
-          id: newUser.id,
-          email: newUser.email,
-          name: newUser.name || 'Anonymous',
-          status: newUser.status,
-          avatar: newUser.avatar,
-          roleId: newUser.roleId,
-          roleName: defaultRole.name,
+          id: profile.sub ?? profile.id,
+          name: profile.name,
+          email: profile.email,
+          image: profile.picture,
         };
       },
     }),
   ],
+
   session: {
-    strategy: 'jwt',
+    strategy: "jwt",
     maxAge: 24 * 60 * 60,
   },
-  callbacks: {
-    async jwt({
-      token,
-      user,
-      session,
-      trigger,
-    }: {
-      token: JWT;
-      user: User;
-      session?: Session;
-      trigger?: 'signIn' | 'signUp' | 'update';
-    }) {
-      if (trigger === 'update' && session?.user) {
-        token = session.user;
-      } else {
-        if (user && user.roleId) {
-          const role = await prisma.userRole.findUnique({
-            where: { id: user.roleId },
-          });
 
-          token.id = (user.id || token.sub) as string;
-          token.email = user.email;
-          token.name = user.name;
-          token.avatar = user.avatar;
-          token.status = user.status;
-          token.roleId = user.roleId;
-          token.roleName = role?.name;
-        }
+  callbacks: {
+    async jwt({ token, user, trigger, session }) {
+      if (trigger === "update" && session?.user) {
+        return { ...token, ...(session.user as any) };
+      }
+
+      if (user) {
+        // خزّن أي بيانات إضافية في التوكن
+        const u = user as any;
+        token.id = u.id ?? token.sub;
+        (token as any).roleId = u.roleId;
+        (token as any).status = u.status;
+        (token as any).avatar = u.avatar;
       }
 
       return token;
     },
-    async session({ session, token }: { session: Session; token: JWT }) {
+
+    async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id;
-        session.user.email = token.email;
-        session.user.name = token.name;
-        session.user.avatar = token.avatar;
-        session.user.status = token.status;
-        session.user.roleId = token.roleId;
-        session.user.roleName = token.roleName;
+        (session.user as any).id = (token as any).id;
+        (session.user as any).roleId = (token as any).roleId;
+        (session.user as any).status = (token as any).status;
+        (session.user as any).avatar = (token as any).avatar;
       }
       return session;
     },
   },
+
   pages: {
-    signIn: '/signin',
+    signIn: "/signin",
   },
 };
 

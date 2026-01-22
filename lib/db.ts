@@ -1,5 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
+import prisma from "@/lib/prisma";
 import { SystemSetting } from '@/app/models/system';
 
 /**
@@ -10,7 +9,7 @@ import { SystemSetting } from '@/app/models/system';
  * @returns - `true` if unique, otherwise `false`.
  * @throws - Error if the table does not exist.
  */
-export async function isUnique<T extends keyof PrismaClient & string>(
+export async function isUnique<T extends keyof typeof prisma & string>(
   table: T,
   fields: Record<string, unknown>,
   exclude?: Record<string, unknown>,

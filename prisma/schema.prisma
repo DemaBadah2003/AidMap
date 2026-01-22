@@ -4,6 +4,8 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
+
+
 }
 
 // User Modoule
@@ -11,6 +13,7 @@ enum UserStatus {
   INACTIVE
   ACTIVE
   BLOCKED
+  
 }
 
 model User {
