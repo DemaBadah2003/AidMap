@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
 import prisma from '@/lib/prisma';
-import { verifyRecaptchaToken } from '@/lib/recaptcha';
+// import { verifyRecaptchaToken } from '@/lib/recaptcha';
 import { sendEmail } from '@/services/send-email';
 import {
   getSignupSchema,
@@ -42,23 +42,23 @@ async function sendVerificationEmail(user: User) {
 
 export async function POST(req: NextRequest) {
   try {
-    const recaptchaToken = req.headers.get('x-recaptcha-token');
+    // const recaptchaToken = req.headers.get('x-recaptcha-token');
 
-    if (!recaptchaToken) {
-      return NextResponse.json(
-        { message: 'reCAPTCHA verification required' },
-        { status: 400 },
-      );
-    }
+    // if (!recaptchaToken) {
+    //   return NextResponse.json(
+    //     { message: 'reCAPTCHA verification required' },
+    //     { status: 400 },
+    //   );
+    // }
 
-    const isValidToken = await verifyRecaptchaToken(recaptchaToken);
+    // const isValidToken = await verifyRecaptchaToken(recaptchaToken);
 
-    if (!isValidToken) {
-      return NextResponse.json(
-        { message: 'reCAPTCHA verification failed' },
-        { status: 400 },
-      );
-    }
+    // if (!isValidToken) {
+    //   return NextResponse.json(
+    //     { message: 'reCAPTCHA verification failed' },
+    //     { status: 400 },
+    //   );
+    // }
 
     // Parse the request body as JSON.
     const body = await req.json();
@@ -109,6 +109,7 @@ export async function POST(req: NextRequest) {
     if (!defaultRole) {
       throw new Error('Default role not found. Unable to create a new user.');
     }
+    console.log('Default role found:', defaultRole.name);
 
     // Hash the password.
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -135,7 +136,8 @@ export async function POST(req: NextRequest) {
       },
       { status: 200 },
     );
-  } catch {
+  } catch (error) {
+    console.error('Error during user registration:', error);
     return NextResponse.json(
       { message: 'Registration failed. Please try again later.' },
       { status: 500 },

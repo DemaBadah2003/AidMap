@@ -12,14 +12,16 @@ export async function apiFetch(
   init?: RequestInit,
 ): Promise<Response> {
   let url = input;
-
+  console.log('API Fetch called with URL:', url);
   // If input is a string and is a relative API path, prefix with base URL
   if (typeof input === 'string') {
     if (input.startsWith('/api/')) {
+      console.log('Prefixing API URL with base path');
       // Remove leading slash to avoid double slashes
       url =
         process.env.NEXT_PUBLIC_BASE_PATH +
         (input.startsWith('/') ? input : '/' + input);
+        console.log('Full API URL:', url);
     }
   }
   // If input is a Request object, you could extend logic here if needed

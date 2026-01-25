@@ -49,6 +49,7 @@ export default function Page() {
     if (!result) return;
     try {
       const values = form.getValues();
+      console.log('Form Values:', values);
       setIsProcessing(true);
       setError(null);
       const response = await apiFetch('/api/auth/signup', {
