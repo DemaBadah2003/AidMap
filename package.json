@@ -9,7 +9,9 @@
     "build:staging": "cp .env.staging .env.local && next build",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "prisma:migrate": "prisma migrate",
     "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio"
   },
   "prisma": {

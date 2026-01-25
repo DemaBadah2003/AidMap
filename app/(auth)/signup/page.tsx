@@ -22,7 +22,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { LoaderCircleIcon } from 'lucide-react';
 import { Icons } from '@/components/common/icons';
-import { RecaptchaPopover } from '@/components/common/recaptcha-popover';
 import { getSignupSchema, SignupSchemaType } from '../forms/signup-schema';
 
 export default function Page() {
@@ -33,13 +32,11 @@ export default function Page() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean | null>(false);
-  const [showRecaptcha, setShowRecaptcha] = useState(false);
 
   const form = useForm<SignupSchemaType>({
     resolver: zodResolver(getSignupSchema()),
     defaultValues: {
       name: '',
-      email: '',
       password: '',
       passwordConfirmation: '',
       accept: false,
@@ -50,27 +47,17 @@ export default function Page() {
     e.preventDefault();
     const result = await form.trigger();
     if (!result) return;
-
-    setShowRecaptcha(true);
-  };
-
-  const handleVerifiedSubmit = async (token: string) => {
     try {
       const values = form.getValues();
-
       setIsProcessing(true);
       setError(null);
-      setShowRecaptcha(false);
-
       const response = await apiFetch('/api/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-recaptcha-token': token,
         },
         body: JSON.stringify(values),
       });
-
       if (!response.ok) {
         const { message } = await response.json();
         setError(message);
@@ -87,27 +74,6 @@ export default function Page() {
       setIsProcessing(false);
     }
   };
-
-  if (success) {
-    return (
-      <Alert onClose={() => setSuccess(false)}>
-        <AlertIcon>
-          <Check />
-        </AlertIcon>
-        <AlertTitle>
-          You have successfully signed up! Please check your email to verify
-          your account and then{' '}
-          <Link
-            href="/signin/"
-            className="text-primary hover:text-primary-darker"
-          >
-            Log in
-          </Link>
-          .
-        </AlertTitle>
-      </Alert>
-    );
-  }
 
   return (
     <Suspense>
@@ -288,23 +254,12 @@ export default function Page() {
           </div>
 
           <div className="flex flex-col gap-2.5">
-            <RecaptchaPopover
-              open={showRecaptcha}
-              onOpenChange={(open) => {
-                if (!open) {
-                  setShowRecaptcha(false);
-                }
-              }}
-              onVerify={handleVerifiedSubmit}
-              trigger={
-                <Button type="submit" disabled={isProcessing}>
-                  {isProcessing ? (
-                    <LoaderCircleIcon className="size-4 animate-spin" />
-                  ) : null}
-                  Continue
-                </Button>
-              }
-            />
+            <Button type="submit" disabled={isProcessing}>
+              {isProcessing ? (
+                <LoaderCircleIcon className="size-4 animate-spin" />
+              ) : null}
+              Continue
+            </Button>
           </div>
 
           <div className="text-sm text-muted-foreground text-center">

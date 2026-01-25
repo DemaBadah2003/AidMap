@@ -1,7 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
 const { faker } = require('@faker-js/faker');
-const prisma = new PrismaClient({ log: ['query', 'info', 'warn', 'error'] });
+const { prisma } = require('@prisma/client');
 
 async function main() {
   console.log('Setting up database...');

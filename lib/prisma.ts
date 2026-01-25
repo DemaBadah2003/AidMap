@@ -18,7 +18,7 @@ const prisma =
   global.prisma ||
   new PrismaClient({
     adapter,
-    log: ["query"], // optional: يظهر جميع الاستعلامات في التيرمينال
+    log: ["query"], 
   });
 
 if (process.env.NODE_ENV !== "production") global.prisma = prisma;

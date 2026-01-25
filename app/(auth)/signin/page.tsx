@@ -51,6 +51,8 @@ export default function Page() {
         rememberMe: values.rememberMe,
       });
 
+      console.log('Sign-in response:', response);
+
       if (response?.error) {
         const errorData = JSON.parse(response.error);
         setError(errorData.message);
