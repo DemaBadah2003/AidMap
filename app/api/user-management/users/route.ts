@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
+import Prisma from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
 import { getClientIP } from '@/lib/api';
-import { prisma } from '@/lib/prisma';
+import prisma from '@/lib/prisma';
 import { systemLog } from '@/services/system-log';
 import {
   UserAddSchema,

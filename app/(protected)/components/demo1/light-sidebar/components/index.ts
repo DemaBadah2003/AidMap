@@ -4,3 +4,4 @@ export * from './entry-callout';
 export * from './highlights';
 export * from './team-meeting';
 export * from './teams';
+export * from './dashboard-wireframe';

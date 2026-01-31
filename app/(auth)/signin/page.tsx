@@ -52,10 +52,27 @@ export default function Page() {
       });
 
       console.log('Sign-in response:', response);
+if (response?.error) {
+  // next-auth sometimes returns a plain string like "OAuthSignin"
+  // and sometimes a JSON string from custom callbacks
+  let message = response.error;
 
-      if (response?.error) {
-        const errorData = JSON.parse(response.error);
-        setError(errorData.message);
+  try {
+    const parsed = JSON.parse(response.error);
+    if (parsed?.message) message = parsed.message;
+  } catch {
+    // ignore parsing errors and keep message as plain string
+  }
+
+  const friendly: Record<string, string> = {
+    CredentialsSignin: "الإيميل أو كلمة المرور غير صحيحة.",
+    OAuthSignin: "مشكلة بتسجيل الدخول عبر Google. تأكدي من إعدادات Google.",
+    OAuthCallback: "فشل تسجيل الدخول عبر Google (Callback).",
+    Configuration: "في مشكلة بإعدادات تسجيل الدخول (NextAuth).",
+    AccessDenied: "تم رفض الوصول.",
+  };
+
+  setError(friendly[message] ?? message);
       } else {
         router.push('/');
       }
@@ -98,7 +115,7 @@ export default function Page() {
           <Button
             variant="outline"
             type="button"
-            onClick={() => signIn('google', { callbackUrl: '/' })}
+           onClick={() => signIn('google', { callbackUrl: '/', redirect: true })}
           >
             <Icons.googleColorful className="size-5! opacity-100!" /> Sign in
             with Google

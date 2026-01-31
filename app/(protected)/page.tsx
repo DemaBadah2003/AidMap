@@ -10,6 +10,8 @@ import { Demo5Page } from './components/demo5';
 export default function Page() {
   const { settings } = useSettings();
 
+console.log('Current layout setting:', settings);
+
   if (settings?.layout === 'demo1') {
     return <Demo1LightSidebarPage />;
   } else if (settings?.layout === 'demo2') {

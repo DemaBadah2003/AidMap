@@ -5,7 +5,8 @@ const bcrypt = require('bcrypt');
 const rolesData = require('./data/roles');
 const usersData = require('./data/users');
 const permissionsData = require('./data/permissions');
-const { prisma } = require('@prisma/client');
+
+const prisma = new PrismaClient();
 
 async function main() {
   console.log('Running database seeding...');
