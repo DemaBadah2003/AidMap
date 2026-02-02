@@ -1,37 +1,168 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { AlertTriangle, MapPin, Search } from 'lucide-react';
+import { useState } from 'react';
+
+import { Card, CardContent, CardHeader, CardTitle } from '../../../../../../components/ui/card';
+import { Button } from '../../../../../../components/ui/button';
+import { Input } from '../../../../../../components/ui/input';
+import { ScrollArea } from '../../../../../../components/ui/scroll-area';
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '../../../../../../components/ui/dialog';
+
+import { MapPin, Search } from 'lucide-react';
+
+type TopItem = {
+  key: 'shelter' | 'aid' | 'school';
+  title: string; // عربي
+  name: string;  // إنجليزي
+  meta: string;  // عربي
+};
 
 const TopCards = () => {
-  const items = [
-    { title: 'أقرب مأوى', name: 'Al-Azhar Shelter', meta: 'يبعد 1.2 كم' },
-    { title: 'توزيع غذاء وماء', name: 'Al-Rahfah Aid Center', meta: 'مفتوح - 09:00' },
-    { title: 'المدارس المتاحة', name: 'Great Gaza Primary School', meta: 'سعة 120' },
+  const items: TopItem[] = [
+    { key: 'shelter', title: 'أقرب مأوى', name: 'Al-Azhar Shelter', meta: 'يبعد 1.2 كم' },
+    { key: 'aid', title: 'توزيع غذاء وماء', name: 'Al-Rahfah Aid Center', meta: 'مفتوح - 09:00' },
+    { key: 'school', title: 'المدارس المتاحة', name: 'Great Gaza Primary School', meta: 'سعة 120' },
   ];
 
-  return (
-    <div className="grid gap-4 md:grid-cols-3">
-      {items.map((it, idx) => (
-        <Card key={idx}>
-          <CardContent className="p-4 flex flex-col gap-2">
-            <div className="text-sm text-secondary-foreground">{it.title}</div>
-            <div className="text-base font-semibold text-mono">{it.name}</div>
-            <div className="text-xs text-muted-foreground flex items-center gap-1">
-              <MapPin className="size-3.5" />
-              {it.meta}
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<TopItem | null>(null);
+
+  const onOpenDetails = (item: TopItem) => {
+    setSelected(item);
+    setOpen(true);
+  };
+
+  const renderDetailsContent = () => {
+    if (!selected) return null;
+
+    // ✅ محتوى عربي: RTL + يمين
+    // ✅ النص الإنجليزي (selected.name) نخليه LTR + يسار
+    if (selected.key === 'shelter') {
+      return (
+        <div dir="rtl" className="grid gap-3 text-sm text-right">
+          <div className="text-muted-foreground">تفاصيل المأوى:</div>
+
+          <div className="grid gap-2 rounded-lg border p-3">
+            <div dir="ltr" className="font-medium text-left">
+              {selected.name}
             </div>
-            <Button className="mt-2" size="sm">
-              عرض التفاصيل
+
+            <div className="text-muted-foreground">المسافة: {selected.meta}</div>
+            <div className="text-muted-foreground">السعة المتوقعة: 250</div>
+            <div className="text-muted-foreground">الحالة: متاح</div>
+          </div>
+
+          <div className="text-xs text-muted-foreground">
+            * استبدل هذه البيانات لاحقًا ببيانات حقيقية من API.
+          </div>
+        </div>
+      );
+    }
+
+    if (selected.key === 'aid') {
+      return (
+        <div dir="rtl" className="grid gap-3 text-sm text-right">
+          <div className="text-muted-foreground">تفاصيل مركز التوزيع:</div>
+
+          <div className="grid gap-2 rounded-lg border p-3">
+            <div dir="ltr" className="font-medium text-left">
+              {selected.name}
+            </div>
+
+            <div className="text-muted-foreground">المواعيد: {selected.meta}</div>
+            <div className="text-muted-foreground">المواد المتوفرة: غذاء + ماء</div>
+            <div className="text-muted-foreground">مستوى الازدحام: متوسط</div>
+          </div>
+
+          <div className="text-xs text-muted-foreground">
+            * تقدر تضيف زر “طلب دور/حجز” هنا لاحقًا.
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div dir="rtl" className="grid gap-3 text-sm text-right">
+        <div className="text-muted-foreground">تفاصيل المدرسة:</div>
+
+        <div className="grid gap-2 rounded-lg border p-3">
+          <div dir="ltr" className="font-medium text-left">
+            {selected.name}
+          </div>
+
+          <div className="text-muted-foreground">السعة: {selected.meta}</div>
+          <div className="text-muted-foreground">الفئات: ابتدائي</div>
+          <div className="text-muted-foreground">الدوام: صباحي</div>
+        </div>
+
+        <div className="text-xs text-muted-foreground">
+          * لاحقًا اربطها بخريطة/موقع وإحصائيات حضور.
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <>
+      {/* ✅ الكروت عربية: RTL */}
+      <div dir="rtl" className="grid gap-4 md:grid-cols-3">
+        {items.map((it) => (
+          <Card key={it.key}>
+            <CardContent className="p-4 flex flex-col gap-2 text-right">
+              <div className="text-sm text-secondary-foreground">{it.title}</div>
+
+              {/* ✅ الاسم إنجليزي: LTR */}
+              <div dir="ltr" className="text-base font-semibold text-mono text-left">
+                {it.name}
+              </div>
+
+              <div className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
+                <MapPin className="size-3.5" />
+                {it.meta}
+              </div>
+
+              <Button className="mt-2" size="sm" onClick={() => onOpenDetails(it)}>
+                عرض التفاصيل
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          {/* ✅ عنوان عربي: RTL */}
+          <DialogHeader dir="rtl" className="text-right">
+            <DialogTitle>
+              {selected ? `تفاصيل: ${selected.title}` : 'تفاصيل'}
+            </DialogTitle>
+
+            {/* ✅ الاسم إنجليزي: LTR */}
+            <DialogDescription dir="ltr" className="text-left">
+              {selected ? selected.name : ''}
+            </DialogDescription>
+          </DialogHeader>
+
+          {renderDetailsContent()}
+
+          {/* ✅ أزرار عربية: RTL */}
+          <DialogFooter dir="rtl" className="gap-2">
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              إغلاق
             </Button>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+            <Button onClick={() => setOpen(false)}>تم</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
@@ -40,62 +171,21 @@ const MapPreview = () => {
     <Card className="h-full">
       <CardHeader className="py-4">
         <div className="flex items-center justify-between gap-3">
-          <CardTitle className="text-base">Map Preview</CardTitle>
-          <Button variant="outline" size="sm">
+          {/* ✅ إنجليزي: LTR */}
+          <CardTitle dir="ltr" className="text-base text-left">
+            Map Preview
+          </CardTitle>
+
+          <Button dir="ltr" variant="outline" size="sm">
             Open Full Map
           </Button>
         </div>
       </CardHeader>
 
       <CardContent className="p-4">
-        {/* Placeholder للخريطة — استبدله لاحقاً بـ Leaflet/Google Map */}
-        <div className="h-[260px] rounded-lg border bg-accent/40 flex items-center justify-center text-sm text-muted-foreground">
+        <div dir="ltr" className="h-[260px] rounded-lg border bg-accent/40 flex items-center justify-center text-sm text-muted-foreground text-left">
           Map Placeholder
         </div>
-
-        {/* تنبيه صغير تحت الخريطة مثل الصورة */}
-        <div className="mt-4 flex items-start gap-2 rounded-lg border p-3">
-          <AlertTriangle className="size-4 text-destructive mt-0.5" />
-          <div className="text-sm">
-            <div className="font-medium">تنبيه</div>
-            <div className="text-muted-foreground">
-              يرجى متابعة آخر التحديثات قبل التحرك.
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-const AlertsList = () => {
-  const alerts = [
-    { title: 'تنبيه: ازدحام على نقطة توزيع', time: 'قبل 5 دقائق', level: 'high' },
-    { title: 'ملاحظة: نقص مياه في حي X', time: 'قبل 30 دقيقة', level: 'medium' },
-    { title: 'تحديث: فتح مأوى جديد', time: 'قبل ساعتين', level: 'low' },
-  ];
-
-  const levelBadge = (lvl: string) => {
-    if (lvl === 'high') return <Badge variant="destructive">عاجل</Badge>;
-    if (lvl === 'medium') return <Badge variant="secondary">متوسط</Badge>;
-    return <Badge variant="outline">منخفض</Badge>;
-  };
-
-  return (
-    <Card className="h-full">
-      <CardHeader className="py-4">
-        <CardTitle className="text-base">Alerts</CardTitle>
-      </CardHeader>
-      <CardContent className="p-4 flex flex-col gap-3">
-        {alerts.map((a, idx) => (
-          <div key={idx} className="flex items-start justify-between gap-3 rounded-lg border p-3">
-            <div className="flex flex-col gap-1">
-              <div className="text-sm font-medium text-mono">{a.title}</div>
-              <div className="text-xs text-muted-foreground">{a.time}</div>
-            </div>
-            {levelBadge(a.level)}
-          </div>
-        ))}
       </CardContent>
     </Card>
   );
@@ -105,17 +195,22 @@ const RightSidebar = () => {
   return (
     <Card className="h-full">
       <CardHeader className="py-4">
-        <CardTitle className="text-base">Sidebar</CardTitle>
+        {/* ✅ إنجليزي */}
+        <CardTitle dir="ltr" className="text-base text-left">
+          Sidebar
+        </CardTitle>
       </CardHeader>
 
       <CardContent className="p-4">
-        <div className="relative mb-4">
+        {/* ✅ بحث عربي: RTL */}
+        <div dir="rtl" className="relative mb-4">
           <Search className="size-4 text-muted-foreground absolute start-3 top-1/2 -translate-y-1/2" />
           <Input className="ps-9" placeholder="بحث..." />
         </div>
 
         <ScrollArea className="h-[520px] pr-2">
-          <div className="flex flex-col gap-4">
+          {/* ✅ أقسام إنجليزية: LTR */}
+          <div dir="ltr" className="flex flex-col gap-4 text-left">
             <div>
               <div className="text-sm font-semibold mb-2">Admins & Supervisors</div>
               <div className="text-sm text-muted-foreground">- admin1</div>
@@ -149,18 +244,13 @@ const RightSidebar = () => {
 const DashboardWireframe = () => {
   return (
     <div className="grid gap-6">
-      {/* صف البطاقات العلوية */}
       <TopCards />
 
-      {/* محتوى رئيسي + سايدبار يمين */}
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        {/* العمود الرئيسي */}
         <div className="grid gap-6">
           <MapPreview />
-          <AlertsList />
         </div>
 
-        {/* السايدبار */}
         <RightSidebar />
       </div>
     </div>

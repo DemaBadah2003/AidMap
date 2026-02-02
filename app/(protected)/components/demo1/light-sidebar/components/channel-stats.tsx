@@ -1,6 +1,6 @@
 import { Fragment } from 'react';
-import { toAbsoluteUrl } from '@/lib/helpers';
-import { Card, CardContent } from '@/components/ui/card';
+import { toAbsoluteUrl } from '../../../../../../lib/helpers';
+import { Card, CardContent } from '../../../../../../components/ui/card';
 
 interface IChannelStatsItem {
   logo: string;

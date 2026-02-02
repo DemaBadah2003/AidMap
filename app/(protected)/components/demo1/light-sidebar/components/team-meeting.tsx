@@ -1,9 +1,9 @@
 import Link from 'next/link';
-import { AvatarGroup } from '@/partials/common/avatar-group';
+import { AvatarGroup } from '../../partials/common/avatar-group';
 import { MapPin, Users } from 'lucide-react';
-import { toAbsoluteUrl } from '@/lib/helpers';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { toAbsoluteUrl } from '../../../../../../lib/helpers';
+import { Button } from '../../../../../../components/ui/button';
+import { Card, CardContent, CardFooter } from '../../../../../../components/ui/card';
 
 const TeamMeeting = () => {
   return (

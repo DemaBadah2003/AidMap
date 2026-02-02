@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Prisma from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
 import { getClientIP } from '@/lib/api';
 import prisma from '@/lib/prisma';
@@ -17,7 +17,10 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(searchParams.get('limit') || '10', 10);
   const query = searchParams.get('query') || '';
   const sortField = searchParams.get('sort') || 'name';
-  const sortDirection = searchParams.get('dir') === 'desc' ? 'desc' : 'asc';
+
+  const sortDirection: Prisma.SortOrder =
+    searchParams.get('dir') === 'desc' ? 'desc' : 'asc';
+
   const status = searchParams.get('status') || null;
   const roleId = searchParams.get('roleId') || null;
 
@@ -32,7 +35,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Map status query to enum type, fallback to null if invalid
+    // Map status query to enum type, fallback to undefined if invalid
     const statusFilter =
       status && status !== 'all' ? (status as UserStatus) : undefined;
 
@@ -40,8 +43,8 @@ export async function GET(req: NextRequest) {
     const totalCount = await prisma.user.count({
       where: {
         AND: [
-          ...(statusFilter ? [{ status: statusFilter }] : []), // Add status filter if valid
-          ...(roleId && roleId !== 'all' ? [{ roleId }] : []), // Add role filter if valid
+          ...(statusFilter ? [{ status: statusFilter }] : []),
+          ...(roleId && roleId !== 'all' ? [{ roleId }] : []),
           {
             OR: [
               { name: { contains: query, mode: 'insensitive' } },
@@ -54,24 +57,23 @@ export async function GET(req: NextRequest) {
 
     // Set order logic
     const sortMap: Record<string, Prisma.UserOrderByWithRelationInput> = {
-      name: { name: sortDirection as Prisma.SortOrder },
-      role_name: { role: { name: sortDirection as Prisma.SortOrder } },
-      status: { status: sortDirection as Prisma.SortOrder },
-      createdAt: { createdAt: sortDirection as Prisma.SortOrder },
-      lastSignInAt: { lastSignInAt: sortDirection as Prisma.SortOrder },
+      name: { name: sortDirection },
+      role_name: { role: { name: sortDirection } },
+      status: { status: sortDirection },
+      createdAt: { createdAt: sortDirection },
+      lastSignInAt: { lastSignInAt: sortDirection },
     };
 
     // Default to createdAt sorting if no valid field is found
-    const orderBy = sortMap[sortField] || {
-      createdAt: sortDirection as Prisma.SortOrder,
-    };
+    const orderBy: Prisma.UserOrderByWithRelationInput =
+      sortMap[sortField] ?? { createdAt: sortDirection };
 
     // Fetch users with filters
     const users = await prisma.user.findMany({
       where: {
         AND: [
-          ...(statusFilter ? [{ status: statusFilter }] : []), // Add status filter if valid
-          ...(roleId && roleId !== 'all' ? [{ roleId }] : []), // Add role filter if valid
+          ...(statusFilter ? [{ status: statusFilter }] : []),
+          ...(roleId && roleId !== 'all' ? [{ roleId }] : []),
           {
             OR: [
               { name: { contains: query, mode: 'insensitive' } },

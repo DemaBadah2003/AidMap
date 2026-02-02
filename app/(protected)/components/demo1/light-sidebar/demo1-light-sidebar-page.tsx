@@ -28,15 +28,15 @@ export function Demo1LightSidebarPage() {
   );
 
   const handleDateRangeApply = () => {
-    setDate(tempDateRange); // Save the temporary date range to the main state
-    setIsOpen(false); // Close the popover
+    setDate(tempDateRange);
+    setIsOpen(false);
   };
 
   const handleDateRangeReset = () => {
-    setTempDateRange(undefined); // Reset the temporary date range
+    setTempDateRange(undefined);
   };
 
-  const defaultStartDate = new Date(); // Default start date fallback
+  const defaultStartDate = new Date();
 
   return (
     <Fragment>
@@ -85,8 +85,13 @@ export function Demo1LightSidebarPage() {
           </ToolbarActions>
         </Toolbar>
       </Container>
+
       <Container>
+        {/* ✅ المحتوى القديم */}
         <Demo1LightSidebarContent />
+
+        {/* ✅ واجهتك الجديدة تحت المحتوى القديم */}
+  
       </Container>
     </Fragment>
   );
