@@ -1,5 +1,4 @@
 'use client';
-'use client';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, {
@@ -20,6 +19,7 @@ type SettingsContextType = {
   setOption: <T = any>(path: Path, value: T) => void;
   storeOption: <T = any>(path: Path, value: T) => void;
   settings: Settings;
+  isReady: boolean; // ✅ جديد
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(
@@ -28,8 +28,16 @@ const SettingsContext = createContext<SettingsContextType | undefined>(
 
 const LOCAL_STORAGE_PREFIX = 'app_settings_';
 
-// Utility to safely access localStorage
 const isBrowser = () => typeof window !== 'undefined';
+
+// ✅ clone آمن بدل structuredClone
+function deepClone<T>(obj: T): T {
+  try {
+    return JSON.parse(JSON.stringify(obj));
+  } catch {
+    return obj;
+  }
+}
 
 function getFromPath(obj: any, path: string): any {
   return path.split('.').reduce((acc, part) => acc?.[part], obj);
@@ -69,15 +77,14 @@ function getLeafFromStorage(path: string): any {
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [settings, setSettings] = useState<Settings>(
-    structuredClone(APP_SETTINGS),
-  );
+  const [settings, setSettings] = useState<Settings>(() => deepClone(APP_SETTINGS));
+  const [isReady, setIsReady] = useState(false); // ✅ جديد
 
-  // Load settings from localStorage after mount
   useEffect(() => {
     if (!isBrowser()) return;
 
-    const init = structuredClone(APP_SETTINGS);
+    const init = deepClone(APP_SETTINGS);
+
     Object.keys(localStorage)
       .filter((key) => key.startsWith(LOCAL_STORAGE_PREFIX))
       .forEach((key) => {
@@ -87,13 +94,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
           setToPath(init, path, value);
         }
       });
+
     setSettings(init);
-  }, []); // Empty dependency array to run once on mount
+    setIsReady(true); // ✅ جاهز
+  }, []);
 
   const getOption = useCallback(
-    <T,>(path: string): T => {
-      return getFromPath(settings, path) as T;
-    },
+    <T,>(path: string): T => getFromPath(settings, path) as T,
     [settings],
   );
 
@@ -109,10 +116,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   }, []);
 
-  // Memoize context value to prevent unnecessary re-renders
   const contextValue = useMemo(
-    () => ({ getOption, setOption, storeOption, settings }),
-    [getOption, setOption, storeOption, settings],
+    () => ({ getOption, setOption, storeOption, settings, isReady }),
+    [getOption, setOption, storeOption, settings, isReady],
   );
 
   return (

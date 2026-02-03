@@ -3,7 +3,7 @@ import {
   Toolbar,
   ToolbarActions,
   ToolbarHeading,
-} from '@/layouts/demo1/components/toolbar';
+} from '@/components/common/toolbar';
 import { addDays, format } from 'date-fns';
 import { CalendarDays } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
@@ -65,6 +65,7 @@ export function Demo1LightSidebarPage() {
                   )}
                 </Button>
               </PopoverTrigger>
+
               <PopoverContent className="w-auto p-0" align="end">
                 <Calendar
                   initialFocus
@@ -74,6 +75,7 @@ export function Demo1LightSidebarPage() {
                   onSelect={setTempDateRange}
                   numberOfMonths={2}
                 />
+
                 <div className="flex items-center justify-end gap-1.5 border-t border-border p-3">
                   <Button variant="outline" onClick={handleDateRangeReset}>
                     Reset
@@ -87,11 +89,7 @@ export function Demo1LightSidebarPage() {
       </Container>
 
       <Container>
-        {/* ✅ المحتوى القديم */}
         <Demo1LightSidebarContent />
-
-        {/* ✅ واجهتك الجديدة تحت المحتوى القديم */}
-  
       </Container>
     </Fragment>
   );

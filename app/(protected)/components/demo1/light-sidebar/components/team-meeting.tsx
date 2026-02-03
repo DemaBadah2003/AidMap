@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { AvatarGroup } from '../../partials/common/avatar-group';
+import { AvatarGroup } from '../../../../../components/partials/common/avatar-group';
 import { MapPin, Users } from 'lucide-react';
 import { toAbsoluteUrl } from '../../../../../../lib/helpers';
 import { Button } from '../../../../../../components/ui/button';

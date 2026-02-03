@@ -3,9 +3,10 @@
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
 
-    "baseUrl": ".",                // 👈 أضفنا هذا
-    "paths": {                     // 👈 وأضفنا هذا
-      "@/*": ["./*"]
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@/partials/*": ["./app/components/partials/*"]
     },
 
     "allowJs": true,

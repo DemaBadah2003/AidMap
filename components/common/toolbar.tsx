@@ -15,8 +15,13 @@ export interface ToolbarTitleProps {
 }
 
 export interface ToolbarHeadingProps {
+  /** عنوان التولبار */
+  title?: string;
+  /** وصف اختياري تحت العنوان */
+  description?: string;
+  /** لو حابب تستخدم children بدل title */
+  children?: ReactNode;
   className?: string;
-  children: ReactNode;
 }
 
 export const Toolbar = ({ children }: ToolbarProps) => {
@@ -28,11 +33,25 @@ export const Toolbar = ({ children }: ToolbarProps) => {
 };
 
 export const ToolbarHeading = ({
+  title,
+  description,
   children,
   className,
 }: ToolbarHeadingProps) => {
   return (
     <div className={cn('flex flex-col flex-wrap gap-px', className)}>
+      {title && (
+        <h1 className="font-semibold text-foreground text-lg">
+          {title}
+        </h1>
+      )}
+
+      {description && (
+        <p className="text-sm text-muted-foreground">
+          {description}
+        </p>
+      )}
+
       {children}
     </div>
   );
