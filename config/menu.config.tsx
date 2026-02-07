@@ -59,8 +59,12 @@ export const MENU_SIDEBAR: MenuConfig = [
     title: 'Dashboards',
     icon: LayoutGrid,
     children: [
-      { title: 'Light Sidebar', path: '/' },
-      { title: 'Dark Sidebar', path: '/dark-sidebar' },
+      { title: 'Camps Sidebar', path: '/project/camps' },
+      { title: 'beneficiaries Sidebar', path: '/project/beneficiaries' },
+      { title: '   Clinics Sidebar', path: '/project/clinics' },
+
+
+
     ],
   },
   { heading: 'User' },

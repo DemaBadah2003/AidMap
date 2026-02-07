@@ -2,9 +2,9 @@
 
 import { useMemo, useState, type ChangeEvent } from 'react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Button } from '../../../components/ui/button';
-import { Input } from '../../../components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '../../../../components/ui/card';
+import { Button } from '../../../../components/ui/button';
+import { Input } from '../../../../components/ui/input';
 
 import {
   Dialog,
@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '../../../components/ui/dialog';
+} from '../../../../components/ui/dialog';
 
 import {
   LayoutDashboard,
@@ -29,26 +29,52 @@ import {
   X,
 } from 'lucide-react';
 
-type Camp = {
+type Priority = 'عادي' | 'مستعجل' | 'حرج';
+
+type Beneficiary = {
   id: string;
   nameAr: string;
   nameEn: string;
-  areaAr: string;
-  familiesCount: number;
-  capacity: number;
-  status: 'نشط' | 'مؤقت' | 'مغلق';
+  phone: string;
+  familyCount: number;
+  campAr: string;
+  priority: Priority;
+  // (لو حابة تتركيهم بالمستقبل)
+  lastAidDaysAgo?: number;
+  notes?: string;
 };
 
-const campsSeed: Camp[] = [
-  { id: 'cp_01', nameAr: 'مخيم الشمال A', nameEn: 'North Camp A', areaAr: 'شمال غزة', familiesCount: 320, capacity: 2000, status: 'نشط' },
-  { id: 'cp_02', nameAr: 'مخيم الوسط B', nameEn: 'Middle Camp B', areaAr: 'الوسطى', familiesCount: 210, capacity: 1400, status: 'مؤقت' },
-  { id: 'cp_03', nameAr: 'مخيم الجنوب C', nameEn: 'South Camp C', areaAr: 'خانيونس', familiesCount: 120, capacity: 900, status: 'نشط' },
+const beneficiariesSeed: Beneficiary[] = [
+  {
+    id: 'bf_01',
+    nameAr: 'أحمد محمد',
+    nameEn: 'Ahmed Mohammad',
+    phone: '+970-111-222',
+    familyCount: 6,
+    campAr: 'مخيم الوسط B',
+    priority: 'مستعجل',
+    notes: 'حالة سكرية + يحتاج دواء',
+  },
+  {
+    id: 'bf_02',
+    nameAr: 'سارة علي',
+    nameEn: 'Sara Ali',
+    phone: '+970-333-444',
+    familyCount: 3,
+    campAr: 'مخيم الشمال A',
+    priority: 'عادي',
+  },
+  {
+    id: 'bf_03',
+    nameAr: 'خالد حسن',
+    nameEn: 'Khaled Hassan',
+    phone: '+970-444-555',
+    familyCount: 8,
+    campAr: 'مخيم الجنوب C',
+    priority: 'حرج',
+    notes: 'إعاقة حركية',
+  },
 ];
-
-type FillStatus = 'Full' | 'Not Full';
-
-const defaultFillStatus = (families: number, capacity: number): FillStatus =>
-  families >= capacity ? 'Full' : 'Not Full';
 
 // ✅ أرقام صحيحة فقط (بدون كسور / بدون حروف)
 const toIntOnly = (value: string) => {
@@ -56,15 +82,24 @@ const toIntOnly = (value: string) => {
   return digits ? Number(digits) : 0;
 };
 
-export default function CampsPage() {
+// ✅ FIX: استخدم ألوان theme (مضمونة الظهور) بدل amber/red
+const priorityBadgeClass = (p: Priority) => {
+  switch (p) {
+    case 'حرج':
+      return 'bg-destructive text-destructive-foreground';
+    case 'مستعجل':
+      return 'bg-primary text-primary-foreground';
+    default:
+      return 'bg-muted text-foreground';
+  }
+};
+
+export default function BeneficiariesPage() {
   const [q, setQ] = useState('');
-  const [items, setItems] = useState<Camp[]>(campsSeed);
+  const [items, setItems] = useState<Beneficiary[]>(beneficiariesSeed);
 
-  // فلترة status (Full / Not Full) من فوق
-  const [statusFilter, setStatusFilter] = useState<'all' | 'full' | 'notfull'>('all');
-
-  // اختيار status لكل صف
-  const [statusPick, setStatusPick] = useState<Record<string, FillStatus>>({});
+  // فلترة حسب الأولوية
+  const [priorityFilter, setPriorityFilter] = useState<'all' | Priority>('all');
 
   // ✅ Hamburger / Drawer sidebar للـ mobile
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -76,52 +111,49 @@ export default function CampsPage() {
   // Add dialog
   const [addOpen, setAddOpen] = useState(false);
   const [nameAr, setNameAr] = useState('');
-  const [areaAr, setAreaAr] = useState('');
-  const [capacity, setCapacity] = useState<number>(0);
+  const [phone, setPhone] = useState('');
+  const [familyCount, setFamilyCount] = useState<number>(0);
+  const [campAr, setCampAr] = useState('');
+  const [priority, setPriority] = useState<Priority>('عادي');
 
   // Inline Edit
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{
     nameAr: string;
-    areaAr: string;
-    capacity: number;
-    fillStatus: FillStatus;
+    phone: string;
+    familyCount: number;
+    campAr: string;
+    priority: Priority;
   }>({
     nameAr: '',
-    areaAr: '',
-    capacity: 1,
-    fillStatus: 'Not Full',
+    phone: '',
+    familyCount: 1,
+    campAr: '',
+    priority: 'عادي',
   });
 
-  // ✅ فلترة search + فلترة status (حسب statusPick أو الافتراضي)
+  // ✅ فلترة search + فلترة priority
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
 
-    return items.filter((c) => {
+    return items.filter((b) => {
       const matchSearch =
         !s ||
-        c.nameEn.toLowerCase().includes(s) ||
-        c.nameAr.includes(q) ||
-        c.areaAr.includes(q);
+        b.nameEn.toLowerCase().includes(s) ||
+        b.nameAr.includes(q) ||
+        b.phone.includes(q) ||
+        b.campAr.includes(q);
 
-      const rowStatus: FillStatus =
-        statusPick[c.id] ?? defaultFillStatus(c.familiesCount, c.capacity);
+      const matchPriority = priorityFilter === 'all' ? true : b.priority === priorityFilter;
 
-      const matchStatus =
-        statusFilter === 'all'
-          ? true
-          : statusFilter === 'full'
-          ? rowStatus === 'Full'
-          : rowStatus === 'Not Full';
-
-      return matchSearch && matchStatus;
+      return matchSearch && matchPriority;
     });
-  }, [q, items, statusFilter, statusPick]);
+  }, [q, items, priorityFilter]);
 
   // Reset page on filter change
   useMemo(() => {
     setPage(1);
-  }, [q, statusFilter, pageSize]);
+  }, [q, priorityFilter, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -133,47 +165,43 @@ export default function CampsPage() {
 
   const onAdd = () => {
     const ar = nameAr.trim();
-    const area = areaAr.trim();
-    if (!ar || !area || !Number.isInteger(capacity) || capacity <= 0) return;
+    const ph = phone.trim();
+    const camp = campAr.trim();
 
-    const newItem: Camp = {
-      id: `cp_${Math.random().toString(16).slice(2, 8)}`,
+    if (!ar || !ph || !camp || !Number.isInteger(familyCount) || familyCount <= 0) return;
+
+    const newItem: Beneficiary = {
+      id: `bf_${Math.random().toString(16).slice(2, 8)}`,
       nameAr: ar,
       nameEn: ar,
-      areaAr: area,
-      familiesCount: 0,
-      capacity,
-      status: 'مؤقت',
+      phone: ph,
+      familyCount,
+      campAr: camp,
+      priority, // ✅ مهم
     };
 
     setItems((prev) => [newItem, ...prev]);
     setNameAr('');
-    setAreaAr('');
-    setCapacity(0);
+    setPhone('');
+    setFamilyCount(0);
+    setCampAr('');
+    setPriority('عادي');
     setAddOpen(false);
   };
 
   const onDeleteOne = (id: string) => {
     if (editingId === id) setEditingId(null);
-
     setItems((prev) => prev.filter((x) => x.id !== id));
-    setStatusPick((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
   };
 
-  const startEditRow = (c: Camp) => {
-    const currentStatus: FillStatus =
-      statusPick[c.id] ?? defaultFillStatus(c.familiesCount, c.capacity);
-
-    setEditingId(c.id);
+  const startEditRow = (b: Beneficiary) => {
+    setEditingId(b.id);
     setEditDraft({
-      nameAr: c.nameAr,
-      areaAr: c.areaAr,
-      capacity: c.capacity,
-      fillStatus: currentStatus,
+      nameAr: b.nameAr,
+      phone: b.phone,
+      familyCount: b.familyCount,
+      campAr: b.campAr,
+      priority: b.priority ?? 'عادي',
     });
   };
 
@@ -181,25 +209,28 @@ export default function CampsPage() {
 
   const saveEditRow = (id: string) => {
     const ar = editDraft.nameAr.trim();
-    const area = editDraft.areaAr.trim();
+    const ph = editDraft.phone.trim();
+    const camp = editDraft.campAr.trim();
 
-    if (!ar || !area || !Number.isInteger(editDraft.capacity) || editDraft.capacity <= 0) return;
+    if (!ar || !ph || !camp) return;
+    if (!Number.isInteger(editDraft.familyCount) || editDraft.familyCount <= 0) return;
 
     setItems((prev) =>
-      prev.map((c) =>
-        c.id === id
+      prev.map((b) =>
+        b.id === id
           ? {
-              ...c,
+              ...b,
               nameAr: ar,
               nameEn: ar,
-              areaAr: area,
-              capacity: editDraft.capacity,
+              phone: ph,
+              familyCount: editDraft.familyCount,
+              campAr: camp,
+              priority: editDraft.priority, // ✅ مهم
             }
-          : c
+          : b
       )
     );
 
-    setStatusPick((prev) => ({ ...prev, [id]: editDraft.fillStatus }));
     setEditingId(null);
   };
 
@@ -212,7 +243,6 @@ export default function CampsPage() {
           <div className="text-xs text-muted-foreground">Control Panel</div>
         </div>
 
-        {/* X يظهر فقط في الموبايل */}
         {onClose ? (
           <button
             type="button"
@@ -258,19 +288,19 @@ export default function CampsPage() {
 
   return (
     <div dir="ltr" className="min-h-screen w-full bg-muted/30">
-      {/* Mobile Topbar: يظهر فقط تحت lg */}
+      {/* Mobile Topbar */}
       <div className="lg:hidden sticky top-0 z-40 bg-background border-b">
         <div className="flex items-center justify-between px-3 py-2">
           <Button variant="outline" size="sm" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
             <Menu className="size-4" />
           </Button>
-          <div className="font-semibold">Camps</div>
+          <div className="font-semibold">Beneficiaries</div>
           <div className="w-9" />
         </div>
       </div>
 
       <div className="flex min-h-screen">
-        {/* Desktop Sidebar (ثابت) */}
+        {/* Desktop Sidebar */}
         <aside className="hidden lg:block">
           <Sidebar />
         </aside>
@@ -287,12 +317,11 @@ export default function CampsPage() {
 
         {/* Main */}
         <main className="flex-1">
-          {/* Content RTL */}
           <div dir="rtl" className="w-full flex justify-center">
             <div className="w-full max-w-[1200px] px-3 sm:px-6 py-6 grid gap-6">
               {/* Title (desktop) */}
               <div className="hidden lg:block text-center">
-                <h1 className="text-2xl font-bold text-black">Camps</h1>
+                <h1 className="text-2xl font-bold text-black">Beneficiaries</h1>
               </div>
 
               {/* Control Panel */}
@@ -301,41 +330,40 @@ export default function CampsPage() {
                   Control Panel
                 </div>
 
-                {/* responsive row */}
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center" dir="ltr">
                   <div className="flex-1">
                     <Input
                       value={q}
                       onChange={(e: ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
-                      placeholder="Search"
+                      placeholder="Search by name / phone / camp..."
                       className="h-11"
                     />
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button className="h-11 bg-black text-white hover:bg-black/90" onClick={() => setStatusFilter('all')}>
+                    <Button className="h-11 bg-black text-white hover:bg-black/90" onClick={() => setPriorityFilter('all')}>
                       Search
                     </Button>
 
                     <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value as 'all' | 'full' | 'notfull')}
+                      value={priorityFilter}
+                      onChange={(e) => setPriorityFilter(e.target.value as 'all' | Priority)}
                       className="h-11 rounded-md border bg-background px-3 text-sm"
                     >
-                      <option value="all">Search by Status</option>
-                      <option value="full">Full</option>
-                      <option value="notfull">Not Full</option>
+                      <option value="all">Search by Priority</option>
+                      <option value="عادي">عادي</option>
+                      <option value="مستعجل">مستعجل</option>
+                      <option value="حرج">حرج</option>
                     </select>
 
                     <Button className="h-11 bg-black text-white hover:bg-black/90" onClick={() => setAddOpen(true)}>
-                      + Create Camps
+                      + إضافة مستفيد
                     </Button>
 
                     <Button
                       className="h-11 bg-black text-white hover:bg-black/90"
                       onClick={() => {
                         setItems([]);
-                        setStatusPick({});
                         setEditingId(null);
                       }}
                     >
@@ -348,31 +376,32 @@ export default function CampsPage() {
               {/* Table */}
               <Card>
                 <CardHeader className="py-4">
-                  <CardTitle className="text-base">المخيمات</CardTitle>
+                  <CardTitle className="text-base">المستفيدين</CardTitle>
                 </CardHeader>
 
                 <CardContent className="p-4">
                   <div className="rounded-lg border overflow-hidden bg-background">
                     <div className="w-full overflow-x-auto">
-                      <table className="w-full text-sm border-collapse min-w-[820px]" dir="ltr">
+                      <table className="w-full text-sm border-collapse min-w-[900px]" dir="ltr">
                         <thead className="bg-muted/60">
                           <tr className="text-left">
+                            <th className="px-4 py-3 font-semibold border-b border-r">Beneficiary's Name</th>
+                            <th className="px-4 py-3 font-semibold border-b border-r">Phone</th>
+                            <th className="px-4 py-3 font-semibold border-b border-r">Number Of Family</th>
                             <th className="px-4 py-3 font-semibold border-b border-r">Camp Name</th>
-                            <th className="px-4 py-3 font-semibold border-b border-r">Area</th>
-                            <th className="px-4 py-3 font-semibold border-b border-r">Capacity</th>
-                            <th className="px-4 py-3 font-semibold border-b border-r">Status</th>
+                            <th className="px-4 py-3 font-semibold border-b border-r">Priority</th>
                             <th className="px-4 py-3 font-semibold border-b">Actions</th>
                           </tr>
                         </thead>
 
                         <tbody>
-                          {pageItems.map((c) => {
-                            const isEditing = editingId === c.id;
-                            const currentStatus: FillStatus =
-                              statusPick[c.id] ?? defaultFillStatus(c.familiesCount, c.capacity);
+                          {pageItems.map((b) => {
+                            const isEditing = editingId === b.id;
+                            const showPriority: Priority = (b.priority ?? 'عادي') as Priority;
 
                             return (
-                              <tr key={c.id} className="hover:bg-muted/30">
+                              <tr key={b.id} className="hover:bg-muted/30">
+                                {/* Beneficiary Name */}
                                 <td className="px-4 py-3 border-b border-r font-medium">
                                   {isEditing ? (
                                     <Input
@@ -381,74 +410,86 @@ export default function CampsPage() {
                                       className="h-9"
                                     />
                                   ) : (
-                                    c.nameAr
+                                    b.nameAr
                                   )}
                                 </td>
 
+                                {/* Phone */}
                                 <td className="px-4 py-3 border-b border-r">
                                   {isEditing ? (
                                     <Input
-                                      value={editDraft.areaAr}
-                                      onChange={(e) => setEditDraft((p) => ({ ...p, areaAr: e.target.value }))}
+                                      value={editDraft.phone}
+                                      onChange={(e) => setEditDraft((p) => ({ ...p, phone: e.target.value }))}
                                       className="h-9"
                                     />
                                   ) : (
-                                    c.areaAr
+                                    b.phone
                                   )}
                                 </td>
 
+                                {/* Number Of Family */}
                                 <td className="px-4 py-3 border-b border-r">
                                   {isEditing ? (
                                     <Input
                                       inputMode="numeric"
                                       pattern="[0-9]*"
                                       type="text"
-                                      value={editDraft.capacity ? String(editDraft.capacity) : ''}
+                                      value={editDraft.familyCount ? String(editDraft.familyCount) : ''}
                                       onChange={(e) =>
                                         setEditDraft((p) => ({
                                           ...p,
-                                          capacity: toIntOnly(e.target.value),
+                                          familyCount: toIntOnly(e.target.value),
                                         }))
                                       }
                                       className="h-9"
                                     />
                                   ) : (
-                                    c.capacity
+                                    b.familyCount
                                   )}
                                 </td>
 
+                                {/* Camp Name */}
+                                <td className="px-4 py-3 border-b border-r">
+                                  {isEditing ? (
+                                    <Input
+                                      value={editDraft.campAr}
+                                      onChange={(e) => setEditDraft((p) => ({ ...p, campAr: e.target.value }))}
+                                      className="h-9"
+                                    />
+                                  ) : (
+                                    b.campAr
+                                  )}
+                                </td>
+
+                                {/* Priority */}
                                 <td className="px-4 py-3 border-b border-r">
                                   {isEditing ? (
                                     <select
-                                      value={editDraft.fillStatus}
+                                      value={editDraft.priority}
                                       onChange={(e) =>
                                         setEditDraft((p) => ({
                                           ...p,
-                                          fillStatus: e.target.value as FillStatus,
+                                          priority: e.target.value as Priority,
                                         }))
                                       }
                                       className="h-9 rounded-md border px-3 bg-background"
                                     >
-                                      <option value="Full">Full</option>
-                                      <option value="Not Full">Not Full</option>
+                                      <option value="عادي">عادي</option>
+                                      <option value="مستعجل">مستعجل</option>
+                                      <option value="حرج">حرج</option>
                                     </select>
                                   ) : (
-                                    <select
-                                      value={currentStatus}
-                                      onChange={(e) =>
-                                        setStatusPick((prev) => ({
-                                          ...prev,
-                                          [c.id]: e.target.value as FillStatus,
-                                        }))
-                                      }
-                                      className="h-9 rounded-md border px-3 bg-background"
+                                    <span
+                                      className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold ${priorityBadgeClass(
+                                        showPriority
+                                      )}`}
                                     >
-                                      <option value="Full">Full</option>
-                                      <option value="Not Full">Not Full</option>
-                                    </select>
+                                      {showPriority}
+                                    </span>
                                   )}
                                 </td>
 
+                                {/* Actions */}
                                 <td className="px-4 py-3 border-b">
                                   <div className="flex items-center gap-2">
                                     {!isEditing ? (
@@ -456,8 +497,8 @@ export default function CampsPage() {
                                         <button
                                           type="button"
                                           className="inline-flex items-center justify-center rounded-md border h-9 w-9 hover:bg-muted"
+                                          onClick={() => startEditRow(b)}
                                           title="Edit"
-                                          onClick={() => startEditRow(c)}
                                         >
                                           <Pencil className="size-4" />
                                         </button>
@@ -465,8 +506,8 @@ export default function CampsPage() {
                                         <button
                                           type="button"
                                           className="inline-flex items-center justify-center rounded-md border h-9 w-9 hover:bg-muted"
+                                          onClick={() => onDeleteOne(b.id)}
                                           title="Delete"
-                                          onClick={() => onDeleteOne(c.id)}
                                         >
                                           <Trash2 className="size-4" />
                                         </button>
@@ -476,8 +517,8 @@ export default function CampsPage() {
                                         <Button
                                           size="sm"
                                           className="h-9 bg-black text-white hover:bg-black/90"
-                                          onClick={() => saveEditRow(c.id)}
-                                          disabled={!Number.isInteger(editDraft.capacity) || editDraft.capacity <= 0}
+                                          onClick={() => saveEditRow(b.id)}
+                                          disabled={!Number.isInteger(editDraft.familyCount) || editDraft.familyCount <= 0}
                                         >
                                           <Save className="size-4 me-2" />
                                           Save
@@ -497,8 +538,8 @@ export default function CampsPage() {
 
                           {!pageItems.length && (
                             <tr>
-                              <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
-                                No camps found
+                              <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                                No beneficiaries found
                               </td>
                             </tr>
                           )}
@@ -538,47 +579,66 @@ export default function CampsPage() {
                 </CardContent>
               </Card>
 
-              {/* Add Camp Dialog */}
+              {/* Add Beneficiary Dialog */}
               <Dialog open={addOpen} onOpenChange={setAddOpen}>
-                <DialogContent className="sm:max-w-[560px]">
+                <DialogContent className="sm:max-w-[640px]">
                   <DialogHeader dir="rtl" className="text-right">
-                    <DialogTitle>إضافة مخيم</DialogTitle>
-                    <DialogDescription>إدخال بيانات المخيم</DialogDescription>
+                    <DialogTitle>إضافة مستفيد</DialogTitle>
+                    <DialogDescription>إدخال بيانات المستفيد</DialogDescription>
                   </DialogHeader>
 
                   <div dir="rtl" className="grid gap-3">
                     <div className="grid gap-2">
-                      <div className="text-sm">اسم المخيم</div>
-                      <Input value={nameAr} onChange={(e) => setNameAr(e.target.value)} placeholder="مثال: مخيم الشمال A" />
+                      <div className="text-sm">اسم المستفيد</div>
+                      <Input value={nameAr} onChange={(e) => setNameAr(e.target.value)} placeholder="مثال: أحمد محمد" />
                     </div>
 
                     <div className="grid gap-2">
-                      <div className="text-sm">المنطقة</div>
-                      <Input value={areaAr} onChange={(e) => setAreaAr(e.target.value)} placeholder="مثال: شمال غزة" />
+                      <div className="text-sm">رقم الهاتف</div>
+                      <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+970-..." />
                     </div>
 
                     <div className="grid gap-2">
-                      <div className="text-sm">السعة</div>
+                      <div className="text-sm">عدد أفراد الأسرة</div>
                       <Input
                         inputMode="numeric"
                         pattern="[0-9]*"
                         type="text"
-                        value={capacity ? String(capacity) : ''}
-                        onChange={(e) => setCapacity(toIntOnly(e.target.value))}
-                        placeholder="مثال: 1500"
+                        value={familyCount ? String(familyCount) : ''}
+                        onChange={(e) => setFamilyCount(toIntOnly(e.target.value))}
+                        placeholder="مثال: 6"
                       />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <div className="text-sm">المخيم</div>
+                      <Input value={campAr} onChange={(e) => setCampAr(e.target.value)} placeholder="مثال: مخيم الوسط B" />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <div className="text-sm">الأولوية</div>
+                      <select
+                        value={priority}
+                        onChange={(e) => setPriority(e.target.value as Priority)}
+                        className="h-11 rounded-md border bg-background px-3 text-sm"
+                      >
+                        <option value="عادي">عادي</option>
+                        <option value="مستعجل">مستعجل</option>
+                        <option value="حرج">حرج</option>
+                      </select>
                     </div>
                   </div>
 
                   <DialogFooter dir="rtl" className="gap-2">
-                    <Button variant="outline" onClick={() => setAddOpen(false)}>إغلاق</Button>
-                    <Button onClick={onAdd} disabled={!Number.isInteger(capacity) || capacity <= 0}>
+                    <Button variant="outline" onClick={() => setAddOpen(false)}>
+                      إغلاق
+                    </Button>
+                    <Button onClick={onAdd} disabled={!Number.isInteger(familyCount) || familyCount <= 0}>
                       إضافة
                     </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-
             </div>
           </div>
         </main>
