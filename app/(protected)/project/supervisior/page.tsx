@@ -1,10 +1,10 @@
 'use client'
 
-import { useMemo, useState, type ChangeEvent } from 'react'
+import {useMemo, useState, type ChangeEvent} from 'react'
 
-import { Card, CardContent } from '../../../../components/ui/card'
-import { Button } from '../../../../components/ui/button'
-import { Input } from '../../../../components/ui/input'
+import {Card, CardContent} from '../../../../components/ui/card'
+import {Button} from '../../../../components/ui/button'
+import {Input} from '../../../../components/ui/input'
 
 import {
   Dialog,
@@ -15,68 +15,29 @@ import {
   DialogFooter,
 } from '../../../../components/ui/dialog'
 
-import { Pencil, Trash2, Save, X, Plus, Search } from 'lucide-react'
+import {Pencil, Trash2, Save, X, Plus, Search} from 'lucide-react'
 
-type Camp = {
+type Supervisor = {
   id: string
   nameAr: string
-  nameEn: string
-  areaAr: string
-  familiesCount: number
-  capacity: number
-  status: 'نشط' | 'مؤقت' | 'مغلق'
+  phone: string
+  status: 'نشط' | 'موقوف'
 }
 
-const campsSeed: Camp[] = [
-  {
-    id: 'cp_01',
-    nameAr: 'مخيم الشمال A',
-    nameEn: 'North Camp A',
-    areaAr: 'شمال غزة',
-    familiesCount: 320,
-    capacity: 2000,
-    status: 'نشط',
-  },
-  {
-    id: 'cp_02',
-    nameAr: 'مخيم الوسط B',
-    nameEn: 'Middle Camp B',
-    areaAr: 'الوسطى',
-    familiesCount: 210,
-    capacity: 1400,
-    status: 'مؤقت',
-  },
-  {
-    id: 'cp_03',
-    nameAr: 'مخيم الجنوب C',
-    nameEn: 'South Camp C',
-    areaAr: 'خانيونس',
-    familiesCount: 120,
-    capacity: 900,
-    status: 'نشط',
-  },
+const supervisorsSeed: Supervisor[] = [
+  {id: 'sp_01', nameAr: 'أحمد محمد', phone: '0599123456', status: 'نشط'},
+  {id: 'sp_02', nameAr: 'سارة علي', phone: '0569876543', status: 'نشط'},
+  {id: 'sp_03', nameAr: 'محمود حسن', phone: '0599001122', status: 'موقوف'},
 ]
 
-type FillStatus = 'Full' | 'Not Full'
+const normalizePhone = (value: string) => value.replace(/[^\d+]/g, '')
 
-const defaultFillStatus = (families: number, capacity: number): FillStatus =>
-  families >= capacity ? 'Full' : 'Not Full'
-
-// ✅ أرقام صحيحة فقط
-const toIntOnly = (value: string) => {
-  const digits = value.replace(/\D/g, '')
-  return digits ? Number(digits) : 0
-}
-
-export default function CampsPage() {
+export default function SupervisorsPage() {
   const [q, setQ] = useState('')
-  const [items, setItems] = useState<Camp[]>(campsSeed)
+  const [items, setItems] = useState<Supervisor[]>(supervisorsSeed)
 
-  // فلترة status (Full / Not Full) من فوق
-  const [statusFilter, setStatusFilter] = useState<'all' | 'full' | 'notfull'>('all')
-
-  // اختيار status لكل صف
-  const [statusPick, setStatusPick] = useState<Record<string, FillStatus>>({})
+  // فلترة status من فوق
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'blocked'>('all')
 
   // Pagination
   const [page, setPage] = useState(1)
@@ -85,47 +46,41 @@ export default function CampsPage() {
   // Add dialog
   const [addOpen, setAddOpen] = useState(false)
   const [nameAr, setNameAr] = useState('')
-  const [areaAr, setAreaAr] = useState('')
-  const [capacity, setCapacity] = useState<number>(0)
+  const [phone, setPhone] = useState('')
+  const [status, setStatus] = useState<Supervisor['status']>('نشط')
 
   // Inline Edit
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<{
     nameAr: string
-    areaAr: string
-    capacity: number
-    fillStatus: FillStatus
+    phone: string
+    status: Supervisor['status']
   }>({
     nameAr: '',
-    areaAr: '',
-    capacity: 1,
-    fillStatus: 'Not Full',
+    phone: '',
+    status: 'نشط',
   })
 
-  // ✅ فلترة search + فلترة status
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
 
-    return items.filter((c) => {
+    return items.filter((sp) => {
       const matchSearch =
         !s ||
-        c.nameEn.toLowerCase().includes(s) ||
-        c.nameAr.includes(q) ||
-        c.areaAr.includes(q)
-
-      const rowStatus: FillStatus =
-        statusPick[c.id] ?? defaultFillStatus(c.familiesCount, c.capacity)
+        sp.id.toLowerCase().includes(s) ||
+        sp.nameAr.includes(q) ||
+        sp.phone.includes(q)
 
       const matchStatus =
         statusFilter === 'all'
           ? true
-          : statusFilter === 'full'
-            ? rowStatus === 'Full'
-            : rowStatus === 'Not Full'
+          : statusFilter === 'active'
+            ? sp.status === 'نشط'
+            : sp.status === 'موقوف'
 
       return matchSearch && matchStatus
     })
-  }, [q, items, statusFilter, statusPick])
+  }, [q, items, statusFilter])
 
   useMemo(() => {
     setPage(1)
@@ -141,47 +96,34 @@ export default function CampsPage() {
 
   const onAdd = () => {
     const ar = nameAr.trim()
-    const area = areaAr.trim()
-    if (!ar || !area || !Number.isInteger(capacity) || capacity <= 0) return
+    const ph = normalizePhone(phone.trim())
+    if (!ar || !ph) return
 
-    const newItem: Camp = {
-      id: `cp_${Math.random().toString(16).slice(2, 8)}`,
+    const newItem: Supervisor = {
+      id: `sp_${Math.random().toString(16).slice(2, 8)}`,
       nameAr: ar,
-      nameEn: ar,
-      areaAr: area,
-      familiesCount: 0,
-      capacity,
-      status: 'مؤقت',
+      phone: ph,
+      status,
     }
 
     setItems((prev) => [newItem, ...prev])
     setNameAr('')
-    setAreaAr('')
-    setCapacity(0)
+    setPhone('')
+    setStatus('نشط')
     setAddOpen(false)
   }
 
   const onDeleteOne = (id: string) => {
     if (editingId === id) setEditingId(null)
-
     setItems((prev) => prev.filter((x) => x.id !== id))
-    setStatusPick((prev) => {
-      const next = { ...prev }
-      delete next[id]
-      return next
-    })
   }
 
-  const startEditRow = (c: Camp) => {
-    const currentStatus: FillStatus =
-      statusPick[c.id] ?? defaultFillStatus(c.familiesCount, c.capacity)
-
-    setEditingId(c.id)
+  const startEditRow = (sp: Supervisor) => {
+    setEditingId(sp.id)
     setEditDraft({
-      nameAr: c.nameAr,
-      areaAr: c.areaAr,
-      capacity: c.capacity,
-      fillStatus: currentStatus,
+      nameAr: sp.nameAr,
+      phone: sp.phone,
+      status: sp.status,
     })
   }
 
@@ -189,29 +131,25 @@ export default function CampsPage() {
 
   const saveEditRow = (id: string) => {
     const ar = editDraft.nameAr.trim()
-    const area = editDraft.areaAr.trim()
-
-    if (!ar || !area || !Number.isInteger(editDraft.capacity) || editDraft.capacity <= 0) return
+    const ph = normalizePhone(editDraft.phone.trim())
+    if (!ar || !ph) return
 
     setItems((prev) =>
-      prev.map((c) =>
-        c.id === id
+      prev.map((sp) =>
+        sp.id === id
           ? {
-              ...c,
+              ...sp,
               nameAr: ar,
-              nameEn: ar,
-              areaAr: area,
-              capacity: editDraft.capacity,
+              phone: ph,
+              status: editDraft.status,
             }
-          : c
+          : sp
       )
     )
 
-    setStatusPick((prev) => ({ ...prev, [id]: editDraft.fillStatus }))
     setEditingId(null)
   }
 
-  // Pagination label: "1 - 10 of N"
   const rangeStart = filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1
   const rangeEnd = Math.min(safePage * pageSize, filtered.length)
 
@@ -220,11 +158,11 @@ export default function CampsPage() {
       {/* Header */}
       <div className="mb-6" dir="ltr">
         <div className="text-left">
-          <div className="text-2xl font-semibold text-foreground">Camps</div>
+          <div className="text-2xl font-semibold text-foreground">Supervisors</div>
 
           <div className="mt-1 text-sm text-muted-foreground">
             Home <span className="mx-1">{'>'}</span>{' '}
-            <span className="text-foreground">Camps Management</span>
+            <span className="text-foreground">Supervisors Management</span>
           </div>
         </div>
       </div>
@@ -237,47 +175,44 @@ export default function CampsPage() {
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 {/* Left */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  {/* ✅ Search مطابق Users (نفس الشكل تمامًا) */}
+                  {/* Search */}
                   <div className="relative w-full sm:w-[260px]">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Input
                       value={q}
                       onChange={(e: ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
-                      placeholder="Search camps"
+                      placeholder="Search supervisors"
                       className="!h-10 !rounded-lg border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:!ring-2 focus:!ring-slate-200"
                     />
                   </div>
 
-                  {/* ✅ Select مطابق Users (نفس height/radius/border) */}
+                  {/* Status Filter */}
                   <select
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as 'all' | 'full' | 'notfull')}
+                    onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'blocked')}
                     className="h-10 w-full sm:w-[160px] rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
                   >
                     <option value="all">All status</option>
-                    <option value="full">Full</option>
-                    <option value="notfull">Not Full</option>
+                    <option value="active">Active</option>
+                    <option value="blocked">Blocked</option>
                   </select>
                 </div>
 
                 {/* Right */}
                 <div className="flex items-center gap-2 justify-end">
-                  {/* ✅ زر Add camp مطابق Add user تمامًا */}
                   <Button
                     className="!h-10 !rounded-lg !bg-blue-600 !px-4 !text-sm !font-semibold !text-white hover:!bg-blue-700 inline-flex items-center gap-2"
                     onClick={() => setAddOpen(true)}
                   >
                     <Plus className="h-4 w-4" />
-                    Add camp
+                    Add supervisor
                   </Button>
 
-                  {/* زر Delete all (outline بنفس مقاسات Users) */}
                   <Button
                     variant="outline"
                     className="!h-10 !rounded-lg !px-4 !text-sm !font-semibold border-slate-200 text-slate-700 hover:bg-slate-50"
                     onClick={() => {
                       setItems([])
-                      setStatusPick({})
                       setEditingId(null)
                     }}
                   >
@@ -292,7 +227,7 @@ export default function CampsPage() {
             {/* Table */}
             <div className="rounded-b-lg overflow-hidden">
               <div className="w-full overflow-x-auto">
-                <table className="w-full text-sm border-collapse min-w-[820px]">
+                <table className="w-full text-sm border-collapse min-w-[920px]">
                   <thead
                     style={{
                       backgroundColor: '#F9FAFB',
@@ -300,95 +235,68 @@ export default function CampsPage() {
                     }}
                   >
                     <tr className="text-left text-foreground/60">
-                      <th className="px-4 py-3 border-b border-r font-normal">Camp Name</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Area</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Capacity</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">Supervisor</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">Phone</th>
                       <th className="px-4 py-3 border-b border-r font-normal">Status</th>
                       <th className="px-4 py-3 border-b font-normal">Actions</th>
                     </tr>
                   </thead>
 
                   <tbody>
-                    {pageItems.map((c) => {
-                      const isEditing = editingId === c.id
-                      const currentStatus: FillStatus =
-                        statusPick[c.id] ?? defaultFillStatus(c.familiesCount, c.capacity)
-
+                    {pageItems.map((sp) => {
+                      const isEditing = editingId === sp.id
                       return (
-                        <tr key={c.id} className="hover:bg-muted/30">
+                        <tr key={sp.id} className="hover:bg-muted/30">
                           <td className="px-4 py-3 border-b border-r font-medium">
+                            {/* نفس نمط Users: الاسم + id تحت */}
                             {isEditing ? (
                               <Input
                                 value={editDraft.nameAr}
-                                onChange={(e) => setEditDraft((p) => ({ ...p, nameAr: e.target.value }))}
+                                onChange={(e) => setEditDraft((p) => ({...p, nameAr: e.target.value}))}
                                 className="h-9"
                               />
                             ) : (
-                              c.nameAr
+                              <div className="flex flex-col">
+                                <span className="font-medium text-foreground">{sp.nameAr}</span>
+                                <span className="text-xs text-muted-foreground">{sp.id}</span>
+                              </div>
                             )}
                           </td>
 
                           <td className="px-4 py-3 border-b border-r">
                             {isEditing ? (
                               <Input
-                                value={editDraft.areaAr}
-                                onChange={(e) => setEditDraft((p) => ({ ...p, areaAr: e.target.value }))}
+                                value={editDraft.phone}
+                                onChange={(e) => setEditDraft((p) => ({...p, phone: normalizePhone(e.target.value)}))}
                                 className="h-9"
                               />
                             ) : (
-                              c.areaAr
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3 border-b border-r">
-                            {isEditing ? (
-                              <Input
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                type="text"
-                                value={editDraft.capacity ? String(editDraft.capacity) : ''}
-                                onChange={(e) =>
-                                  setEditDraft((p) => ({
-                                    ...p,
-                                    capacity: toIntOnly(e.target.value),
-                                  }))
-                                }
-                                className="h-9"
-                              />
-                            ) : (
-                              c.capacity
+                              sp.phone
                             )}
                           </td>
 
                           <td className="px-4 py-3 border-b border-r">
                             {isEditing ? (
                               <select
-                                value={editDraft.fillStatus}
+                                value={editDraft.status}
                                 onChange={(e) =>
-                                  setEditDraft((p) => ({
-                                    ...p,
-                                    fillStatus: e.target.value as FillStatus,
-                                  }))
+                                  setEditDraft((p) => ({...p, status: e.target.value as Supervisor['status']}))
                                 }
                                 className="h-9 rounded-md border px-3 bg-background"
                               >
-                                <option value="Full">Full</option>
-                                <option value="Not Full">Not Full</option>
+                                <option value="نشط">نشط</option>
+                                <option value="موقوف">موقوف</option>
                               </select>
                             ) : (
-                              <select
-                                value={currentStatus}
-                                onChange={(e) =>
-                                  setStatusPick((prev) => ({
-                                    ...prev,
-                                    [c.id]: e.target.value as FillStatus,
-                                  }))
+                              <span
+                                className={
+                                  sp.status === 'نشط'
+                                    ? 'inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700'
+                                    : 'inline-flex rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700'
                                 }
-                                className="h-9 rounded-md border px-3 bg-background"
                               >
-                                <option value="Full">Full</option>
-                                <option value="Not Full">Not Full</option>
-                              </select>
+                                {sp.status}
+                              </span>
                             )}
                           </td>
 
@@ -400,7 +308,7 @@ export default function CampsPage() {
                                     type="button"
                                     className="inline-flex items-center justify-center rounded-md border h-10 w-10 hover:bg-muted"
                                     title="Edit"
-                                    onClick={() => startEditRow(c)}
+                                    onClick={() => startEditRow(sp)}
                                   >
                                     <Pencil className="size-4" />
                                   </button>
@@ -409,19 +317,14 @@ export default function CampsPage() {
                                     type="button"
                                     className="inline-flex items-center justify-center rounded-md border h-10 w-10 hover:bg-muted"
                                     title="Delete"
-                                    onClick={() => onDeleteOne(c.id)}
+                                    onClick={() => onDeleteOne(sp.id)}
                                   >
                                     <Trash2 className="size-4" />
                                   </button>
                                 </>
                               ) : (
                                 <>
-                                  <Button
-                                    size="sm"
-                                    className="h-10"
-                                    onClick={() => saveEditRow(c.id)}
-                                    disabled={!Number.isInteger(editDraft.capacity) || editDraft.capacity <= 0}
-                                  >
+                                  <Button size="sm" className="h-10" onClick={() => saveEditRow(sp.id)}>
                                     <Save className="size-4 me-2" />
                                     Save
                                   </Button>
@@ -440,8 +343,8 @@ export default function CampsPage() {
 
                     {!pageItems.length && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
-                          No camps found
+                        <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
+                          No supervisors found
                         </td>
                       </tr>
                     )}
@@ -492,35 +395,35 @@ export default function CampsPage() {
           </CardContent>
         </Card>
 
-        {/* Add Camp Dialog */}
+        {/* Add Supervisor Dialog */}
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogContent className="sm:max-w-[560px]">
             <DialogHeader dir="rtl" className="text-right">
-              <DialogTitle>إضافة مخيم</DialogTitle>
-              <DialogDescription>إدخال بيانات المخيم</DialogDescription>
+              <DialogTitle>إضافة مشرف</DialogTitle>
+              <DialogDescription>إدخال بيانات المشرف</DialogDescription>
             </DialogHeader>
 
             <div dir="rtl" className="grid gap-3">
               <div className="grid gap-2">
-                <div className="text-sm">اسم المخيم</div>
-                <Input value={nameAr} onChange={(e) => setNameAr(e.target.value)} placeholder="مثال: مخيم الشمال A" />
+                <div className="text-sm">اسم المشرف</div>
+                <Input value={nameAr} onChange={(e) => setNameAr(e.target.value)} placeholder="مثال: أحمد محمد" />
               </div>
 
               <div className="grid gap-2">
-                <div className="text-sm">المنطقة</div>
-                <Input value={areaAr} onChange={(e) => setAreaAr(e.target.value)} placeholder="مثال: شمال غزة" />
+                <div className="text-sm">رقم الجوال</div>
+                <Input value={phone} onChange={(e) => setPhone(normalizePhone(e.target.value))} placeholder="مثال: 0599123456" />
               </div>
 
               <div className="grid gap-2">
-                <div className="text-sm">السعة</div>
-                <Input
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  type="text"
-                  value={capacity ? String(capacity) : ''}
-                  onChange={(e) => setCapacity(toIntOnly(e.target.value))}
-                  placeholder="مثال: 1500"
-                />
+                <div className="text-sm">الحالة</div>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as Supervisor['status'])}
+                  className="h-10 rounded-md border px-3 bg-background"
+                >
+                  <option value="نشط">نشط</option>
+                  <option value="موقوف">موقوف</option>
+                </select>
               </div>
             </div>
 
@@ -528,7 +431,7 @@ export default function CampsPage() {
               <Button variant="outline" onClick={() => setAddOpen(false)}>
                 إغلاق
               </Button>
-              <Button onClick={onAdd} disabled={!Number.isInteger(capacity) || capacity <= 0}>
+              <Button onClick={onAdd} disabled={!nameAr.trim() || !phone.trim()}>
                 إضافة
               </Button>
             </DialogFooter>

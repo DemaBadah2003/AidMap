@@ -1,10 +1,10 @@
 'use client'
 
-import { useMemo, useState, type ChangeEvent } from 'react'
+import {useMemo, useState, type ChangeEvent} from 'react'
 
-import { Card, CardContent } from '../../../../components/ui/card'
-import { Button } from '../../../../components/ui/button'
-import { Input } from '../../../../components/ui/input'
+import {Card, CardContent} from '../../../../components/ui/card'
+import {Button} from '../../../../components/ui/button'
+import {Input} from '../../../../components/ui/input'
 
 import {
   Dialog,
@@ -15,68 +15,55 @@ import {
   DialogFooter,
 } from '../../../../components/ui/dialog'
 
-import { Pencil, Trash2, Save, X, Plus, Search } from 'lucide-react'
+import {Pencil, Trash2, Save, X, Plus, Search} from 'lucide-react'
 
-type Camp = {
+type PresenceStatus = 'متاح' | 'مشغول' | 'غير متاح'
+
+type Institution = {
   id: string
+  instagramId: string
   nameAr: string
-  nameEn: string
-  areaAr: string
-  familiesCount: number
-  capacity: number
-  status: 'نشط' | 'مؤقت' | 'مغلق'
+  email: string
+  serviceType: string
+  presence: PresenceStatus
 }
 
-const campsSeed: Camp[] = [
+const institutionsSeed: Institution[] = [
   {
-    id: 'cp_01',
-    nameAr: 'مخيم الشمال A',
-    nameEn: 'North Camp A',
-    areaAr: 'شمال غزة',
-    familiesCount: 320,
-    capacity: 2000,
-    status: 'نشط',
+    id: 'ins_01',
+    instagramId: 'inst_redcrescent',
+    nameAr: 'الهلال الأحمر',
+    email: 'info@redcrescent.org',
+    serviceType: 'إغاثة',
+    presence: 'متاح',
   },
   {
-    id: 'cp_02',
-    nameAr: 'مخيم الوسط B',
-    nameEn: 'Middle Camp B',
-    areaAr: 'الوسطى',
-    familiesCount: 210,
-    capacity: 1400,
-    status: 'مؤقت',
+    id: 'ins_02',
+    instagramId: 'inst_unicef',
+    nameAr: 'يونيسف',
+    email: 'contact@unicef.org',
+    serviceType: 'دعم نفسي',
+    presence: 'مشغول',
   },
   {
-    id: 'cp_03',
-    nameAr: 'مخيم الجنوب C',
-    nameEn: 'South Camp C',
-    areaAr: 'خانيونس',
-    familiesCount: 120,
-    capacity: 900,
-    status: 'نشط',
+    id: 'ins_03',
+    instagramId: 'inst_wfp',
+    nameAr: 'برنامج الغذاء العالمي',
+    email: 'support@wfp.org',
+    serviceType: 'مساعدات غذائية',
+    presence: 'غير متاح',
   },
 ]
 
-type FillStatus = 'Full' | 'Not Full'
+const normalizeInstagram = (v: string) => v.trim().replace(/\s+/g, '_')
+const normalizeEmail = (v: string) => v.trim()
 
-const defaultFillStatus = (families: number, capacity: number): FillStatus =>
-  families >= capacity ? 'Full' : 'Not Full'
-
-// ✅ أرقام صحيحة فقط
-const toIntOnly = (value: string) => {
-  const digits = value.replace(/\D/g, '')
-  return digits ? Number(digits) : 0
-}
-
-export default function CampsPage() {
+export default function InstitutionsPage() {
   const [q, setQ] = useState('')
-  const [items, setItems] = useState<Camp[]>(campsSeed)
+  const [items, setItems] = useState<Institution[]>(institutionsSeed)
 
-  // فلترة status (Full / Not Full) من فوق
-  const [statusFilter, setStatusFilter] = useState<'all' | 'full' | 'notfull'>('all')
-
-  // اختيار status لكل صف
-  const [statusPick, setStatusPick] = useState<Record<string, FillStatus>>({})
+  // فلترة presence من فوق
+  const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'busy' | 'unavailable'>('all')
 
   // Pagination
   const [page, setPage] = useState(1)
@@ -84,48 +71,52 @@ export default function CampsPage() {
 
   // Add dialog
   const [addOpen, setAddOpen] = useState(false)
+  const [instagramId, setInstagramId] = useState('')
   const [nameAr, setNameAr] = useState('')
-  const [areaAr, setAreaAr] = useState('')
-  const [capacity, setCapacity] = useState<number>(0)
+  const [email, setEmail] = useState('')
+  const [serviceType, setServiceType] = useState('')
+  const [presence, setPresence] = useState<PresenceStatus>('متاح')
 
   // Inline Edit
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<{
+    instagramId: string
     nameAr: string
-    areaAr: string
-    capacity: number
-    fillStatus: FillStatus
+    email: string
+    serviceType: string
+    presence: PresenceStatus
   }>({
+    instagramId: '',
     nameAr: '',
-    areaAr: '',
-    capacity: 1,
-    fillStatus: 'Not Full',
+    email: '',
+    serviceType: '',
+    presence: 'متاح',
   })
 
-  // ✅ فلترة search + فلترة status
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
 
-    return items.filter((c) => {
+    return items.filter((ins) => {
       const matchSearch =
         !s ||
-        c.nameEn.toLowerCase().includes(s) ||
-        c.nameAr.includes(q) ||
-        c.areaAr.includes(q)
-
-      const rowStatus: FillStatus =
-        statusPick[c.id] ?? defaultFillStatus(c.familiesCount, c.capacity)
+        ins.id.toLowerCase().includes(s) ||
+        ins.instagramId.toLowerCase().includes(s) ||
+        ins.nameAr.includes(q) ||
+        ins.email.toLowerCase().includes(s) ||
+        ins.serviceType.includes(q)
 
       const matchStatus =
         statusFilter === 'all'
           ? true
-          : statusFilter === 'full'
-            ? rowStatus === 'Full'
-            : rowStatus === 'Not Full'
+          : statusFilter === 'available'
+            ? ins.presence === 'متاح'
+            : statusFilter === 'busy'
+              ? ins.presence === 'مشغول'
+              : ins.presence === 'غير متاح'
 
       return matchSearch && matchStatus
     })
-  }, [q, items, statusFilter, statusPick])
+  }, [q, items, statusFilter])
 
   useMemo(() => {
     setPage(1)
@@ -140,91 +131,95 @@ export default function CampsPage() {
   }, [filtered, safePage, pageSize])
 
   const onAdd = () => {
+    const inst = normalizeInstagram(instagramId)
     const ar = nameAr.trim()
-    const area = areaAr.trim()
-    if (!ar || !area || !Number.isInteger(capacity) || capacity <= 0) return
+    const em = normalizeEmail(email)
+    const st = serviceType.trim()
 
-    const newItem: Camp = {
-      id: `cp_${Math.random().toString(16).slice(2, 8)}`,
+    if (!inst || !ar || !em || !st) return
+
+    const newItem: Institution = {
+      id: `ins_${Math.random().toString(16).slice(2, 8)}`,
+      instagramId: inst,
       nameAr: ar,
-      nameEn: ar,
-      areaAr: area,
-      familiesCount: 0,
-      capacity,
-      status: 'مؤقت',
+      email: em,
+      serviceType: st,
+      presence,
     }
 
     setItems((prev) => [newItem, ...prev])
+    setInstagramId('')
     setNameAr('')
-    setAreaAr('')
-    setCapacity(0)
+    setEmail('')
+    setServiceType('')
+    setPresence('متاح')
     setAddOpen(false)
   }
 
   const onDeleteOne = (id: string) => {
     if (editingId === id) setEditingId(null)
-
     setItems((prev) => prev.filter((x) => x.id !== id))
-    setStatusPick((prev) => {
-      const next = { ...prev }
-      delete next[id]
-      return next
-    })
   }
 
-  const startEditRow = (c: Camp) => {
-    const currentStatus: FillStatus =
-      statusPick[c.id] ?? defaultFillStatus(c.familiesCount, c.capacity)
-
-    setEditingId(c.id)
+  const startEditRow = (ins: Institution) => {
+    setEditingId(ins.id)
     setEditDraft({
-      nameAr: c.nameAr,
-      areaAr: c.areaAr,
-      capacity: c.capacity,
-      fillStatus: currentStatus,
+      instagramId: ins.instagramId,
+      nameAr: ins.nameAr,
+      email: ins.email,
+      serviceType: ins.serviceType,
+      presence: ins.presence,
     })
   }
 
   const cancelEditRow = () => setEditingId(null)
 
   const saveEditRow = (id: string) => {
+    const inst = normalizeInstagram(editDraft.instagramId)
     const ar = editDraft.nameAr.trim()
-    const area = editDraft.areaAr.trim()
+    const em = normalizeEmail(editDraft.email)
+    const st = editDraft.serviceType.trim()
 
-    if (!ar || !area || !Number.isInteger(editDraft.capacity) || editDraft.capacity <= 0) return
+    if (!inst || !ar || !em || !st) return
 
     setItems((prev) =>
-      prev.map((c) =>
-        c.id === id
+      prev.map((ins) =>
+        ins.id === id
           ? {
-              ...c,
+              ...ins,
+              instagramId: inst,
               nameAr: ar,
-              nameEn: ar,
-              areaAr: area,
-              capacity: editDraft.capacity,
+              email: em,
+              serviceType: st,
+              presence: editDraft.presence,
             }
-          : c
+          : ins
       )
     )
 
-    setStatusPick((prev) => ({ ...prev, [id]: editDraft.fillStatus }))
     setEditingId(null)
   }
 
-  // Pagination label: "1 - 10 of N"
   const rangeStart = filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1
   const rangeEnd = Math.min(safePage * pageSize, filtered.length)
+
+  const presenceBadgeClass = (p: PresenceStatus) =>
+    p === 'متاح'
+      ? 'bg-emerald-50 text-emerald-700'
+      : p === 'مشغول'
+        ? 'bg-amber-50 text-amber-700'
+        : 'bg-red-50 text-red-700'
 
   return (
     <div className="w-full px-3 sm:px-6 py-6" dir="rtl">
       {/* Header */}
       <div className="mb-6" dir="ltr">
         <div className="text-left">
-          <div className="text-2xl font-semibold text-foreground">Camps</div>
+          <div className="text-2xl font-semibold text-foreground">Institutions</div>
 
           <div className="mt-1 text-sm text-muted-foreground">
             Home <span className="mx-1">{'>'}</span>{' '}
-            <span className="text-foreground">Camps Management</span>
+            <span className="text-foreground">Institutions Management</span>
           </div>
         </div>
       </div>
@@ -237,47 +232,45 @@ export default function CampsPage() {
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 {/* Left */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  {/* ✅ Search مطابق Users (نفس الشكل تمامًا) */}
+                  {/* Search */}
                   <div className="relative w-full sm:w-[260px]">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Input
                       value={q}
                       onChange={(e: ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
-                      placeholder="Search camps"
+                      placeholder="Search institutions"
                       className="!h-10 !rounded-lg border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:!ring-2 focus:!ring-slate-200"
                     />
                   </div>
 
-                  {/* ✅ Select مطابق Users (نفس height/radius/border) */}
+                  {/* Presence Filter */}
                   <select
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as 'all' | 'full' | 'notfull')}
+                    onChange={(e) => setStatusFilter(e.target.value as any)}
                     className="h-10 w-full sm:w-[160px] rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
                   >
                     <option value="all">All status</option>
-                    <option value="full">Full</option>
-                    <option value="notfull">Not Full</option>
+                    <option value="available">متاح</option>
+                    <option value="busy">مشغول</option>
+                    <option value="unavailable">غير متاح</option>
                   </select>
                 </div>
 
                 {/* Right */}
                 <div className="flex items-center gap-2 justify-end">
-                  {/* ✅ زر Add camp مطابق Add user تمامًا */}
                   <Button
                     className="!h-10 !rounded-lg !bg-blue-600 !px-4 !text-sm !font-semibold !text-white hover:!bg-blue-700 inline-flex items-center gap-2"
                     onClick={() => setAddOpen(true)}
                   >
                     <Plus className="h-4 w-4" />
-                    Add camp
+                    Add institution
                   </Button>
 
-                  {/* زر Delete all (outline بنفس مقاسات Users) */}
                   <Button
                     variant="outline"
                     className="!h-10 !rounded-lg !px-4 !text-sm !font-semibold border-slate-200 text-slate-700 hover:bg-slate-50"
                     onClick={() => {
                       setItems([])
-                      setStatusPick({})
                       setEditingId(null)
                     }}
                   >
@@ -292,7 +285,7 @@ export default function CampsPage() {
             {/* Table */}
             <div className="rounded-b-lg overflow-hidden">
               <div className="w-full overflow-x-auto">
-                <table className="w-full text-sm border-collapse min-w-[820px]">
+                <table className="w-full text-sm border-collapse min-w-[1100px]">
                   <thead
                     style={{
                       backgroundColor: '#F9FAFB',
@@ -300,95 +293,91 @@ export default function CampsPage() {
                     }}
                   >
                     <tr className="text-left text-foreground/60">
-                      <th className="px-4 py-3 border-b border-r font-normal">Camp Name</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Area</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Capacity</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Status</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">Institution</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">Instagram ID</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">Email</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">Service Type</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">Presence</th>
                       <th className="px-4 py-3 border-b font-normal">Actions</th>
                     </tr>
                   </thead>
 
                   <tbody>
-                    {pageItems.map((c) => {
-                      const isEditing = editingId === c.id
-                      const currentStatus: FillStatus =
-                        statusPick[c.id] ?? defaultFillStatus(c.familiesCount, c.capacity)
+                    {pageItems.map((ins) => {
+                      const isEditing = editingId === ins.id
 
                       return (
-                        <tr key={c.id} className="hover:bg-muted/30">
+                        <tr key={ins.id} className="hover:bg-muted/30">
                           <td className="px-4 py-3 border-b border-r font-medium">
                             {isEditing ? (
                               <Input
                                 value={editDraft.nameAr}
-                                onChange={(e) => setEditDraft((p) => ({ ...p, nameAr: e.target.value }))}
+                                onChange={(e) => setEditDraft((p) => ({...p, nameAr: e.target.value}))}
                                 className="h-9"
                               />
                             ) : (
-                              c.nameAr
+                              <div className="flex flex-col">
+                                <span className="font-medium text-foreground">{ins.nameAr}</span>
+                                <span className="text-xs text-muted-foreground">{ins.id}</span>
+                              </div>
                             )}
                           </td>
 
                           <td className="px-4 py-3 border-b border-r">
                             {isEditing ? (
                               <Input
-                                value={editDraft.areaAr}
-                                onChange={(e) => setEditDraft((p) => ({ ...p, areaAr: e.target.value }))}
+                                value={editDraft.instagramId}
+                                onChange={(e) => setEditDraft((p) => ({...p, instagramId: e.target.value}))}
                                 className="h-9"
                               />
                             ) : (
-                              c.areaAr
+                              ins.instagramId
                             )}
                           </td>
 
                           <td className="px-4 py-3 border-b border-r">
                             {isEditing ? (
                               <Input
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                type="text"
-                                value={editDraft.capacity ? String(editDraft.capacity) : ''}
-                                onChange={(e) =>
-                                  setEditDraft((p) => ({
-                                    ...p,
-                                    capacity: toIntOnly(e.target.value),
-                                  }))
-                                }
+                                value={editDraft.email}
+                                onChange={(e) => setEditDraft((p) => ({...p, email: e.target.value}))}
                                 className="h-9"
                               />
                             ) : (
-                              c.capacity
+                              ins.email
+                            )}
+                          </td>
+
+                          <td className="px-4 py-3 border-b border-r">
+                            {isEditing ? (
+                              <Input
+                                value={editDraft.serviceType}
+                                onChange={(e) => setEditDraft((p) => ({...p, serviceType: e.target.value}))}
+                                className="h-9"
+                              />
+                            ) : (
+                              ins.serviceType
                             )}
                           </td>
 
                           <td className="px-4 py-3 border-b border-r">
                             {isEditing ? (
                               <select
-                                value={editDraft.fillStatus}
+                                value={editDraft.presence}
                                 onChange={(e) =>
-                                  setEditDraft((p) => ({
-                                    ...p,
-                                    fillStatus: e.target.value as FillStatus,
-                                  }))
+                                  setEditDraft((p) => ({...p, presence: e.target.value as PresenceStatus}))
                                 }
                                 className="h-9 rounded-md border px-3 bg-background"
                               >
-                                <option value="Full">Full</option>
-                                <option value="Not Full">Not Full</option>
+                                <option value="متاح">متاح</option>
+                                <option value="مشغول">مشغول</option>
+                                <option value="غير متاح">غير متاح</option>
                               </select>
                             ) : (
-                              <select
-                                value={currentStatus}
-                                onChange={(e) =>
-                                  setStatusPick((prev) => ({
-                                    ...prev,
-                                    [c.id]: e.target.value as FillStatus,
-                                  }))
-                                }
-                                className="h-9 rounded-md border px-3 bg-background"
+                              <span
+                                className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${presenceBadgeClass(ins.presence)}`}
                               >
-                                <option value="Full">Full</option>
-                                <option value="Not Full">Not Full</option>
-                              </select>
+                                {ins.presence}
+                              </span>
                             )}
                           </td>
 
@@ -400,7 +389,7 @@ export default function CampsPage() {
                                     type="button"
                                     className="inline-flex items-center justify-center rounded-md border h-10 w-10 hover:bg-muted"
                                     title="Edit"
-                                    onClick={() => startEditRow(c)}
+                                    onClick={() => startEditRow(ins)}
                                   >
                                     <Pencil className="size-4" />
                                   </button>
@@ -409,19 +398,14 @@ export default function CampsPage() {
                                     type="button"
                                     className="inline-flex items-center justify-center rounded-md border h-10 w-10 hover:bg-muted"
                                     title="Delete"
-                                    onClick={() => onDeleteOne(c.id)}
+                                    onClick={() => onDeleteOne(ins.id)}
                                   >
                                     <Trash2 className="size-4" />
                                   </button>
                                 </>
                               ) : (
                                 <>
-                                  <Button
-                                    size="sm"
-                                    className="h-10"
-                                    onClick={() => saveEditRow(c.id)}
-                                    disabled={!Number.isInteger(editDraft.capacity) || editDraft.capacity <= 0}
-                                  >
+                                  <Button size="sm" className="h-10" onClick={() => saveEditRow(ins.id)}>
                                     <Save className="size-4 me-2" />
                                     Save
                                   </Button>
@@ -440,8 +424,8 @@ export default function CampsPage() {
 
                     {!pageItems.length && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
-                          No camps found
+                        <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                          No institutions found
                         </td>
                       </tr>
                     )}
@@ -492,35 +476,46 @@ export default function CampsPage() {
           </CardContent>
         </Card>
 
-        {/* Add Camp Dialog */}
+        {/* Add Institution Dialog */}
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogContent className="sm:max-w-[560px]">
             <DialogHeader dir="rtl" className="text-right">
-              <DialogTitle>إضافة مخيم</DialogTitle>
-              <DialogDescription>إدخال بيانات المخيم</DialogDescription>
+              <DialogTitle>إضافة مؤسسة</DialogTitle>
+              <DialogDescription>إدخال بيانات المؤسسة</DialogDescription>
             </DialogHeader>
 
             <div dir="rtl" className="grid gap-3">
               <div className="grid gap-2">
-                <div className="text-sm">اسم المخيم</div>
-                <Input value={nameAr} onChange={(e) => setNameAr(e.target.value)} placeholder="مثال: مخيم الشمال A" />
+                <div className="text-sm">Instagram ID</div>
+                <Input value={instagramId} onChange={(e) => setInstagramId(e.target.value)} placeholder="مثال: inst_org" />
               </div>
 
               <div className="grid gap-2">
-                <div className="text-sm">المنطقة</div>
-                <Input value={areaAr} onChange={(e) => setAreaAr(e.target.value)} placeholder="مثال: شمال غزة" />
+                <div className="text-sm">اسم المؤسسة</div>
+                <Input value={nameAr} onChange={(e) => setNameAr(e.target.value)} placeholder="مثال: الهلال الأحمر" />
               </div>
 
               <div className="grid gap-2">
-                <div className="text-sm">السعة</div>
-                <Input
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  type="text"
-                  value={capacity ? String(capacity) : ''}
-                  onChange={(e) => setCapacity(toIntOnly(e.target.value))}
-                  placeholder="مثال: 1500"
-                />
+                <div className="text-sm">إيميل المؤسسة</div>
+                <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="مثال: info@org.com" />
+              </div>
+
+              <div className="grid gap-2">
+                <div className="text-sm">نوع الخدمة</div>
+                <Input value={serviceType} onChange={(e) => setServiceType(e.target.value)} placeholder="مثال: إغاثة" />
+              </div>
+
+              <div className="grid gap-2">
+                <div className="text-sm">حالة التواجد</div>
+                <select
+                  value={presence}
+                  onChange={(e) => setPresence(e.target.value as PresenceStatus)}
+                  className="h-10 rounded-md border px-3 bg-background"
+                >
+                  <option value="متاح">متاح</option>
+                  <option value="مشغول">مشغول</option>
+                  <option value="غير متاح">غير متاح</option>
+                </select>
               </div>
             </div>
 
@@ -528,7 +523,10 @@ export default function CampsPage() {
               <Button variant="outline" onClick={() => setAddOpen(false)}>
                 إغلاق
               </Button>
-              <Button onClick={onAdd} disabled={!Number.isInteger(capacity) || capacity <= 0}>
+              <Button
+                onClick={onAdd}
+                disabled={!instagramId.trim() || !nameAr.trim() || !email.trim() || !serviceType.trim()}
+              >
                 إضافة
               </Button>
             </DialogFooter>

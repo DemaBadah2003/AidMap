@@ -1,10 +1,10 @@
 'use client'
 
-import { useMemo, useState, type ChangeEvent } from 'react'
+import {useMemo, useState, type ChangeEvent} from 'react'
 
-import { Card, CardContent } from '../../../../components/ui/card'
-import { Button } from '../../../../components/ui/button'
-import { Input } from '../../../../components/ui/input'
+import {Card, CardContent} from '../../../../components/ui/card'
+import {Button} from '../../../../components/ui/button'
+import {Input} from '../../../../components/ui/input'
 
 import {
   Dialog,
@@ -15,45 +15,45 @@ import {
   DialogFooter,
 } from '../../../../components/ui/dialog'
 
-import { Pencil, Trash2, Save, X, Plus, Search } from 'lucide-react'
+import {Pencil, Trash2, Save, X, Plus, Search} from 'lucide-react'
 
-type Camp = {
+type Shelter = {
   id: string
   nameAr: string
-  nameEn: string
   areaAr: string
+  supervisorAr: string
+  phone: string
   familiesCount: number
   capacity: number
-  status: 'نشط' | 'مؤقت' | 'مغلق'
 }
 
-const campsSeed: Camp[] = [
+const sheltersSeed: Shelter[] = [
   {
-    id: 'cp_01',
-    nameAr: 'مخيم الشمال A',
-    nameEn: 'North Camp A',
+    id: 'sh_01',
+    nameAr: 'مركز إيواء الشمال A',
     areaAr: 'شمال غزة',
+    supervisorAr: 'أحمد علي',
+    phone: '0599123456',
     familiesCount: 320,
     capacity: 2000,
-    status: 'نشط',
   },
   {
-    id: 'cp_02',
-    nameAr: 'مخيم الوسط B',
-    nameEn: 'Middle Camp B',
+    id: 'sh_02',
+    nameAr: 'مركز إيواء الوسط B',
     areaAr: 'الوسطى',
-    familiesCount: 210,
+    supervisorAr: 'سارة محمد',
+    phone: '0569876543',
+    familiesCount: 1400,
     capacity: 1400,
-    status: 'مؤقت',
   },
   {
-    id: 'cp_03',
-    nameAr: 'مخيم الجنوب C',
-    nameEn: 'South Camp C',
+    id: 'sh_03',
+    nameAr: 'مركز إيواء الجنوب C',
     areaAr: 'خانيونس',
-    familiesCount: 120,
+    supervisorAr: 'محمود حسن',
+    phone: '0599001122',
+    familiesCount: 850,
     capacity: 900,
-    status: 'نشط',
   },
 ]
 
@@ -68,9 +68,9 @@ const toIntOnly = (value: string) => {
   return digits ? Number(digits) : 0
 }
 
-export default function CampsPage() {
+export default function SheltersPage() {
   const [q, setQ] = useState('')
-  const [items, setItems] = useState<Camp[]>(campsSeed)
+  const [items, setItems] = useState<Shelter[]>(sheltersSeed)
 
   // فلترة status (Full / Not Full) من فوق
   const [statusFilter, setStatusFilter] = useState<'all' | 'full' | 'notfull'>('all')
@@ -86,6 +86,8 @@ export default function CampsPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [nameAr, setNameAr] = useState('')
   const [areaAr, setAreaAr] = useState('')
+  const [supervisorAr, setSupervisorAr] = useState('')
+  const [phone, setPhone] = useState('')
   const [capacity, setCapacity] = useState<number>(0)
 
   // Inline Edit
@@ -93,11 +95,15 @@ export default function CampsPage() {
   const [editDraft, setEditDraft] = useState<{
     nameAr: string
     areaAr: string
+    supervisorAr: string
+    phone: string
     capacity: number
     fillStatus: FillStatus
   }>({
     nameAr: '',
     areaAr: '',
+    supervisorAr: '',
+    phone: '',
     capacity: 1,
     fillStatus: 'Not Full',
   })
@@ -106,15 +112,17 @@ export default function CampsPage() {
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
 
-    return items.filter((c) => {
+    return items.filter((sh) => {
       const matchSearch =
         !s ||
-        c.nameEn.toLowerCase().includes(s) ||
-        c.nameAr.includes(q) ||
-        c.areaAr.includes(q)
+        sh.id.toLowerCase().includes(s) ||
+        sh.nameAr.includes(q) ||
+        sh.areaAr.includes(q) ||
+        sh.supervisorAr.includes(q) ||
+        sh.phone.includes(q)
 
       const rowStatus: FillStatus =
-        statusPick[c.id] ?? defaultFillStatus(c.familiesCount, c.capacity)
+        statusPick[sh.id] ?? defaultFillStatus(sh.familiesCount, sh.capacity)
 
       const matchStatus =
         statusFilter === 'all'
@@ -142,21 +150,26 @@ export default function CampsPage() {
   const onAdd = () => {
     const ar = nameAr.trim()
     const area = areaAr.trim()
-    if (!ar || !area || !Number.isInteger(capacity) || capacity <= 0) return
+    const sup = supervisorAr.trim()
+    const ph = phone.trim()
 
-    const newItem: Camp = {
-      id: `cp_${Math.random().toString(16).slice(2, 8)}`,
+    if (!ar || !area || !sup || !ph || !Number.isInteger(capacity) || capacity <= 0) return
+
+    const newItem: Shelter = {
+      id: `sh_${Math.random().toString(16).slice(2, 8)}`,
       nameAr: ar,
-      nameEn: ar,
       areaAr: area,
+      supervisorAr: sup,
+      phone: ph,
       familiesCount: 0,
       capacity,
-      status: 'مؤقت',
     }
 
     setItems((prev) => [newItem, ...prev])
     setNameAr('')
     setAreaAr('')
+    setSupervisorAr('')
+    setPhone('')
     setCapacity(0)
     setAddOpen(false)
   }
@@ -166,21 +179,23 @@ export default function CampsPage() {
 
     setItems((prev) => prev.filter((x) => x.id !== id))
     setStatusPick((prev) => {
-      const next = { ...prev }
+      const next = {...prev}
       delete next[id]
       return next
     })
   }
 
-  const startEditRow = (c: Camp) => {
+  const startEditRow = (sh: Shelter) => {
     const currentStatus: FillStatus =
-      statusPick[c.id] ?? defaultFillStatus(c.familiesCount, c.capacity)
+      statusPick[sh.id] ?? defaultFillStatus(sh.familiesCount, sh.capacity)
 
-    setEditingId(c.id)
+    setEditingId(sh.id)
     setEditDraft({
-      nameAr: c.nameAr,
-      areaAr: c.areaAr,
-      capacity: c.capacity,
+      nameAr: sh.nameAr,
+      areaAr: sh.areaAr,
+      supervisorAr: sh.supervisorAr,
+      phone: sh.phone,
+      capacity: sh.capacity,
       fillStatus: currentStatus,
     })
   }
@@ -190,24 +205,27 @@ export default function CampsPage() {
   const saveEditRow = (id: string) => {
     const ar = editDraft.nameAr.trim()
     const area = editDraft.areaAr.trim()
+    const sup = editDraft.supervisorAr.trim()
+    const ph = editDraft.phone.trim()
 
-    if (!ar || !area || !Number.isInteger(editDraft.capacity) || editDraft.capacity <= 0) return
+    if (!ar || !area || !sup || !ph || !Number.isInteger(editDraft.capacity) || editDraft.capacity <= 0) return
 
     setItems((prev) =>
-      prev.map((c) =>
-        c.id === id
+      prev.map((sh) =>
+        sh.id === id
           ? {
-              ...c,
+              ...sh,
               nameAr: ar,
-              nameEn: ar,
               areaAr: area,
+              supervisorAr: sup,
+              phone: ph,
               capacity: editDraft.capacity,
             }
-          : c
+          : sh
       )
     )
 
-    setStatusPick((prev) => ({ ...prev, [id]: editDraft.fillStatus }))
+    setStatusPick((prev) => ({...prev, [id]: editDraft.fillStatus}))
     setEditingId(null)
   }
 
@@ -220,11 +238,11 @@ export default function CampsPage() {
       {/* Header */}
       <div className="mb-6" dir="ltr">
         <div className="text-left">
-          <div className="text-2xl font-semibold text-foreground">Camps</div>
+          <div className="text-2xl font-semibold text-foreground">Shelters</div>
 
           <div className="mt-1 text-sm text-muted-foreground">
             Home <span className="mx-1">{'>'}</span>{' '}
-            <span className="text-foreground">Camps Management</span>
+            <span className="text-foreground">Shelters Management</span>
           </div>
         </div>
       </div>
@@ -237,18 +255,18 @@ export default function CampsPage() {
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 {/* Left */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  {/* ✅ Search مطابق Users (نفس الشكل تمامًا) */}
+                  {/* ✅ Search مطابق Users */}
                   <div className="relative w-full sm:w-[260px]">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Input
                       value={q}
                       onChange={(e: ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
-                      placeholder="Search camps"
+                      placeholder="Search shelters"
                       className="!h-10 !rounded-lg border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:!ring-2 focus:!ring-slate-200"
                     />
                   </div>
 
-                  {/* ✅ Select مطابق Users (نفس height/radius/border) */}
+                  {/* ✅ Select مطابق Users */}
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value as 'all' | 'full' | 'notfull')}
@@ -262,16 +280,15 @@ export default function CampsPage() {
 
                 {/* Right */}
                 <div className="flex items-center gap-2 justify-end">
-                  {/* ✅ زر Add camp مطابق Add user تمامًا */}
+                  {/* ✅ زر Add shelter مطابق */}
                   <Button
                     className="!h-10 !rounded-lg !bg-blue-600 !px-4 !text-sm !font-semibold !text-white hover:!bg-blue-700 inline-flex items-center gap-2"
                     onClick={() => setAddOpen(true)}
                   >
                     <Plus className="h-4 w-4" />
-                    Add camp
+                    Add shelter
                   </Button>
 
-                  {/* زر Delete all (outline بنفس مقاسات Users) */}
                   <Button
                     variant="outline"
                     className="!h-10 !rounded-lg !px-4 !text-sm !font-semibold border-slate-200 text-slate-700 hover:bg-slate-50"
@@ -292,7 +309,7 @@ export default function CampsPage() {
             {/* Table */}
             <div className="rounded-b-lg overflow-hidden">
               <div className="w-full overflow-x-auto">
-                <table className="w-full text-sm border-collapse min-w-[820px]">
+                <table className="w-full text-sm border-collapse min-w-[980px]">
                   <thead
                     style={{
                       backgroundColor: '#F9FAFB',
@@ -300,8 +317,10 @@ export default function CampsPage() {
                     }}
                   >
                     <tr className="text-left text-foreground/60">
-                      <th className="px-4 py-3 border-b border-r font-normal">Camp Name</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">Shelter Name</th>
                       <th className="px-4 py-3 border-b border-r font-normal">Area</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">Supervisor</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">Phone</th>
                       <th className="px-4 py-3 border-b border-r font-normal">Capacity</th>
                       <th className="px-4 py-3 border-b border-r font-normal">Status</th>
                       <th className="px-4 py-3 border-b font-normal">Actions</th>
@@ -309,22 +328,22 @@ export default function CampsPage() {
                   </thead>
 
                   <tbody>
-                    {pageItems.map((c) => {
-                      const isEditing = editingId === c.id
+                    {pageItems.map((sh) => {
+                      const isEditing = editingId === sh.id
                       const currentStatus: FillStatus =
-                        statusPick[c.id] ?? defaultFillStatus(c.familiesCount, c.capacity)
+                        statusPick[sh.id] ?? defaultFillStatus(sh.familiesCount, sh.capacity)
 
                       return (
-                        <tr key={c.id} className="hover:bg-muted/30">
+                        <tr key={sh.id} className="hover:bg-muted/30">
                           <td className="px-4 py-3 border-b border-r font-medium">
                             {isEditing ? (
                               <Input
                                 value={editDraft.nameAr}
-                                onChange={(e) => setEditDraft((p) => ({ ...p, nameAr: e.target.value }))}
+                                onChange={(e) => setEditDraft((p) => ({...p, nameAr: e.target.value}))}
                                 className="h-9"
                               />
                             ) : (
-                              c.nameAr
+                              sh.nameAr
                             )}
                           </td>
 
@@ -332,11 +351,35 @@ export default function CampsPage() {
                             {isEditing ? (
                               <Input
                                 value={editDraft.areaAr}
-                                onChange={(e) => setEditDraft((p) => ({ ...p, areaAr: e.target.value }))}
+                                onChange={(e) => setEditDraft((p) => ({...p, areaAr: e.target.value}))}
                                 className="h-9"
                               />
                             ) : (
-                              c.areaAr
+                              sh.areaAr
+                            )}
+                          </td>
+
+                          <td className="px-4 py-3 border-b border-r">
+                            {isEditing ? (
+                              <Input
+                                value={editDraft.supervisorAr}
+                                onChange={(e) => setEditDraft((p) => ({...p, supervisorAr: e.target.value}))}
+                                className="h-9"
+                              />
+                            ) : (
+                              sh.supervisorAr
+                            )}
+                          </td>
+
+                          <td className="px-4 py-3 border-b border-r">
+                            {isEditing ? (
+                              <Input
+                                value={editDraft.phone}
+                                onChange={(e) => setEditDraft((p) => ({...p, phone: e.target.value}))}
+                                className="h-9"
+                              />
+                            ) : (
+                              sh.phone
                             )}
                           </td>
 
@@ -356,7 +399,7 @@ export default function CampsPage() {
                                 className="h-9"
                               />
                             ) : (
-                              c.capacity
+                              sh.capacity
                             )}
                           </td>
 
@@ -381,7 +424,7 @@ export default function CampsPage() {
                                 onChange={(e) =>
                                   setStatusPick((prev) => ({
                                     ...prev,
-                                    [c.id]: e.target.value as FillStatus,
+                                    [sh.id]: e.target.value as FillStatus,
                                   }))
                                 }
                                 className="h-9 rounded-md border px-3 bg-background"
@@ -400,7 +443,7 @@ export default function CampsPage() {
                                     type="button"
                                     className="inline-flex items-center justify-center rounded-md border h-10 w-10 hover:bg-muted"
                                     title="Edit"
-                                    onClick={() => startEditRow(c)}
+                                    onClick={() => startEditRow(sh)}
                                   >
                                     <Pencil className="size-4" />
                                   </button>
@@ -409,7 +452,7 @@ export default function CampsPage() {
                                     type="button"
                                     className="inline-flex items-center justify-center rounded-md border h-10 w-10 hover:bg-muted"
                                     title="Delete"
-                                    onClick={() => onDeleteOne(c.id)}
+                                    onClick={() => onDeleteOne(sh.id)}
                                   >
                                     <Trash2 className="size-4" />
                                   </button>
@@ -419,7 +462,7 @@ export default function CampsPage() {
                                   <Button
                                     size="sm"
                                     className="h-10"
-                                    onClick={() => saveEditRow(c.id)}
+                                    onClick={() => saveEditRow(sh.id)}
                                     disabled={!Number.isInteger(editDraft.capacity) || editDraft.capacity <= 0}
                                   >
                                     <Save className="size-4 me-2" />
@@ -440,8 +483,8 @@ export default function CampsPage() {
 
                     {!pageItems.length && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
-                          No camps found
+                        <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                          No shelters found
                         </td>
                       </tr>
                     )}
@@ -492,23 +535,33 @@ export default function CampsPage() {
           </CardContent>
         </Card>
 
-        {/* Add Camp Dialog */}
+        {/* Add Shelter Dialog */}
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogContent className="sm:max-w-[560px]">
             <DialogHeader dir="rtl" className="text-right">
-              <DialogTitle>إضافة مخيم</DialogTitle>
-              <DialogDescription>إدخال بيانات المخيم</DialogDescription>
+              <DialogTitle>إضافة مركز إيواء</DialogTitle>
+              <DialogDescription>إدخال بيانات المركز</DialogDescription>
             </DialogHeader>
 
             <div dir="rtl" className="grid gap-3">
               <div className="grid gap-2">
-                <div className="text-sm">اسم المخيم</div>
-                <Input value={nameAr} onChange={(e) => setNameAr(e.target.value)} placeholder="مثال: مخيم الشمال A" />
+                <div className="text-sm">اسم المركز</div>
+                <Input value={nameAr} onChange={(e) => setNameAr(e.target.value)} placeholder="مثال: مركز إيواء الشمال A" />
               </div>
 
               <div className="grid gap-2">
                 <div className="text-sm">المنطقة</div>
                 <Input value={areaAr} onChange={(e) => setAreaAr(e.target.value)} placeholder="مثال: شمال غزة" />
+              </div>
+
+              <div className="grid gap-2">
+                <div className="text-sm">المشرف</div>
+                <Input value={supervisorAr} onChange={(e) => setSupervisorAr(e.target.value)} placeholder="مثال: أحمد علي" />
+              </div>
+
+              <div className="grid gap-2">
+                <div className="text-sm">رقم التواصل</div>
+                <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="مثال: 0599123456" />
               </div>
 
               <div className="grid gap-2">
