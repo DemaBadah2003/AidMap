@@ -43,7 +43,7 @@ export function Demo1LightSidebarPage() {
       <Container>
         <Toolbar>
           <ToolbarHeading
-            title="Dashboard"
+            title="Dddddddddddddddddddddddddddashboard"
             description="Central Hub for Personal Customization"
           />
           <ToolbarActions>

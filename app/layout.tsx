@@ -16,6 +16,9 @@ const inter = Inter({ subsets: ['latin'] });
 import '@/css/styles.css';
 import '@/components/keenicons/assets/styles.css';
 
+// ✅ خلي CSS الخاص بـ MapLibre آخر شي (أفضل لتفادي تعارض CSS)
+import 'maplibre-gl/dist/maplibre-gl.css';
+
 export const metadata: Metadata = {
   title: {
     template: '%s | Metronic',
