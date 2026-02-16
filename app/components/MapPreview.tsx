@@ -23,9 +23,10 @@ type Props = {
   osmAmenities?: Array<'hospital' | 'clinic' | 'school' | 'pharmacy' | 'doctors' | 'drinking_water'>
 
   osmCategories?: {
-    shelters?: boolean
-    medical?: boolean
-    aid?: boolean
+    shelters?: boolean // مدارس / مراكز ايواء (مدارس)
+    medical?: boolean // مستشفيات/عيادات/صيدليات/أطباء
+    aid?: boolean // ماء
+    food?: boolean // غذاء/جمعيات/مراكز دعم
   }
 }
 
@@ -44,28 +45,39 @@ export default function MapPreview({
 
   osmEnabled = false,
   osmAmenities = ['hospital', 'clinic', 'school', 'pharmacy', 'doctors', 'drinking_water'],
-  osmCategories = { shelters: true, medical: true, aid: true },
+  osmCategories = { shelters: true, medical: true, aid: true, food: true },
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef<maplibregl.Marker[]>([])
   const osmHandlersRef = useRef<HandlerItem[]>([])
 
+  // RTL plugin مرة واحدة فقط
+  const rtlReadyRef = useRef(false)
+
   const OSM_LAYERS = [
     'osm-clusters',
     'osm-cluster-count',
-    'osm-shelters-layer',
-    'osm-shelters-labels',
+
+    'osm-schools-layer',
+    'osm-schools-labels',
+    'osm-unrwa-schools-layer',
+    'osm-unrwa-schools-labels',
+
     'osm-medical-layer',
     'osm-medical-labels',
-    'osm-aid-layer',
-    'osm-aid-labels',
+
+    'osm-water-layer',
+    'osm-water-labels',
+
+    'osm-food-layer',
+    'osm-food-labels',
   ] as const
 
   const amenityToArabic = (a: string) => {
     switch (a) {
       case 'school':
-        return 'مدرسة / مركز إيواء'
+        return 'مدرسة'
       case 'hospital':
         return 'مستشفى'
       case 'clinic':
@@ -76,12 +88,18 @@ export default function MapPreview({
         return 'أطباء'
       case 'drinking_water':
         return 'نقطة ماء'
+      case 'community_centre':
+        return 'مركز مجتمعي'
+      case 'social_centre':
+        return 'مركز دعم'
+      case 'marketplace':
+        return 'سوق'
       default:
         return a
     }
   }
 
-  // إصلاح “mojibake” لو صار بأسماء OSM
+  // إصلاح mojibake
   const looksMojibake = (s: string) => /Ã.|Â|Ø.|Ù./.test(s)
   const fixUtf8FromLatin1 = (s: string) => {
     try {
@@ -122,15 +140,22 @@ export default function MapPreview({
     if (!el) return
     if (mapRef.current) return
 
+    // RTL plugin قبل إنشاء الخريطة (مرة واحدة)
+    if (typeof window !== 'undefined' && !rtlReadyRef.current) {
+      rtlReadyRef.current = true
+      const anyMap: any = maplibregl as any
+      if (typeof anyMap.setRTLTextPlugin === 'function') {
+        anyMap.setRTLTextPlugin(
+          'https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.2.3/mapbox-gl-rtl-text.js',
+          () => {},
+          true
+        )
+      }
+    }
+
     const map = new maplibregl.Map({
       container: el,
-
-      /**
-       * ✅ الحل النهائي للطلاسم:
-       * هذا Style أنظف وأقل labels بكثير من liberty
-       */
       style: 'https://tiles.openfreemap.org/styles/positron',
-
       center: [lng, lat],
       zoom,
     })
@@ -214,7 +239,7 @@ export default function MapPreview({
     window.setTimeout(() => map.resize(), 60)
   }, [places, zoom])
 
-  // OSM
+  // OSM overlay
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -225,6 +250,7 @@ export default function MapPreview({
     }
 
     let cancelled = false
+    let timer: any = null
 
     const getBbox = () => {
       try {
@@ -251,13 +277,23 @@ export default function MapPreview({
         const [lng, lat] = f.geometry.coordinates
         const p = f.properties || {}
 
-        const displayName = cleanText(p.display_name || p.name || '')
-        const amenity = cleanText(p.amenity || 'unknown')
-        const title = displayName.length ? displayName : amenityToArabic(amenity)
+        const name = cleanText(p.display_name || p.name || '')
+        const operator = cleanText(p.operator || '')
+        const amenity = cleanText(p.amenity || '')
+        const kind = cleanText(p.kind || '')
+        const title = name || amenityToArabic(amenity) || 'موقع'
+
+        const extra = operator ? `<div style="opacity:.8;margin-top:4px">الجهة: ${operator}</div>` : ''
 
         new maplibregl.Popup({ offset: 18 })
           .setLngLat([lng, lat])
-          .setHTML(`<b>${title}</b><br/>${amenityToArabic(amenity)}`)
+          .setHTML(
+            `<div style="font-size:13px;line-height:1.35">
+              <div style="font-weight:800">${title}</div>
+              <div style="opacity:.8">${kind ? kind : ''}${amenity ? (kind ? ' • ' : '') + amenityToArabic(amenity) : ''}</div>
+              ${extra}
+            </div>`
+          )
           .addTo(map)
       }
 
@@ -266,48 +302,87 @@ export default function MapPreview({
       attachLayerHandler('mouseleave', layerId, () => (map.getCanvas().style.cursor = ''))
     }
 
+    // تصنيف مدارس وكالة عبر الاسم/المشغل
+    const isUnrwa = (name: string, operator: string) => {
+      const t = `${name} ${operator}`.toLowerCase()
+      return t.includes('unrwa') || t.includes('وكالة') || t.includes('الاونروا') || t.includes('الأونروا')
+    }
+
     async function run() {
       try {
         const { south, west, north, east } = getBbox()
 
-        const overpassQuery = `
-          [out:json][timeout:25];
-          (
-            ${osmAmenities
-              .map((a) => `node["amenity"="${a}"](${south},${west},${north},${east});`)
-              .join('\n')}
-          );
-          out body;
+        const foodExtra = `
+          nwr["amenity"="community_centre"](${south},${west},${north},${east});
+          nwr["amenity"="social_centre"](${south},${west},${north},${east});
+          nwr["amenity"="marketplace"](${south},${west},${north},${east});
+          nwr["office"="ngo"](${south},${west},${north},${east});
+          nwr["social_facility"](${south},${west},${north},${east});
+          nwr["shop"="supermarket"](${south},${west},${north},${east});
         `
+
+        const overpassQuery = `
+[out:json][timeout:25];
+(
+  ${osmAmenities.map((a) => `nwr["amenity"="${a}"](${south},${west},${north},${east});`).join('\n')}
+  ${foodExtra}
+);
+out center;
+`
         const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(overpassQuery)
 
         const res = await fetch(url)
         const osm = await res.json()
         if (cancelled) return
 
-        const geojson = {
-          type: 'FeatureCollection',
-          features: (osm.elements || [])
-            .filter(
-              (el: any) => el.type === 'node' && typeof el.lat === 'number' && typeof el.lon === 'number'
-            )
+        const features =
+          (osm.elements || [])
+            .filter((el: any) => {
+              if (el.type === 'node') return typeof el.lat === 'number' && typeof el.lon === 'number'
+              return el.center && typeof el.center.lat === 'number' && typeof el.center.lon === 'number'
+            })
             .map((el: any) => {
-              const rawName =
-                el.tags?.['name:ar'] || el.tags?.name || el.tags?.['name:en'] || el.tags?.operator || ''
-              const amenity = el.tags?.amenity || 'unknown'
-              const fixedName = cleanText(rawName)
+              const lon = el.type === 'node' ? el.lon : el.center.lon
+              const lat = el.type === 'node' ? el.lat : el.center.lat
+
+              const tags = el.tags || {}
+              const rawName = tags['name:ar'] || tags.name || tags['name:en'] || tags.operator || ''
+              const operator = tags.operator || tags['operator:ar'] || ''
+              const amenity = tags.amenity || ''
+              const shop = tags.shop || ''
+              const office = tags.office || ''
+              const socialFacility = tags.social_facility || ''
+
+              const display = cleanText(rawName)
+              const op = cleanText(operator)
+
+              let kind = 'other'
+              if (amenity === 'school') kind = isUnrwa(display, op) ? 'unrwa_school' : 'school'
+              else if (['hospital', 'clinic', 'pharmacy', 'doctors'].includes(amenity)) kind = 'medical'
+              else if (amenity === 'drinking_water') kind = 'water'
+              else if (
+                ['community_centre', 'social_centre', 'marketplace'].includes(amenity) ||
+                office === 'ngo' ||
+                socialFacility ||
+                shop === 'supermarket'
+              ) {
+                kind = 'food'
+              }
 
               return {
                 type: 'Feature',
                 properties: {
                   name: rawName,
-                  display_name: fixedName,
-                  amenity,
+                  display_name: display,
+                  operator: op,
+                  amenity: amenity || '',
+                  kind,
                 },
-                geometry: { type: 'Point', coordinates: [el.lon, el.lat] },
+                geometry: { type: 'Point', coordinates: [lon, lat] },
               }
-            }),
-        } as any
+            })
+
+        const geojson = { type: 'FeatureCollection', features } as any
 
         if (map.getSource('osm-places')) {
           ;(map.getSource('osm-places') as any).setData(geojson)
@@ -349,10 +424,9 @@ export default function MapPreview({
         })
 
         const onClusterClick = (e: any) => {
-          const features = map.queryRenderedFeatures(e.point, { layers: ['osm-clusters'] })
-          const cluster = features[0]
+          const feats = map.queryRenderedFeatures(e.point, { layers: ['osm-clusters'] })
+          const cluster = feats[0]
           if (!cluster) return
-
           const source = map.getSource('osm-places') as any
           const clusterId = cluster.properties.cluster_id
           source.getClusterExpansionZoom(clusterId, (err: any, expansionZoom: number) => {
@@ -365,22 +439,22 @@ export default function MapPreview({
         attachLayerHandler('mouseenter', 'osm-clusters', () => (map.getCanvas().style.cursor = 'pointer'))
         attachLayerHandler('mouseleave', 'osm-clusters', () => (map.getCanvas().style.cursor = ''))
 
+        // Schools (غير وكالة)
         map.addLayer({
-          id: 'osm-shelters-layer',
+          id: 'osm-schools-layer',
           type: 'circle',
           source: 'osm-places',
-          filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'amenity'], 'school']],
+          filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'kind'], 'school']],
           paint: { 'circle-radius': 6, 'circle-color': '#2a9d8f', 'circle-stroke-width': 1, 'circle-stroke-color': '#fff' },
         })
-
         map.addLayer({
-          id: 'osm-shelters-labels',
+          id: 'osm-schools-labels',
           type: 'symbol',
           source: 'osm-places',
-          filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'amenity'], 'school']],
-          minzoom: 13,
+          filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'kind'], 'school']],
+          minzoom: 11,
           layout: {
-            'text-field': ['case', ['>', ['length', ['get', 'display_name']], 0], ['get', 'display_name'], 'مدرسة / مركز إيواء'],
+            'text-field': ['case', ['>', ['length', ['get', 'display_name']], 0], ['get', 'display_name'], 'مدرسة'],
             'text-size': 12,
             'text-offset': [0, 1.2],
             'text-anchor': 'top',
@@ -390,20 +464,45 @@ export default function MapPreview({
           paint: { 'text-color': '#111', 'text-halo-color': '#fff', 'text-halo-width': 1.4 },
         })
 
+        // UNRWA
+        map.addLayer({
+          id: 'osm-unrwa-schools-layer',
+          type: 'circle',
+          source: 'osm-places',
+          filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'kind'], 'unrwa_school']],
+          paint: { 'circle-radius': 6, 'circle-color': '#1b7fbd', 'circle-stroke-width': 1, 'circle-stroke-color': '#fff' },
+        })
+        map.addLayer({
+          id: 'osm-unrwa-schools-labels',
+          type: 'symbol',
+          source: 'osm-places',
+          filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'kind'], 'unrwa_school']],
+          minzoom: 11,
+          layout: {
+            'text-field': ['case', ['>', ['length', ['get', 'display_name']], 0], ['get', 'display_name'], 'مدرسة وكالة (UNRWA)'],
+            'text-size': 12,
+            'text-offset': [0, 1.2],
+            'text-anchor': 'top',
+            'text-optional': true,
+            'text-allow-overlap': false,
+          },
+          paint: { 'text-color': '#111', 'text-halo-color': '#fff', 'text-halo-width': 1.4 },
+        })
+
+        // Medical
         map.addLayer({
           id: 'osm-medical-layer',
           type: 'circle',
           source: 'osm-places',
-          filter: ['all', ['!', ['has', 'point_count']], ['in', ['get', 'amenity'], ['literal', ['hospital', 'clinic', 'pharmacy', 'doctors']]]],
+          filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'kind'], 'medical']],
           paint: { 'circle-radius': 6, 'circle-color': '#e63946', 'circle-stroke-width': 1, 'circle-stroke-color': '#fff' },
         })
-
         map.addLayer({
           id: 'osm-medical-labels',
           type: 'symbol',
           source: 'osm-places',
-          filter: ['all', ['!', ['has', 'point_count']], ['in', ['get', 'amenity'], ['literal', ['hospital', 'clinic', 'pharmacy', 'doctors']]]],
-          minzoom: 13,
+          filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'kind'], 'medical']],
+          minzoom: 11,
           layout: {
             'text-field': [
               'case',
@@ -420,20 +519,20 @@ export default function MapPreview({
           paint: { 'text-color': '#111', 'text-halo-color': '#fff', 'text-halo-width': 1.4 },
         })
 
+        // Water
         map.addLayer({
-          id: 'osm-aid-layer',
+          id: 'osm-water-layer',
           type: 'circle',
           source: 'osm-places',
-          filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'amenity'], 'drinking_water']],
+          filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'kind'], 'water']],
           paint: { 'circle-radius': 6, 'circle-color': '#457b9d', 'circle-stroke-width': 1, 'circle-stroke-color': '#fff' },
         })
-
         map.addLayer({
-          id: 'osm-aid-labels',
+          id: 'osm-water-labels',
           type: 'symbol',
           source: 'osm-places',
-          filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'amenity'], 'drinking_water']],
-          minzoom: 13,
+          filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'kind'], 'water']],
+          minzoom: 11,
           layout: {
             'text-field': ['case', ['>', ['length', ['get', 'display_name']], 0], ['get', 'display_name'], 'نقطة ماء'],
             'text-size': 12,
@@ -445,9 +544,36 @@ export default function MapPreview({
           paint: { 'text-color': '#111', 'text-halo-color': '#fff', 'text-halo-width': 1.4 },
         })
 
-        attachPopup('osm-shelters-layer')
+        // Food
+        map.addLayer({
+          id: 'osm-food-layer',
+          type: 'circle',
+          source: 'osm-places',
+          filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'kind'], 'food']],
+          paint: { 'circle-radius': 6, 'circle-color': '#f4a261', 'circle-stroke-width': 1, 'circle-stroke-color': '#fff' },
+        })
+        map.addLayer({
+          id: 'osm-food-labels',
+          type: 'symbol',
+          source: 'osm-places',
+          filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'kind'], 'food']],
+          minzoom: 11,
+          layout: {
+            'text-field': ['case', ['>', ['length', ['get', 'display_name']], 0], ['get', 'display_name'], 'مركز دعم / توزيع'],
+            'text-size': 12,
+            'text-offset': [0, 1.2],
+            'text-anchor': 'top',
+            'text-optional': true,
+            'text-allow-overlap': false,
+          },
+          paint: { 'text-color': '#111', 'text-halo-color': '#fff', 'text-halo-width': 1.4 },
+        })
+
+        attachPopup('osm-schools-layer')
+        attachPopup('osm-unrwa-schools-layer')
         attachPopup('osm-medical-layer')
-        attachPopup('osm-aid-layer')
+        attachPopup('osm-water-layer')
+        attachPopup('osm-food-layer')
 
         window.setTimeout(() => map.resize(), 60)
       } catch (err) {
@@ -455,17 +581,32 @@ export default function MapPreview({
       }
     }
 
+    // ✅ أعد الجلب عند تغيير مكان/زوم (مهم لزر تحديد الموقع)
+    const scheduleRun = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        if (!cancelled) run()
+      }, 350)
+    }
+
     cleanupOsm()
     if (map.loaded()) run()
     else map.once('load', run)
 
+    map.on('moveend', scheduleRun)
+    map.on('zoomend', scheduleRun)
+
     return () => {
       cancelled = true
+      clearTimeout(timer)
+      map.off('moveend', scheduleRun)
+      map.off('zoomend', scheduleRun)
       cleanupOsm()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [osmEnabled, osmAmenitiesKey])
 
+  // إخفاء/إظهار طبقات حسب الفلاتر
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -478,14 +619,20 @@ export default function MapPreview({
     setVis('osm-clusters', true)
     setVis('osm-cluster-count', true)
 
-    setVis('osm-shelters-layer', !!osmCategories?.shelters)
-    setVis('osm-shelters-labels', !!osmCategories?.shelters)
+    const showSchools = !!osmCategories?.shelters
+    setVis('osm-schools-layer', showSchools)
+    setVis('osm-schools-labels', showSchools)
+    setVis('osm-unrwa-schools-layer', showSchools)
+    setVis('osm-unrwa-schools-labels', showSchools)
 
     setVis('osm-medical-layer', !!osmCategories?.medical)
     setVis('osm-medical-labels', !!osmCategories?.medical)
 
-    setVis('osm-aid-layer', !!osmCategories?.aid)
-    setVis('osm-aid-labels', !!osmCategories?.aid)
+    setVis('osm-water-layer', !!osmCategories?.aid)
+    setVis('osm-water-labels', !!osmCategories?.aid)
+
+    setVis('osm-food-layer', !!osmCategories?.food)
+    setVis('osm-food-labels', !!osmCategories?.food)
   }, [osmCategories])
 
   return (

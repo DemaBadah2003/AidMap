@@ -71,7 +71,7 @@ export const MENU_SIDEBAR: MenuConfig = [
        { title: 'Enterprise Products  Sidebar', path: '/project/Enterprise Products' },
         { title: 'products Sidebar', path: '/project/products' },
         { title: 'service Sidebar', path: '/project/service' },
-        { title: 'Institutional Services Sidebar', path: '/project/Institutional Services' },
+        { title: 'institutional-services Sidebar', path: '/project/Institutional Services' },
        { title: 'Emergency  Sidebar', path: '/project/Emergency' },
         { title: 'Distributions  Sidebar', path: '/project/Distributions' },
 

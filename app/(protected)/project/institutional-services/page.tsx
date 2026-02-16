@@ -17,46 +17,33 @@ import {
 
 import { Pencil, Trash2, Save, X, Plus, Search } from 'lucide-react'
 
-type ServiceStatus = 'نشط' | 'مؤقت' | 'مغلق'
+type ActiveStatus = 'مفعل' | 'غير مفعل'
 
-type Service = {
-  id: string // service_id (PK)
-  typeAr: string // نوع الخدمة
-  donorAr: string // المتبرع/الجهة
-  detailsAr: string // تفاصيل/ملاحظات
-  status: ServiceStatus // حالة الخدمة
+type InstitutionService = {
+  id: string // PK (string للعرض/التحرير بسهولة)
+  institutionId: number
+  serviceId: number // FK
+  status: ActiveStatus
 }
 
-const servicesSeed: Service[] = [
-  {
-    id: 'srv_01',
-    typeAr: 'توزيع سلال غذائية',
-    donorAr: 'مؤسسة الخير',
-    detailsAr: 'توزيع أسبوعي - حي الرمال',
-    status: 'نشط',
-  },
-  {
-    id: 'srv_02',
-    typeAr: 'عيادة متنقلة',
-    donorAr: 'منظمة الصحة',
-    detailsAr: 'زيارة كل 3 أيام',
-    status: 'مؤقت',
-  },
-  {
-    id: 'srv_03',
-    typeAr: 'توفير مياه',
-    donorAr: 'جمعية الإغاثة',
-    detailsAr: 'صهاريج مياه للمخيمات',
-    status: 'نشط',
-  },
+const seed: InstitutionService[] = [
+  { id: 'is_01', institutionId: 10, serviceId: 101, status: 'مفعل' },
+  { id: 'is_02', institutionId: 10, serviceId: 102, status: 'غير مفعل' },
+  { id: 'is_03', institutionId: 12, serviceId: 104, status: 'مفعل' },
 ]
 
-export default function ServicesPage() {
+// ✅ أرقام صحيحة فقط
+const toIntOnly = (value: string) => {
+  const digits = value.replace(/\D/g, '')
+  return digits ? Number(digits) : 0
+}
+
+export default function InstitutionServicesPage() {
   const [q, setQ] = useState('')
-  const [items, setItems] = useState<Service[]>(servicesSeed)
+  const [items, setItems] = useState<InstitutionService[]>(seed)
 
   // فلترة الحالة من فوق
-  const [statusFilter, setStatusFilter] = useState<'all' | ServiceStatus>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
 
   // Pagination
   const [page, setPage] = useState(1)
@@ -64,23 +51,20 @@ export default function ServicesPage() {
 
   // Add dialog
   const [addOpen, setAddOpen] = useState(false)
-  const [typeAr, setTypeAr] = useState('')
-  const [donorAr, setDonorAr] = useState('')
-  const [detailsAr, setDetailsAr] = useState('')
-  const [status, setStatus] = useState<ServiceStatus>('نشط')
+  const [institutionId, setInstitutionId] = useState<number>(0)
+  const [serviceId, setServiceId] = useState<number>(0)
+  const [status, setStatus] = useState<ActiveStatus>('مفعل')
 
   // Inline Edit
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<{
-    typeAr: string
-    donorAr: string
-    detailsAr: string
-    status: ServiceStatus
+    institutionId: number
+    serviceId: number
+    status: ActiveStatus
   }>({
-    typeAr: '',
-    donorAr: '',
-    detailsAr: '',
-    status: 'نشط',
+    institutionId: 0,
+    serviceId: 0,
+    status: 'مفعل',
   })
 
   // ✅ فلترة search + فلترة status
@@ -91,16 +75,21 @@ export default function ServicesPage() {
       const matchSearch =
         !s ||
         x.id.toLowerCase().includes(s) ||
-        x.typeAr.includes(q) ||
-        x.donorAr.includes(q) ||
-        x.detailsAr.includes(q)
+        String(x.institutionId).includes(s) ||
+        String(x.serviceId).includes(s)
 
-      const matchStatus = statusFilter === 'all' ? true : x.status === statusFilter
+      const matchStatus =
+        statusFilter === 'all'
+          ? true
+          : statusFilter === 'active'
+            ? x.status === 'مفعل'
+            : x.status === 'غير مفعل'
+
       return matchSearch && matchStatus
     })
   }, [q, items, statusFilter])
 
-  // ✅ reset page عند تغيير الفلاتر/البحث/حجم الصفحة (useEffect مش useMemo)
+  // ✅ reset page عند أي تغيير
   useEffect(() => {
     setPage(1)
   }, [q, statusFilter, pageSize])
@@ -114,24 +103,20 @@ export default function ServicesPage() {
   }, [filtered, safePage, pageSize])
 
   const onAdd = () => {
-    const t = typeAr.trim()
-    const d = donorAr.trim()
-    const det = detailsAr.trim()
-    if (!t || !d) return
+    if (!Number.isInteger(institutionId) || institutionId <= 0) return
+    if (!Number.isInteger(serviceId) || serviceId <= 0) return
 
-    const newItem: Service = {
-      id: `srv_${Math.random().toString(16).slice(2, 8)}`,
-      typeAr: t,
-      donorAr: d,
-      detailsAr: det,
+    const newItem: InstitutionService = {
+      id: `is_${Math.random().toString(16).slice(2, 8)}`,
+      institutionId,
+      serviceId,
       status,
     }
 
     setItems((prev) => [newItem, ...prev])
-    setTypeAr('')
-    setDonorAr('')
-    setDetailsAr('')
-    setStatus('نشط')
+    setInstitutionId(0)
+    setServiceId(0)
+    setStatus('مفعل')
     setAddOpen(false)
   }
 
@@ -140,43 +125,37 @@ export default function ServicesPage() {
     setItems((prev) => prev.filter((x) => x.id !== id))
   }
 
-  const startEditRow = (s: Service) => {
-    setEditingId(s.id)
+  const startEditRow = (row: InstitutionService) => {
+    setEditingId(row.id)
     setEditDraft({
-      typeAr: s.typeAr,
-      donorAr: s.donorAr,
-      detailsAr: s.detailsAr,
-      status: s.status,
+      institutionId: row.institutionId,
+      serviceId: row.serviceId,
+      status: row.status,
     })
   }
 
   const cancelEditRow = () => setEditingId(null)
 
   const saveEditRow = (id: string) => {
-    const t = editDraft.typeAr.trim()
-    const d = editDraft.donorAr.trim()
-    const det = editDraft.detailsAr.trim()
-
-    if (!t || !d) return
+    if (!Number.isInteger(editDraft.institutionId) || editDraft.institutionId <= 0) return
+    if (!Number.isInteger(editDraft.serviceId) || editDraft.serviceId <= 0) return
 
     setItems((prev) =>
       prev.map((x) =>
         x.id === id
           ? {
               ...x,
-              typeAr: t,
-              donorAr: d,
-              detailsAr: det,
+              institutionId: editDraft.institutionId,
+              serviceId: editDraft.serviceId,
               status: editDraft.status,
             }
           : x
       )
     )
-
     setEditingId(null)
   }
 
-  // Pagination label: "1 - 10 of N"
+  // Pagination label
   const rangeStart = filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1
   const rangeEnd = Math.min(safePage * pageSize, filtered.length)
 
@@ -185,11 +164,11 @@ export default function ServicesPage() {
       {/* Header */}
       <div className="mb-6" dir="ltr">
         <div className="text-left">
-          <div className="text-2xl font-semibold text-foreground">Services</div>
+          <div className="text-2xl font-semibold text-foreground">Institution Services</div>
 
           <div className="mt-1 text-sm text-muted-foreground">
             Home <span className="mx-1">{'>'}</span>{' '}
-            <span className="text-foreground">Services Management</span>
+            <span className="text-foreground">Institution Services Management</span>
           </div>
         </div>
       </div>
@@ -208,7 +187,7 @@ export default function ServicesPage() {
                     <Input
                       value={q}
                       onChange={(e: ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
-                      placeholder="Search services"
+                      placeholder="Search institution services"
                       className="!h-10 !rounded-lg border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:!ring-2 focus:!ring-slate-200"
                     />
                   </div>
@@ -216,13 +195,12 @@ export default function ServicesPage() {
                   {/* Status filter */}
                   <select
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as 'all' | ServiceStatus)}
-                    className="h-10 w-full sm:w-[160px] rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+                    onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+                    className="h-10 w-full sm:w-[180px] rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
                   >
                     <option value="all">All status</option>
-                    <option value="نشط">Active</option>
-                    <option value="مؤقت">Temporary</option>
-                    <option value="مغلق">Closed</option>
+                    <option value="active">مفعل</option>
+                    <option value="inactive">غير مفعل</option>
                   </select>
                 </div>
 
@@ -233,7 +211,7 @@ export default function ServicesPage() {
                     onClick={() => setAddOpen(true)}
                   >
                     <Plus className="h-4 w-4" />
-                    Add service
+                    Add
                   </Button>
 
                   <Button
@@ -263,78 +241,67 @@ export default function ServicesPage() {
                     }}
                   >
                     <tr className="text-left text-foreground/60">
-                      <th className="px-4 py-3 border-b border-r font-normal">Service ID</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Service Type</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Donor / Organization</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Details</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">ID (PK)</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">Institution ID</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">Service ID (FK)</th>
                       <th className="px-4 py-3 border-b border-r font-normal">Status</th>
                       <th className="px-4 py-3 border-b font-normal">Actions</th>
                     </tr>
                   </thead>
 
                   <tbody>
-                    {pageItems.map((s) => {
-                      const isEditing = editingId === s.id
+                    {pageItems.map((row) => {
+                      const isEditing = editingId === row.id
 
                       return (
-                        <tr key={s.id} className="hover:bg-muted/30">
-                          <td className="px-4 py-3 border-b border-r font-medium">{s.id}</td>
+                        <tr key={row.id} className="hover:bg-muted/30">
+                          <td className="px-4 py-3 border-b border-r font-medium">{row.id}</td>
 
-                          <td className="px-4 py-3 border-b border-r" dir="rtl">
+                          <td className="px-4 py-3 border-b border-r">
                             {isEditing ? (
                               <Input
-                                value={editDraft.typeAr}
-                                onChange={(e) => setEditDraft((p) => ({ ...p, typeAr: e.target.value }))}
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                type="text"
+                                value={editDraft.institutionId ? String(editDraft.institutionId) : ''}
+                                onChange={(e) =>
+                                  setEditDraft((p) => ({ ...p, institutionId: toIntOnly(e.target.value) }))
+                                }
                                 className="h-10"
                               />
                             ) : (
-                              s.typeAr
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3 border-b border-r" dir="rtl">
-                            {isEditing ? (
-                              <Input
-                                value={editDraft.donorAr}
-                                onChange={(e) => setEditDraft((p) => ({ ...p, donorAr: e.target.value }))}
-                                className="h-10"
-                              />
-                            ) : (
-                              s.donorAr
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3 border-b border-r" dir="rtl">
-                            {isEditing ? (
-                              <Input
-                                value={editDraft.detailsAr}
-                                onChange={(e) => setEditDraft((p) => ({ ...p, detailsAr: e.target.value }))}
-                                className="h-10"
-                              />
-                            ) : (
-                              s.detailsAr || <span className="text-muted-foreground">—</span>
+                              row.institutionId
                             )}
                           </td>
 
                           <td className="px-4 py-3 border-b border-r">
                             {isEditing ? (
+                              <Input
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                type="text"
+                                value={editDraft.serviceId ? String(editDraft.serviceId) : ''}
+                                onChange={(e) => setEditDraft((p) => ({ ...p, serviceId: toIntOnly(e.target.value) }))}
+                                className="h-10"
+                              />
+                            ) : (
+                              row.serviceId
+                            )}
+                          </td>
+
+                          <td className="px-4 py-3 border-b border-r" dir="rtl">
+                            {isEditing ? (
                               <select
                                 value={editDraft.status}
-                                onChange={(e) =>
-                                  setEditDraft((p) => ({
-                                    ...p,
-                                    status: e.target.value as ServiceStatus,
-                                  }))
-                                }
+                                onChange={(e) => setEditDraft((p) => ({ ...p, status: e.target.value as ActiveStatus }))}
                                 className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
                               >
-                                <option value="نشط">Active</option>
-                                <option value="مؤقت">Temporary</option>
-                                <option value="مغلق">Closed</option>
+                                <option value="مفعل">مفعل</option>
+                                <option value="غير مفعل">غير مفعل</option>
                               </select>
                             ) : (
                               <span className="inline-flex items-center rounded-md border px-2 py-1 text-xs">
-                                {s.status}
+                                {row.status}
                               </span>
                             )}
                           </td>
@@ -347,7 +314,7 @@ export default function ServicesPage() {
                                     type="button"
                                     className="inline-flex items-center justify-center rounded-md border h-10 w-10 hover:bg-muted"
                                     title="Edit"
-                                    onClick={() => startEditRow(s)}
+                                    onClick={() => startEditRow(row)}
                                   >
                                     <Pencil className="size-4" />
                                   </button>
@@ -356,14 +323,24 @@ export default function ServicesPage() {
                                     type="button"
                                     className="inline-flex items-center justify-center rounded-md border h-10 w-10 hover:bg-muted"
                                     title="Delete"
-                                    onClick={() => onDeleteOne(s.id)}
+                                    onClick={() => onDeleteOne(row.id)}
                                   >
                                     <Trash2 className="size-4" />
                                   </button>
                                 </>
                               ) : (
                                 <>
-                                  <Button size="sm" className="h-10" onClick={() => saveEditRow(s.id)}>
+                                  <Button
+                                    size="sm"
+                                    className="h-10"
+                                    onClick={() => saveEditRow(row.id)}
+                                    disabled={
+                                      !Number.isInteger(editDraft.institutionId) ||
+                                      editDraft.institutionId <= 0 ||
+                                      !Number.isInteger(editDraft.serviceId) ||
+                                      editDraft.serviceId <= 0
+                                    }
+                                  >
                                     <Save className="size-4 me-2" />
                                     Save
                                   </Button>
@@ -382,8 +359,8 @@ export default function ServicesPage() {
 
                     {!pageItems.length && (
                       <tr>
-                        <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
-                          No services found
+                        <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                          No records found
                         </td>
                       </tr>
                     )}
@@ -434,44 +411,48 @@ export default function ServicesPage() {
           </CardContent>
         </Card>
 
-        {/* Add Service Dialog */}
+        {/* Add Dialog */}
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogContent className="sm:max-w-[560px]">
             <DialogHeader dir="rtl" className="text-right">
-              <DialogTitle>إضافة خدمة</DialogTitle>
-              <DialogDescription>إدخال بيانات الخدمة</DialogDescription>
+              <DialogTitle>إضافة خدمة للمؤسسة</DialogTitle>
+              <DialogDescription>إدخال بيانات خدمات المؤسسة</DialogDescription>
             </DialogHeader>
 
             <div dir="rtl" className="grid gap-3">
               <div className="grid gap-2">
-                <div className="text-sm">نوع الخدمة</div>
-                <Input value={typeAr} onChange={(e) => setTypeAr(e.target.value)} placeholder="مثال: توزيع سلال غذائية" />
-              </div>
-
-              <div className="grid gap-2">
-                <div className="text-sm">المتبرع / الجهة</div>
-                <Input value={donorAr} onChange={(e) => setDonorAr(e.target.value)} placeholder="مثال: مؤسسة الخير" />
-              </div>
-
-              <div className="grid gap-2">
-                <div className="text-sm">تفاصيل</div>
+                <div className="text-sm">Institution ID</div>
                 <Input
-                  value={detailsAr}
-                  onChange={(e) => setDetailsAr(e.target.value)}
-                  placeholder="مثال: توزيع أسبوعي - حي الرمال"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  type="text"
+                  value={institutionId ? String(institutionId) : ''}
+                  onChange={(e) => setInstitutionId(toIntOnly(e.target.value))}
+                  placeholder="مثال: 10"
                 />
               </div>
 
               <div className="grid gap-2">
-                <div className="text-sm">الحالة</div>
+                <div className="text-sm">Service ID (FK)</div>
+                <Input
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  type="text"
+                  value={serviceId ? String(serviceId) : ''}
+                  onChange={(e) => setServiceId(toIntOnly(e.target.value))}
+                  placeholder="مثال: 101"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <div className="text-sm">حالة الخدمة</div>
                 <select
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as ServiceStatus)}
+                  onChange={(e) => setStatus(e.target.value as ActiveStatus)}
                   className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
                 >
-                  <option value="نشط">نشط</option>
-                  <option value="مؤقت">مؤقت</option>
-                  <option value="مغلق">مغلق</option>
+                  <option value="مفعل">مفعل</option>
+                  <option value="غير مفعل">غير مفعل</option>
                 </select>
               </div>
             </div>
@@ -480,7 +461,15 @@ export default function ServicesPage() {
               <Button variant="outline" onClick={() => setAddOpen(false)}>
                 إغلاق
               </Button>
-              <Button onClick={onAdd} disabled={!typeAr.trim() || !donorAr.trim()}>
+              <Button
+                onClick={onAdd}
+                disabled={
+                  !Number.isInteger(institutionId) ||
+                  institutionId <= 0 ||
+                  !Number.isInteger(serviceId) ||
+                  serviceId <= 0
+                }
+              >
                 إضافة
               </Button>
             </DialogFooter>
