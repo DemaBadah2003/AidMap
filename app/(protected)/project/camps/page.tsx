@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 
 import { Card, CardContent } from '../../../../components/ui/card'
 import { Button } from '../../../../components/ui/button'
@@ -16,6 +16,7 @@ import {
 } from '../../../../components/ui/dialog'
 
 import { Pencil, Trash2, Save, X, Plus, Search } from 'lucide-react'
+import { campsApi, type FillStatus as ApiFillStatus } from '../../../helpers/campsService' // ✅ عدّل المسار إذا لزم
 
 type Camp = {
   id: string
@@ -27,42 +28,11 @@ type Camp = {
   status: 'نشط' | 'مؤقت' | 'مغلق'
 }
 
-const campsSeed: Camp[] = [
-  {
-    id: 'cp_01',
-    nameAr: 'مخيم الشمال A',
-    nameEn: 'North Camp A',
-    areaAr: 'شمال غزة',
-    familiesCount: 320,
-    capacity: 2000,
-    status: 'نشط',
-  },
-  {
-    id: 'cp_02',
-    nameAr: 'مخيم الوسط B',
-    nameEn: 'Middle Camp B',
-    areaAr: 'الوسطى',
-    familiesCount: 210,
-    capacity: 1400,
-    status: 'مؤقت',
-  },
-  {
-    id: 'cp_03',
-    nameAr: 'مخيم الجنوب C',
-    nameEn: 'South Camp C',
-    areaAr: 'خانيونس',
-    familiesCount: 120,
-    capacity: 900,
-    status: 'نشط',
-  },
-]
-
 type FillStatus = 'Full' | 'Not Full'
 
 const defaultFillStatus = (families: number, capacity: number): FillStatus =>
   families >= capacity ? 'Full' : 'Not Full'
 
-// ✅ أرقام صحيحة فقط
 const toIntOnly = (value: string) => {
   const digits = value.replace(/\D/g, '')
   return digits ? Number(digits) : 0
@@ -70,25 +40,20 @@ const toIntOnly = (value: string) => {
 
 export default function CampsPage() {
   const [q, setQ] = useState('')
-  const [items, setItems] = useState<Camp[]>(campsSeed)
+  const [items, setItems] = useState<Camp[]>([])
+  const [loading, setLoading] = useState(false)
 
-  // فلترة status (Full / Not Full) من فوق
   const [statusFilter, setStatusFilter] = useState<'all' | 'full' | 'notfull'>('all')
-
-  // اختيار status لكل صف
   const [statusPick, setStatusPick] = useState<Record<string, FillStatus>>({})
 
-  // Pagination
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
-  // Add dialog
   const [addOpen, setAddOpen] = useState(false)
   const [nameAr, setNameAr] = useState('')
   const [areaAr, setAreaAr] = useState('')
   const [capacity, setCapacity] = useState<number>(0)
 
-  // Inline Edit
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<{
     nameAr: string
@@ -102,7 +67,36 @@ export default function CampsPage() {
     fillStatus: 'Not Full',
   })
 
-  // ✅ فلترة search + فلترة status
+  // ✅ Load from backend
+  useEffect(() => {
+    const run = async () => {
+      setLoading(true)
+      try {
+        const data = await campsApi.list()
+        setItems(
+          data.map((x) => ({
+            id: x.id,
+            nameAr: x.name,
+            nameEn: x.name,
+            areaAr: x.area ?? '',
+            familiesCount: 0, // UI only
+            capacity: x.capacity,
+            status: 'مؤقت',
+          }))
+        )
+        // عشان ينعكس status enum على dropdown
+        const pick: Record<string, FillStatus> = {}
+        data.forEach((x) => {
+          pick[x.id] = x.status === 'FULL' ? 'Full' : 'Not Full'
+        })
+        setStatusPick(pick)
+      } finally {
+        setLoading(false)
+      }
+    }
+    run()
+  }, [])
+
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
 
@@ -139,29 +133,42 @@ export default function CampsPage() {
     return filtered.slice(start, start + pageSize)
   }, [filtered, safePage, pageSize])
 
-  const onAdd = () => {
+  const onAdd = async () => {
     const ar = nameAr.trim()
     const area = areaAr.trim()
-    if (!ar || !area || !Number.isInteger(capacity) || capacity <= 0) return
+    if (!ar || !Number.isInteger(capacity) || capacity <= 0) return
 
-    const newItem: Camp = {
-      id: `cp_${Math.random().toString(16).slice(2, 8)}`,
+    const created = await campsApi.create({
       nameAr: ar,
-      nameEn: ar,
       areaAr: area,
-      familiesCount: 0,
       capacity,
-      status: 'مؤقت',
-    }
+      fillStatus: 'Not Full',
+    })
 
-    setItems((prev) => [newItem, ...prev])
+    setItems((prev) => [
+      {
+        id: created.id,
+        nameAr: created.name,
+        nameEn: created.name,
+        areaAr: created.area ?? '',
+        familiesCount: 0,
+        capacity: created.capacity,
+        status: 'مؤقت',
+      },
+      ...prev,
+    ])
+
+    setStatusPick((prev) => ({ ...prev, [created.id]: created.status === 'FULL' ? 'Full' : 'Not Full' }))
+
     setNameAr('')
     setAreaAr('')
     setCapacity(0)
     setAddOpen(false)
   }
 
-  const onDeleteOne = (id: string) => {
+  const onDeleteOne = async (id: string) => {
+    await campsApi.remove(id)
+
     if (editingId === id) setEditingId(null)
 
     setItems((prev) => prev.filter((x) => x.id !== id))
@@ -187,57 +194,53 @@ export default function CampsPage() {
 
   const cancelEditRow = () => setEditingId(null)
 
-  const saveEditRow = (id: string) => {
+  const saveEditRow = async (id: string) => {
     const ar = editDraft.nameAr.trim()
     const area = editDraft.areaAr.trim()
 
-    if (!ar || !area || !Number.isInteger(editDraft.capacity) || editDraft.capacity <= 0) return
+    if (!ar || !Number.isInteger(editDraft.capacity) || editDraft.capacity <= 0) return
+
+    const updated = await campsApi.update(id, {
+      nameAr: ar,
+      areaAr: area,
+      capacity: editDraft.capacity,
+      fillStatus: editDraft.fillStatus as ApiFillStatus,
+    })
 
     setItems((prev) =>
       prev.map((c) =>
         c.id === id
-          ? {
-              ...c,
-              nameAr: ar,
-              nameEn: ar,
-              areaAr: area,
-              capacity: editDraft.capacity,
-            }
+          ? { ...c, nameAr: updated.name, nameEn: updated.name, areaAr: updated.area ?? '', capacity: updated.capacity }
           : c
       )
     )
 
-    setStatusPick((prev) => ({ ...prev, [id]: editDraft.fillStatus }))
+    setStatusPick((prev) => ({ ...prev, [id]: updated.status === 'FULL' ? 'Full' : 'Not Full' }))
     setEditingId(null)
   }
 
-  // Pagination label: "1 - 10 of N"
   const rangeStart = filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1
   const rangeEnd = Math.min(safePage * pageSize, filtered.length)
 
   return (
     <div className="w-full px-3 sm:px-6 py-6" dir="rtl">
-      {/* Header */}
       <div className="mb-6" dir="ltr">
         <div className="text-left">
           <div className="text-2xl font-semibold text-foreground">Camps</div>
-
           <div className="mt-1 text-sm text-muted-foreground">
             Home <span className="mx-1">{'>'}</span>{' '}
             <span className="text-foreground">Camps Management</span>
           </div>
+          {loading && <div className="mt-2 text-sm text-muted-foreground">Loading...</div>}
         </div>
       </div>
 
       <div className="w-full max-w-[1200px]">
         <Card>
           <CardContent className="p-0" dir="ltr">
-            {/* Toolbar */}
             <div className="p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                {/* Left */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  {/* ✅ Search مطابق Users (نفس الشكل تمامًا) */}
                   <div className="relative w-full sm:w-[260px]">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Input
@@ -248,7 +251,6 @@ export default function CampsPage() {
                     />
                   </div>
 
-                  {/* ✅ Select مطابق Users (نفس height/radius/border) */}
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value as 'all' | 'full' | 'notfull')}
@@ -260,9 +262,7 @@ export default function CampsPage() {
                   </select>
                 </div>
 
-                {/* Right */}
                 <div className="flex items-center gap-2 justify-end">
-                  {/* ✅ زر Add camp مطابق Add user تمامًا */}
                   <Button
                     className="!h-10 !rounded-lg !bg-blue-600 !px-4 !text-sm !font-semibold !text-white hover:!bg-blue-700 inline-flex items-center gap-2"
                     onClick={() => setAddOpen(true)}
@@ -271,11 +271,11 @@ export default function CampsPage() {
                     Add camp
                   </Button>
 
-                  {/* زر Delete all (outline بنفس مقاسات Users) */}
                   <Button
                     variant="outline"
                     className="!h-10 !rounded-lg !px-4 !text-sm !font-semibold border-slate-200 text-slate-700 hover:bg-slate-50"
-                    onClick={() => {
+                    onClick={async () => {
+                      await campsApi.removeAll()
                       setItems([])
                       setStatusPick({})
                       setEditingId(null)
@@ -293,12 +293,7 @@ export default function CampsPage() {
             <div className="rounded-b-lg overflow-hidden">
               <div className="w-full overflow-x-auto">
                 <table className="w-full text-sm border-collapse min-w-[820px]">
-                  <thead
-                    style={{
-                      backgroundColor: '#F9FAFB',
-                      boxShadow: '0 1px 0 rgba(0,0,0,0.06)',
-                    }}
-                  >
+                  <thead style={{ backgroundColor: '#F9FAFB', boxShadow: '0 1px 0 rgba(0,0,0,0.06)' }}>
                     <tr className="text-left text-foreground/60">
                       <th className="px-4 py-3 border-b border-r font-normal">Camp Name</th>
                       <th className="px-4 py-3 border-b border-r font-normal">Area</th>
@@ -365,10 +360,7 @@ export default function CampsPage() {
                               <select
                                 value={editDraft.fillStatus}
                                 onChange={(e) =>
-                                  setEditDraft((p) => ({
-                                    ...p,
-                                    fillStatus: e.target.value as FillStatus,
-                                  }))
+                                  setEditDraft((p) => ({ ...p, fillStatus: e.target.value as FillStatus }))
                                 }
                                 className="h-9 rounded-md border px-3 bg-background"
                               >
@@ -379,10 +371,7 @@ export default function CampsPage() {
                               <select
                                 value={currentStatus}
                                 onChange={(e) =>
-                                  setStatusPick((prev) => ({
-                                    ...prev,
-                                    [c.id]: e.target.value as FillStatus,
-                                  }))
+                                  setStatusPick((prev) => ({ ...prev, [c.id]: e.target.value as FillStatus }))
                                 }
                                 className="h-9 rounded-md border px-3 bg-background"
                               >
@@ -449,7 +438,6 @@ export default function CampsPage() {
                 </table>
               </div>
 
-              {/* Pagination */}
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 border-t">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>Rows per page</span>
@@ -469,21 +457,11 @@ export default function CampsPage() {
                     {rangeStart} - {rangeEnd} of {filtered.length}
                   </div>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={safePage <= 1}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  >
+                  <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
                     Previous
                   </Button>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={safePage >= totalPages}
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  >
+                  <Button variant="outline" size="sm" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
                     Next
                   </Button>
                 </div>
@@ -492,7 +470,6 @@ export default function CampsPage() {
           </CardContent>
         </Card>
 
-        {/* Add Camp Dialog */}
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogContent className="sm:max-w-[560px]">
             <DialogHeader dir="rtl" className="text-right">

@@ -4,16 +4,387 @@ generator client {
 
 datasource db {
   provider = "postgresql"
- 
+  // url = env("DATABASE_URL")
 }
 
-// User Modoule
+// =====================
+// Enums
+// =====================
+
+// User Module
 enum UserStatus {
   INACTIVE
   ACTIVE
   BLOCKED
-  
 }
+
+// Camps Module (Shelters)
+enum CampFillStatus {
+  NOT_FULL
+  FULL
+}
+
+// General status (لـ supervisor وغيره)
+enum GeneralStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+// Beneficiary priority (من صفحة beneficiaries)
+enum BeneficiaryPriority {
+  NORMAL
+  IMPORTANT
+  URGENT
+}
+
+// Emergency enums (من صفحة Emergency)
+enum EmergencyStatus {
+  NEW
+  IN_PROGRESS
+  CLOSED
+}
+
+enum EmergencyLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// =====================
+// Camps + Related Tables
+// =====================
+
+model Supervisor {
+  id     String        @id @default(uuid())
+  name   String
+  phone  String?
+  status GeneralStatus @default(ACTIVE)
+
+  // Relations
+  camps       Camps[]
+  emergencies Emergency[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isTrashed   Boolean  @default(false)
+  isProtected Boolean  @default(false)
+
+  @@index([status])
+}
+
+model Camps {
+  id       String         @id @default(uuid())
+  name     String
+  area     String?
+  capacity Int            @default(0)
+  status   CampFillStatus @default(NOT_FULL)
+
+  supervisorId String
+  supervisor   Supervisor @relation(fields: [supervisorId], references: [id], onDelete: Restrict)
+
+  // Relations from الصورة + الواجهات
+  beneficiaries Beneficiary[]
+  addresses     Address[]
+  emergencies   Emergency[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isTrashed   Boolean  @default(false)
+  isProtected Boolean  @default(false)
+
+  @@index([supervisorId])
+  @@index([status])
+}
+
+model Beneficiary {
+  id             String              @id @default(uuid())
+  name           String
+  phone          String?
+  numberOfFamily Int                 @default(0)
+  priority       BeneficiaryPriority @default(NORMAL)
+
+  campId String?
+  camp   Camps?  @relation(fields: [campId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  isTrashed   Boolean   @default(false)
+  isProtected Boolean   @default(false)
+  contacts    Contact[]
+
+  @@index([campId])
+  @@index([priority])
+}
+
+model Address {
+  id          String  @id @default(uuid())
+  addressName String?
+  governorate String?
+  city        String?
+  district    String?
+  street      String?
+  buildingNo  String?
+
+  // Relation to Camps (حسب طلبك + العلاقات)
+  campId String?
+  camp   Camps?  @relation(fields: [campId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([campId])
+  @@index([governorate])
+}
+
+model Emergency {
+  id            String          @id @default(uuid())
+  emergencyType String
+  description   String?
+  status        EmergencyStatus @default(NEW)
+  time          DateTime        @default(now())
+  level         EmergencyLevel  @default(MEDIUM)
+
+  // FK -> Camps (Shelter ID في الواجهة)
+  campId String
+  camp   Camps  @relation(fields: [campId], references: [id], onDelete: Cascade)
+
+  // FK -> Supervisor (في الواجهة موجود عمود Supervisor)
+  supervisorId String
+  supervisor   Supervisor @relation(fields: [supervisorId], references: [id], onDelete: Restrict)
+
+  @@index([campId])
+  @@index([supervisorId])
+  @@index([status])
+}
+
+// ===================================================================
+// ADDITIONAL PAGES MODELS (Added after Camps module)
+// ===================================================================
+
+// ---------- Enums for new pages ----------
+enum ClinicStatus {
+  OPEN
+  CLOSED
+}
+
+enum ActiveStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum PresenceStatus {
+  AVAILABLE
+  UNAVAILABLE
+}
+
+enum ContactStatus {
+  DONE
+  NOT_DONE
+}
+
+enum DistributionStatus {
+  PENDING
+  DONE
+  CANCELED
+}
+
+// ---------- Clinics ----------
+model Clinic {
+  id             String       @id @default(uuid())
+  name           String
+  specialty      String?
+  capacityPerDay Int          @default(0)
+  status         ClinicStatus @default(OPEN)
+
+  institutionId String?
+  institution   Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  distributions Distribution[]
+
+  @@index([status])
+  @@index([institutionId])
+}
+
+// ---------- Institutions ----------
+model Institution {
+  id          String         @id @default(uuid())
+  name        String
+  instagramId String?        @unique
+  email       String?
+  serviceType String?
+  presence    PresenceStatus @default(AVAILABLE)
+  status      GeneralStatus  @default(ACTIVE)
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  isTrashed           Boolean              @default(false)
+  isProtected         Boolean              @default(false)
+  clinics             Clinic[]
+  contacts            Contact[]
+  institutionServices InstitutionService[]
+  institutionProducts InstitutionProduct[]
+  distributions       Distribution[]
+  enterpriseProducts  EnterpriseProduct[]
+
+  @@index([status])
+  @@index([presence])
+}
+
+// ---------- Contacts ----------
+model Contact {
+  id String @id @default(uuid())
+
+  beneficiaryId String
+  beneficiary   Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+
+  contactType String?
+  notes       String?
+  status      ContactStatus @default(NOT_DONE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([beneficiaryId])
+  @@index([institutionId])
+  @@index([status])
+}
+
+// ---------- Products ----------
+model Product {
+  id       String       @id @default(uuid())
+  name     String
+  category String?
+  unit     String?
+  quantity Int          @default(0)
+  price    Float?
+  status   ActiveStatus @default(ACTIVE)
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  institutionProducts InstitutionProduct[]
+  distributions       Distribution[]
+  enterpriseProducts  EnterpriseProduct[]
+
+  @@index([status])
+  @@index([category])
+}
+
+// ---------- Services ----------
+model Service {
+  id                String        @id @default(uuid())
+  serviceType       String
+  donorOrganization String?
+  details           String?
+  status            GeneralStatus @default(ACTIVE)
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  institutionServices InstitutionService[]
+
+  @@index([status])
+}
+
+// ---------- Institutional Services (Join) ----------
+model InstitutionService {
+  id            String        @id @default(uuid())
+  institutionId String
+  serviceId     String
+  status        GeneralStatus @default(ACTIVE)
+
+  institution Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  service     Service     @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([institutionId, serviceId])
+  @@index([institutionId])
+  @@index([serviceId])
+}
+
+// ---------- Enterprise Products (Join) ----------
+model InstitutionProduct {
+  id            String       @id @default(uuid())
+  institutionId String
+  productId     String
+  quantity      Int          @default(0)
+  status        ActiveStatus @default(ACTIVE)
+
+  institution Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([institutionId, productId])
+  @@index([institutionId])
+  @@index([productId])
+  @@index([status])
+}
+
+// ---------- Distributions ----------
+model Distribution {
+  id String @id @default(uuid())
+
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+
+  clinicId String?
+  clinic   Clinic? @relation(fields: [clinicId], references: [id], onDelete: SetNull)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  quantity         Int                @default(0)
+  distributionDate DateTime           @default(now())
+  status           DistributionStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([institutionId])
+  @@index([clinicId])
+  @@index([productId])
+  @@index([status])
+}
+
+// =====================
+// Enterprise Products Page (from UI screenshot)
+// =====================
+
+enum EnterpriseProductAvailability {
+  AVAILABLE
+  UNAVAILABLE
+}
+
+model EnterpriseProduct {
+  id String @id @default(uuid())
+
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  quantity     Int                           @default(0)
+  availability EnterpriseProductAvailability @default(AVAILABLE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([institutionId])
+  @@index([productId])
+  @@index([availability])
+}
+
+// =====================
+// User/Auth/System Tables
+// =====================
 
 model User {
   id              String      @id @default(uuid())
@@ -37,7 +408,6 @@ model User {
   accounts        Account[]
   Session         Session[]
 
-  // Indexes for efficient querying
   @@index([invitedByUserId])
   @@index([roleId])
   @@index([status])
