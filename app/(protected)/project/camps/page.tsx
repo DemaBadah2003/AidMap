@@ -17,7 +17,6 @@ import {
 
 import { Pencil, Trash2, Save, X, Plus, Search } from 'lucide-react'
 import { campsApi, type FillStatus as ApiFillStatus } from '../../../helpers/campsService' // ✅ عدّل المسار إذا لزم
-
 type Camp = {
   id: string
   nameAr: string

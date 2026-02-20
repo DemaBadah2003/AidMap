@@ -5,6 +5,9 @@ import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import prisma from "@/lib/prisma";
 
+const DEMO_EMAIL = "demabadah4@gmail.com";
+const DEMO_PASSWORD = "demabadah12345678910D@";
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
 
@@ -32,8 +35,23 @@ export const authOptions: NextAuthOptions = {
           );
         }
 
+        const email = credentials.email.trim().toLowerCase();
+        const password = credentials.password;
+
+        // ✅ دخول ديمو سريع (يحافظ على تجربة Metronic) حتى لو DB فاضية
+        if (email === DEMO_EMAIL && password === DEMO_PASSWORD) {
+          return {
+            id: "demo-user",
+            email: DEMO_EMAIL,
+            name: "Demo User",
+            roleId: null,
+            status: "ACTIVE",
+            avatar: null,
+          } as any;
+        }
+
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email },
         });
 
         if (!user) {
@@ -46,7 +64,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         const isPasswordValid = await bcrypt.compare(
-          credentials.password,
+          password,
           user.password ?? ""
         );
 
@@ -92,10 +110,10 @@ export const authOptions: NextAuthOptions = {
       profile(profile) {
         // NextAuth يحتاج object فيه على الأقل id/email/name
         return {
-          id: profile.sub ?? profile.id,
+          id: profile.sub ?? (profile as any).id,
           name: profile.name,
           email: profile.email,
-          image: profile.picture,
+          image: (profile as any).picture,
         };
       },
     }),

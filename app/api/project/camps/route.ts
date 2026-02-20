@@ -1,67 +1,220 @@
-import { NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+// app/api/camps/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import prisma from "@/lib/prisma";
 
-export async function GET() {
-  const camps = await prisma.Camps.findMany({
-    where: { isTrashed: false },
-    orderBy: { createdAt: 'desc' },
-  })
-  return NextResponse.json(camps)
+/**
+ * تحويل fillStatus القادم من الفرونت إلى enum الموجود في Prisma
+ */
+function toDbStatus(fillStatus: "Full" | "Not Full") {
+  return fillStatus === "Full" ? "FULL" : "NOT_FULL";
 }
 
-export async function POST(req: Request) {
-  const body = await req.json()
+/**
+ * Zod Schemas
+ */
+const createSchema = z.object({
+  nameAr: z.string().trim().min(1, "Camp name is required"),
+  areaAr: z.string().trim().optional().default(""),
+  capacity: z.coerce.number().int().positive("Capacity must be > 0"),
+  fillStatus: z.enum(["Full", "Not Full"]).default("Not Full"),
+  // optional: لو حابة تبعتيه من الفرونت لاحقًا
+  supervisorId: z.string().uuid().optional(),
+});
 
-  // ✅ يدعم كود الفرونت (nameAr/areaAr) + يدعم name/area
-  const name = String(body?.name ?? body?.nameAr ?? '').trim()
-  const areaRaw = body?.area ?? body?.areaAr
-  const area = areaRaw === undefined || areaRaw === null ? null : String(areaRaw).trim()
-  const capacity = body?.capacity
+const updateSchema = z.object({
+  nameAr: z.string().trim().min(1).optional(),
+  areaAr: z.string().trim().optional(),
+  capacity: z.coerce.number().int().positive().optional(),
+  fillStatus: z.enum(["Full", "Not Full"]).optional(),
+  supervisorId: z.string().uuid().optional(),
+});
 
-  // ✅ fillStatus من الفرونت (Full/Not Full) -> status enum (FULL/NOT_FULL)
-  const fillStatus: 'Full' | 'Not Full' | undefined = body?.fillStatus
-  const status: 'FULL' | 'NOT_FULL' =
-    fillStatus === 'Full' ? 'FULL' : fillStatus === 'Not Full' ? 'NOT_FULL' : body?.status ?? 'NOT_FULL'
+async function getOrCreateDefaultSupervisorId() {
+  const existing = await prisma.supervisor.findFirst({
+    where: { isTrashed: false },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
 
-  if (!name || !Number.isInteger(capacity) || capacity <= 0) {
-    return NextResponse.json({ message: 'Invalid payload' }, { status: 400 })
-  }
+  if (existing?.id) return existing.id;
 
-  // supervisorId إجباري بالـ schema
-  // ✅ إذا ما أرسله الفرونت: بنجيب أول Supervisor موجود (حل مؤقت)
-  let supervisorId: string | undefined = body?.supervisorId
-  if (!supervisorId) {
-    const sup = await prisma.supervisor.findFirst({
-      where: { isTrashed: false },
-      orderBy: { createdAt: 'asc' },
-    })
-    if (!sup) {
-      return NextResponse.json(
-        { message: 'No supervisor found. Create a supervisor first.' },
-        { status: 400 }
-      )
-    }
-    supervisorId = sup.id
-  }
-
-  const created = await prisma.camps.create({
+  const created = await prisma.supervisor.create({
     data: {
-      name,
-      area: area && area.length ? area : null,
-      capacity,
-      status,
-      supervisorId,
+      name: "Default Supervisor",
+      status: "ACTIVE",
     },
-  })
+    select: { id: true },
+  });
 
-  return NextResponse.json(created, { status: 201 })
+  return created.id;
 }
 
-// ✅ Delete all (Soft delete)
-export async function DELETE() {
-  await prisma.camps.updateMany({
+/**
+ * GET /api/camps
+ * يرجع كل المخيمات (مع supervisor)
+ */
+export async function GET() {
+  const camps = await prisma.camps.findMany({
     where: { isTrashed: false },
-    data: { isTrashed: true },
-  })
-  return NextResponse.json({ ok: true })
+    orderBy: { createdAt: "desc" },
+    include: {
+      supervisor: true,
+    },
+  });
+
+  return NextResponse.json(camps);
+}
+
+/**
+ * POST /api/camps
+ * إنشاء مخيم
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const body = createSchema.parse(await req.json());
+
+    // ✅ تحقق تكرار (Business validation)
+    const exists = await prisma.camps.findFirst({
+      where: {
+        isTrashed: false,
+        name: body.nameAr,
+      },
+      select: { id: true },
+    });
+
+    if (exists) {
+      return NextResponse.json(
+        { message: "Camp already exists (duplicate name)." },
+        { status: 409 }
+      );
+    }
+
+    // ✅ supervisorId إجباري في الجدول → نحلها تلقائيًا
+    const supervisorId =
+      body.supervisorId ?? (await getOrCreateDefaultSupervisorId());
+
+    const created = await prisma.camps.create({
+      data: {
+        name: body.nameAr,
+        area: body.areaAr || null,
+        capacity: body.capacity,
+        status: toDbStatus(body.fillStatus),
+        supervisorId,
+      },
+      include: {
+        supervisor: true,
+      },
+    });
+
+    return NextResponse.json(created, { status: 201 });
+  } catch (e) {
+    // Zod errors
+    if (e instanceof z.ZodError) {
+      return NextResponse.json(
+        { message: "Validation failed", issues: e.issues },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { message: e instanceof Error ? e.message : "Server error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PUT /api/camps?id=...
+ * تحديث مخيم
+ */
+export async function PUT(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ message: "Missing id" }, { status: 400 });
+  }
+
+  try {
+    const body = updateSchema.parse(await req.json());
+
+    // ✅ تحقق التكرار لو الاسم انبعت
+    if (body.nameAr) {
+      const exists = await prisma.camps.findFirst({
+        where: {
+          isTrashed: false,
+          name: body.nameAr,
+          NOT: { id },
+        },
+        select: { id: true },
+      });
+
+      if (exists) {
+        return NextResponse.json(
+          { message: "Camp already exists (duplicate name)." },
+          { status: 409 }
+        );
+      }
+    }
+
+    const updated = await prisma.camps.update({
+      where: { id },
+      data: {
+        name: body.nameAr,
+        area: body.areaAr,
+        capacity: body.capacity,
+        status: body.fillStatus ? toDbStatus(body.fillStatus) : undefined,
+        supervisorId: body.supervisorId,
+      },
+      include: { supervisor: true },
+    });
+
+    return NextResponse.json(updated);
+  } catch (e) {
+    if (e instanceof z.ZodError) {
+      return NextResponse.json(
+        { message: "Validation failed", issues: e.issues },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { message: e instanceof Error ? e.message : "Server error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/camps?id=...  -> soft delete
+ * DELETE /api/camps?all=true -> soft delete all
+ */
+export async function DELETE(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get("id");
+  const all = req.nextUrl.searchParams.get("all");
+
+  try {
+    if (all === "true") {
+      await prisma.camps.updateMany({
+        where: { isTrashed: false },
+        data: { isTrashed: true },
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (!id) {
+      return NextResponse.json({ message: "Missing id" }, { status: 400 });
+    }
+
+    await prisma.camps.update({
+      where: { id },
+      data: { isTrashed: true },
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return NextResponse.json(
+      { message: e instanceof Error ? e.message : "Server error" },
+      { status: 500 }
+    );
+  }
 }
