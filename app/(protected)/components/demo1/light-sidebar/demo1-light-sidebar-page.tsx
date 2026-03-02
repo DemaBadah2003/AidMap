@@ -43,8 +43,8 @@ export function Demo1LightSidebarPage() {
       <Container>
         <Toolbar>
           <ToolbarHeading
-            title="Dddddddddddddddddddddddddddashboard"
-            description="Central Hub for Personal Customization"
+            title="Gaza Safe Aid Platform (GSAP)"
+            description="Humanitarian Service Discovery and Routing System"
           />
           <ToolbarActions>
             <Popover open={isOpen} onOpenChange={setIsOpen}>
