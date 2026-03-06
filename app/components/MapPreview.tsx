@@ -3,7 +3,9 @@
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
-
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { MapPin } from 'lucide-react'
 export type Place = {
   id: string
   name: string
@@ -44,6 +46,12 @@ type StepItem = {
 }
 
 type RouterEngine = 'graphhopper' | 'osrm' | 'valhalla'
+type TopItem = {
+  key: 'shelter' | 'aid' | 'school'
+  title: string
+  name: string
+  meta: string
+}
 
 /** ✅ Navbar (OSM-like) */
 function OSMNavbar() {
@@ -205,7 +213,48 @@ const QUERY_ICON = `
   <circle cx="12" cy="17.7" r="1" fill="#111827"/>
 </svg>
 `
+const TopCards = () => {
+  const items: TopItem[] = [
+    { key: 'shelter', title: 'أقرب مأوى', name: 'Al-Azhar Shelter', meta: 'يبعد 1.2 كم' },
+    { key: 'aid', title: 'توزيع غذاء وماء', name: 'Al-Rahfah Aid Center', meta: 'مفتوح - 09:00' },
+    { key: 'school', title: 'المدارس المتاحة', name: 'Great Gaza Primary School', meta: 'سعة 120' },
+  ]
 
+  const [open, setOpen] = useState(false)
+  const [selected, setSelected] = useState<TopItem | null>(null)
+
+  const onOpenDetails = (item: TopItem) => {
+    setSelected(item)
+    setOpen(true)
+  }
+
+  return (
+    <>
+      <div dir="rtl" className="grid gap-4 md:grid-cols-3 mb-4">
+        {items.map((it) => (
+          <Card key={it.key}>
+            <CardContent className="p-4 flex flex-col gap-2 text-right">
+              <div className="text-sm text-secondary-foreground">{it.title}</div>
+
+              <div dir="ltr" className="text-base font-semibold text-mono text-left">
+                {it.name}
+              </div>
+
+              <div className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
+                <MapPin className="size-3.5" />
+                {it.meta}
+              </div>
+
+              <Button className="mt-2" size="sm" onClick={() => onOpenDetails(it)}>
+                عرض التفاصيل
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </>
+  )
+}
 export default function MapPreview({
   lng = 34.4667,
   lat = 31.5,
@@ -1137,10 +1186,13 @@ out center;
     setVis('osm-food-layer', !!layerCats?.food)
     setVis('osm-food-labels', !!layerCats?.food)
   }, [layerCats])
-  return (
+ return (
   <div className="w-full">
+    <TopCards />
+
     {/* ✅ Navbar فوق كل شيء */}
-    <OSMNavbar />
+    <OSMNavbar /> 
+    
 
     {/* ✅ نفس wrapperRef (مهم للـ ResizeObserver) */}
     <div ref={wrapperRef} className="w-full">
