@@ -1137,15 +1137,16 @@ out center;
     setVis('osm-food-layer', !!layerCats?.food)
     setVis('osm-food-labels', !!layerCats?.food)
   }, [layerCats])
-
   return (
-    <div className="w-full rounded-lg overflow-hidden border border-slate-200 bg-white">
-      {/* ✅ Navbar فوق كل شيء */}
-      <OSMNavbar />
+  <div className="w-full">
+    {/* ✅ Navbar فوق كل شيء */}
+    <OSMNavbar />
 
-      {/* ✅ نفس wrapperRef (مهم للـ ResizeObserver) */}
-      <div ref={wrapperRef} className="w-full">
-        <div className="flex w-full" style={{ height }}>
+    {/* ✅ نفس wrapperRef (مهم للـ ResizeObserver) */}
+    <div ref={wrapperRef} className="w-full">
+      <div className="flex w-full" style={{ height }}>
+
+ 
           {/* SIDEBAR */}
           <div
             className="bg-white border-r"
@@ -1612,7 +1613,7 @@ out center;
             )}
           </div>
 
-          {/* MAP + Filters under map */}
+                    {/* MAP + Filters under map */}
           <div className="flex-1 flex flex-col min-w-0">
             {/* MAP */}
             <div className="relative flex-1 min-h-0">
@@ -1691,59 +1692,48 @@ out center;
             </div>
 
             {/* ✅ 3 Filters under the map */}
-            <div
-              className="border-t bg-white px-4 py-3"
-              style={{
-                fontSize: 13,
-                color: '#111827',
-              }}
-            >
-              <div
-                className="flex flex-wrap items-center gap-x-6 gap-y-2"
-                style={{ direction: 'rtl' }}
-              >
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!!layerCats?.shelters}
-                    onChange={(e) =>
-                      setLayerCats((prev) => ({
-                        ...(prev || {}),
-                        shelters: e.target.checked,
-                      }))
-                    }
-                  />
-                  <span>مراكز الإيواء (المدارس الحكومية والأونروا)</span>
-                </label>
+            <div dir="rtl" className="mt-4 grid gap-2 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={!!layerCats?.shelters}
+                  onChange={(e) =>
+                    setLayerCats((prev) => ({
+                      ...(prev || {}),
+                      shelters: e.target.checked,
+                    }))
+                  }
+                />
+                <span>مراكز الإيواء (المدارس الحكومية والوكالة)</span>
+              </label>
 
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!!layerCats?.medical}
-                    onChange={(e) =>
-                      setLayerCats((prev) => ({
-                        ...(prev || {}),
-                        medical: e.target.checked,
-                      }))
-                    }
-                  />
-                  <span>الخدمات الطبية والصيدليات</span>
-                </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={!!layerCats?.medical}
+                  onChange={(e) =>
+                    setLayerCats((prev) => ({
+                      ...(prev || {}),
+                      medical: e.target.checked,
+                    }))
+                  }
+                />
+                <span>العيادات الطبية والصيدليات</span>
+              </label>
 
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!!layerCats?.aid}
-                    onChange={(e) =>
-                      setLayerCats((prev) => ({
-                        ...(prev || {}),
-                        aid: e.target.checked,
-                      }))
-                    }
-                  />
-                  <span>مراكز توزيع المياه</span>
-                </label>
-              </div>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={!!layerCats?.aid}
+                  onChange={(e) =>
+                    setLayerCats((prev) => ({
+                      ...(prev || {}),
+                      aid: e.target.checked,
+                    }))
+                  }
+                />
+                <span>مراكز توزيع الغذاء والماء</span>
+              </label>
             </div>
           </div>
         </div>

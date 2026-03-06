@@ -18,11 +18,8 @@ import {
 
 import { MapPin, Search } from 'lucide-react';
 
-// ✅ import خريطتك (غيرت الاسم لتجنب التعارض مع MapPreview الموجود هنا)
 import MapLibrePreview from '@/app/components/MapPreview';
 
-// ✅ أماكن غزة (غيريها حسب بياناتك) — هذه بياناتك الخاصة
-// ✅ هذه ستظهر كـ Markers (Pins) فوق الخريطة
 const gazaPlaces = [
   { id: 'shelter_01', name: 'مأوى الأزهر', type: 'Shelter', lng: 34.4667, lat: 31.5017 },
   { id: 'aid_01', name: 'مركز توزيع', type: 'Aid Center', lng: 34.45, lat: 31.52 },
@@ -31,9 +28,9 @@ const gazaPlaces = [
 
 type TopItem = {
   key: 'shelter' | 'aid' | 'school';
-  title: string; // عربي
-  name: string;  // إنجليزي
-  meta: string;  // عربي
+  title: string;
+  name: string;
+  meta: string;
 };
 
 const TopCards = () => {
@@ -49,74 +46,6 @@ const TopCards = () => {
   const onOpenDetails = (item: TopItem) => {
     setSelected(item);
     setOpen(true);
-  };
-
-  const renderDetailsContent = () => {
-    if (!selected) return null;
-
-    if (selected.key === 'shelter') {
-      return (
-        <div dir="rtl" className="grid gap-3 text-sm text-right">
-          <div className="text-muted-foreground">تفاصيل المأوى:</div>
-
-          <div className="grid gap-2 rounded-lg border p-3">
-            <div dir="ltr" className="font-medium text-left">
-              {selected.name}
-            </div>
-
-            <div className="text-muted-foreground">المسافة: {selected.meta}</div>
-            <div className="text-muted-foreground">السعة المتوقعة: 250</div>
-            <div className="text-muted-foreground">الحالة: متاح</div>
-          </div>
-
-          <div className="text-xs text-muted-foreground">
-            * استبدل هذه البيانات لاحقًا ببيانات حقيقية من API.
-          </div>
-        </div>
-      );
-    }
-
-    if (selected.key === 'aid') {
-      return (
-        <div dir="rtl" className="grid gap-3 text-sm text-right">
-          <div className="text-muted-foreground">تفاصيل مركز التوزيع:</div>
-
-          <div className="grid gap-2 rounded-lg border p-3">
-            <div dir="ltr" className="font-medium text-left">
-              {selected.name}
-            </div>
-
-            <div className="text-muted-foreground">المواعيد: {selected.meta}</div>
-            <div className="text-muted-foreground">المواد المتوفرة: غذاء + ماء</div>
-            <div className="text-muted-foreground">مستوى الازدحام: متوسط</div>
-          </div>
-
-          <div className="text-xs text-muted-foreground">
-            * تقدر تضيف زر “طلب دور/حجز” هنا لاحقًا.
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div dir="rtl" className="grid gap-3 text-sm text-right">
-        <div className="text-muted-foreground">تفاصيل المدرسة:</div>
-
-        <div className="grid gap-2 rounded-lg border p-3">
-          <div dir="ltr" className="font-medium text-left">
-            {selected.name}
-          </div>
-
-          <div className="text-muted-foreground">السعة: {selected.meta}</div>
-          <div className="text-muted-foreground">الفئات: ابتدائي</div>
-          <div className="text-muted-foreground">الدوام: صباحي</div>
-        </div>
-
-        <div className="text-xs text-muted-foreground">
-          * لاحقًا اربطها بخريطة/موقع وإحصائيات حضور.
-        </div>
-      </div>
-    );
   };
 
   return (
@@ -156,8 +85,6 @@ const TopCards = () => {
             </DialogDescription>
           </DialogHeader>
 
-          {renderDetailsContent()}
-
           <DialogFooter dir="rtl" className="gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>
               إغلاق
@@ -170,38 +97,10 @@ const TopCards = () => {
   );
 };
 
-/**
- * ✅ MapPreview (داخل الداشبورد)
- * - يعرض خريطة صغيرة داخل Card
- * - و Dialog للخريطة الكبيرة
- * - وتحت الخريطة 3 checkboxes للتحكم بإظهار/إخفاء الفئات
- */
 const MapPreview = () => {
   const [fullOpen, setFullOpen] = useState(false);
 
-  // ✅ 3 مفاتيح checkbox (هاي اللي طلبتيهم)
-  const [showShelters, setShowShelters] = useState(true);
-  const [showMedical, setShowMedical] = useState(true);
-  const [showAid, setShowAid] = useState(true);
-
-  /**
-   * ✅ فلترة places الخاصة فيك (Markers)
-   * حسب النوع (type) اللي انتي مخزناه في البيانات
-   */
-  const filteredPlaces = gazaPlaces.filter((p) => {
-    const t = (p.type || '').toLowerCase();
-
-    // ✅ مراكز الإيواء
-    if (t.includes('shelter')) return showShelters;
-
-    // ✅ طبي
-    if (t.includes('clinic') || t.includes('pharmacy') || t.includes('hospital')) return showMedical;
-
-    // ✅ توزيع (ماء/غذاء)
-    if (t.includes('aid') || t.includes('water') || t.includes('food')) return showAid;
-
-    return true;
-  });
+  const filteredPlaces = gazaPlaces;
 
   return (
     <>
@@ -212,7 +111,6 @@ const MapPreview = () => {
               Map Preview
             </CardTitle>
 
-            {/* ✅ الآن الزر يفتح Dialog */}
             <Button dir="ltr" variant="outline" size="sm" onClick={() => setFullOpen(true)}>
               Open Full Map
             </Button>
@@ -220,64 +118,25 @@ const MapPreview = () => {
         </CardHeader>
 
         <CardContent className="p-4">
-          {/* ✅ خريطة أكبر داخل الكارد */}
           <div dir="ltr" className="rounded-lg overflow-hidden">
             <MapLibrePreview
               lng={34.4667}
               lat={31.5}
               zoom={10}
               height={420}
-              places={filteredPlaces} // ✅ نقاطك الخاصة بعد الفلترة
+              places={filteredPlaces}
               osmEnabled={true}
-              // ✅ نجلب كل الأنواع مرة واحدة من OSM
-              // وبعدها نتحكم بعرضها/إخفائها عبر osmCategories
               osmAmenities={['hospital', 'clinic', 'school', 'pharmacy', 'doctors', 'drinking_water']}
               osmCategories={{
-                shelters: showShelters, // ✅ مدارس = مراكز إيواء
-                medical: showMedical,   // ✅ طبي
-                aid: showAid,           // ✅ drinking_water (ماء)
+                shelters: true,
+                medical: true,
+                aid: true,
               }}
             />
-          </div>
-
-          {/* ✅ أزرار/Checkboxes تحت الخريطة (مثل ما طلبتي) */}
-          <div dir="rtl" className="mt-4 grid gap-2 text-sm">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showShelters}
-                onChange={(e) => setShowShelters(e.target.checked)}
-              />
-              <span>مراكز الإيواء (المدارس الحكومية والوكالة)</span>
-            </label>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showMedical}
-                onChange={(e) => setShowMedical(e.target.checked)}
-              />
-              <span>العيادات الطبية والصيدليات</span>
-            </label>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showAid}
-                onChange={(e) => setShowAid(e.target.checked)}
-              />
-              <span>مراكز توزيع الغذاء والماء</span>
-            </label>
-
-            {/* ✅ ملاحظة صغيرة توضيحية */}
-            <div className="text-xs text-muted-foreground mt-1">
-              * طبقة “مراكز التوزيع” من OSM هنا تمثل نقاط الماء (drinking_water)، أما الغذاء غالبًا يحتاج بياناتك الخاصة أو مصدر بيانات ميداني.
-            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* ✅ Dialog للخريطة الكاملة */}
       <Dialog open={fullOpen} onOpenChange={setFullOpen}>
         <DialogContent className="max-w-[1100px] p-0 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b">
@@ -298,9 +157,9 @@ const MapPreview = () => {
               osmEnabled={true}
               osmAmenities={['hospital', 'clinic', 'school', 'pharmacy', 'doctors', 'drinking_water']}
               osmCategories={{
-                shelters: showShelters,
-                medical: showMedical,
-                aid: showAid,
+                shelters: true,
+                medical: true,
+                aid: true,
               }}
             />
           </div>
