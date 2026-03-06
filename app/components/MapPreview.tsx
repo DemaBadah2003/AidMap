@@ -1186,13 +1186,10 @@ out center;
     setVis('osm-food-layer', !!layerCats?.food)
     setVis('osm-food-labels', !!layerCats?.food)
   }, [layerCats])
- return (
+  return (
   <div className="w-full">
-    <TopCards />
-
     {/* ✅ Navbar فوق كل شيء */}
-    <OSMNavbar /> 
-    
+    <OSMNavbar />
 
     {/* ✅ نفس wrapperRef (مهم للـ ResizeObserver) */}
     <div ref={wrapperRef} className="w-full">
