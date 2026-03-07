@@ -653,7 +653,7 @@ export default function MapPreview({
 
   useEffect(() => {
     setTimeout(() => mapRef.current?.resize(), 50)
-  }, [height, dirOpen, layersOpen])
+  }, [dirOpen, layersOpen])
 
   useEffect(() => {
     const map = mapRef.current
@@ -685,10 +685,7 @@ export default function MapPreview({
         </div>
       `)
 
-      const marker = new maplibregl.Marker()
-        .setLngLat([p.lng, p.lat])
-        .setPopup(popup)
-        .addTo(map)
+      const marker = new maplibregl.Marker().setLngLat([p.lng, p.lat]).setPopup(popup).addTo(map)
 
       markersRef.current.push(marker)
     })
@@ -731,11 +728,7 @@ export default function MapPreview({
       }
     }
 
-    const attachLayerHandler = (
-      type: HandlerItem['type'],
-      layerId: string,
-      handler: any
-    ) => {
+    const attachLayerHandler = (type: HandlerItem['type'], layerId: string, handler: any) => {
       if (!map.getLayer(layerId)) return
       map.on(type, layerId, handler)
       osmHandlersRef.current.push({ type, layerId, handler })
@@ -1223,8 +1216,13 @@ out center;
     <div
       ref={wrapperRef}
       style={{
+        position: 'relative',
         width: '100%',
-        height: '100%',
+        height: `${height}px`,
+        minHeight: 500,
+        overflow: 'hidden',
+        background: '#fff',
+        borderRadius: 12,
       }}
     >
       <div
@@ -1232,24 +1230,23 @@ out center;
           position: 'relative',
           width: '100%',
           height: '100%',
-          minHeight: `${height}px`,
           overflow: 'hidden',
-          borderRadius: 12,
         }}
       >
-        {/* MAP */}
         <div
           ref={containerRef}
           style={{
             position: 'absolute',
-            inset: 0,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             width: '100%',
             height: '100%',
             zIndex: 1,
           }}
         />
 
-        {/* SIDEBAR INSIDE MAP - LEFT */}
         <div
           style={{
             position: 'absolute',
@@ -1968,7 +1965,6 @@ out center;
           )}
         </div>
 
-        {/* LAYERS PANEL */}
         {layersOpen && (
           <div
             style={{
@@ -2033,7 +2029,6 @@ out center;
           </div>
         )}
 
-        {/* QUERY HINT */}
         {queryMode && (
           <div
             style={{
@@ -2054,68 +2049,88 @@ out center;
           </div>
         )}
 
-        {/* BOTTOM FILTERS */}
-        <div
-          dir="rtl"
-          style={{
-            position: 'absolute',
-            left: 12,
-            right: 12,
-            bottom: 12,
-            background: 'rgba(255,255,255,0.96)',
-            backdropFilter: 'blur(6px)',
-            border: '1px solid #e5e7eb',
-            borderRadius: 12,
-            padding: 12,
-            display: 'grid',
-            gap: 8,
-            fontSize: 14,
-            zIndex: 20,
-            boxShadow: '0 10px 24px rgba(0,0,0,.14)',
-          }}
-        >
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={!!layerCats?.shelters}
-              onChange={(e) =>
-                setLayerCats((prev) => ({
-                  ...(prev || {}),
-                  shelters: e.target.checked,
-                }))
-              }
-            />
-            <span>مراكز الإيواء (المدارس الحكومية والوكالة)</span>
-          </label>
+       <div
+  dir="rtl"
+  style={{
+    position: 'absolute',
+    right: 12,
+    bottom: 12,
+    width: 'fit-content',
+    background: 'rgba(255,255,255,0.96)',
+    backdropFilter: 'blur(6px)',
+    border: '1px solid #e5e7eb',
+    borderRadius: 12,
+    padding: '10px 14px',
+    display: 'grid',
+    gap: 6,
+    fontSize: 14,
+    zIndex: 20,
+    boxShadow: '0 10px 24px rgba(0,0,0,.14)',
+  }}
+>
+  <label
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+      whiteSpace: 'nowrap',
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={!!layerCats?.shelters}
+      onChange={(e) =>
+        setLayerCats((prev) => ({
+          ...(prev || {}),
+          shelters: e.target.checked,
+        }))
+      }
+    />
+    <span>مراكز الإيواء (المدارس الحكومية والوكالة)</span>
+  </label>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={!!layerCats?.medical}
-              onChange={(e) =>
-                setLayerCats((prev) => ({
-                  ...(prev || {}),
-                  medical: e.target.checked,
-                }))
-              }
-            />
-            <span>العيادات الطبية والصيدليات</span>
-          </label>
+  <label
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+      whiteSpace: 'nowrap',
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={!!layerCats?.medical}
+      onChange={(e) =>
+        setLayerCats((prev) => ({
+          ...(prev || {}),
+          medical: e.target.checked,
+        }))
+      }
+    />
+    <span>العيادات الطبية والصيدليات</span>
+  </label>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={!!layerCats?.aid}
-              onChange={(e) =>
-                setLayerCats((prev) => ({
-                  ...(prev || {}),
-                  aid: e.target.checked,
-                }))
-              }
-            />
-            <span>مراكز توزيع الغذاء والماء</span>
-          </label>
-        </div>
+  <label
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+      whiteSpace: 'nowrap',
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={!!layerCats?.aid}
+      onChange={(e) =>
+        setLayerCats((prev) => ({
+          ...(prev || {}),
+          aid: e.target.checked,
+        }))
+      }
+    />
+    <span>مراكز توزيع الغذاء والماء</span>
+  </label>
+</div>
       </div>
     </div>
   )
