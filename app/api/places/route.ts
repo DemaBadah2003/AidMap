@@ -1,74 +1,69 @@
-import { NextRequest, NextResponse } from "next/server"
-import prisma from "@/lib/prisma";
-import { PlaceType } from "@prisma/client"
+import { NextRequest, NextResponse } from 'next/server'
+import fs from 'fs/promises'
+import path from 'path'
 
-const ALLOWED_TYPES = Object.values(PlaceType)
+type AdminPlaceType = 'shelter' | 'hospital' | 'water' | 'food'
 
-export async function GET(request: NextRequest) {
+type AdminPlace = {
+  id: string
+  name: string
+  type: AdminPlaceType
+  lng: number
+  lat: number
+  operator?: string
+  capacity?: number | null
+  occupancy?: number | null
+  availableBeds?: number | null
+  statusText?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+const DATA_DIR = path.join(process.cwd(), 'data')
+const DATA_FILE = path.join(DATA_DIR, 'places.json')
+
+async function ensureDataFile() {
+  await fs.mkdir(DATA_DIR, { recursive: true })
+
   try {
-    const searchParams = request.nextUrl.searchParams
-    const rawSearch = searchParams.get("search")?.trim() || ""
-    const rawType = searchParams.get("type")?.trim() || ""
+    await fs.access(DATA_FILE)
+  } catch {
+    await fs.writeFile(DATA_FILE, '[]', 'utf-8')
+  }
+}
 
-    const where: any = {
-      isActive: true,
-      isTrashed: false,
+async function readPlaces(): Promise<AdminPlace[]> {
+  await ensureDataFile()
+  const raw = await fs.readFile(DATA_FILE, 'utf-8')
+
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const type = searchParams.get('type')
+
+    let places = await readPlaces()
+
+    if (type && ['shelter', 'hospital', 'water', 'food'].includes(type)) {
+      places = places.filter((p) => p.type === type)
     }
-
-    if (rawSearch) {
-      where.OR = [
-        {
-          name: {
-            contains: rawSearch,
-            mode: "insensitive",
-          },
-        },
-        {
-          description: {
-            contains: rawSearch,
-            mode: "insensitive",
-          },
-        },
-      ]
-    }
-
-    if (rawType && ALLOWED_TYPES.includes(rawType as PlaceType)) {
-      where.type = rawType as PlaceType
-    }
-
-    const places = await prisma.place.findMany({
-      where,
-      orderBy: {
-        createdAt: "desc",
-      },
-    })
 
     return NextResponse.json({
       success: true,
       count: places.length,
-      filters: {
-        search: rawSearch || null,
-        type: rawType || null,
-      },
-      data: places.map((place) => ({
-        id: place.id,
-        name: place.name,
-        type: place.type,
-        description: place.description,
-        lat: Number(place.latitude),
-        lng: Number(place.longitude),
-        status: place.status,
-        isActive: place.isActive,
-      })),
+      data: places,
     })
   } catch (error) {
-    console.error("GET /api/places error:", error)
-
+    console.error('GET /api/places error:', error)
     return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to load places",
-      },
+      { success: false, message: 'فشل في جلب الأماكن للخريطة' },
       { status: 500 }
     )
   }

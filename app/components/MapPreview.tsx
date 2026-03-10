@@ -209,6 +209,7 @@ export default function MapPreview({
   const rtlReadyRef = useRef(false)
   const layersControlRef = useRef<IconButtonControl | null>(null)
   const queryControlRef = useRef<IconButtonControl | null>(null)
+  const lastRouteKeyRef = useRef('')
 
   const [layersOpen, setLayersOpen] = useState(false)
   const [queryMode, setQueryMode] = useState(false)
@@ -382,6 +383,14 @@ export default function MapPreview({
     return `${m} د`
   }
 
+  const estimateDurationByProfile = (
+    distanceKm: number,
+    mode: 'walking' | 'cycling' | 'driving'
+  ) => {
+    const speedKmH = mode === 'walking' ? 5 : mode === 'cycling' ? 15 : 40
+    return (distanceKm / speedKmH) * 60
+  }
+
   const parseNumber = (v: any) => {
     if (v === null || v === undefined || v === '') return null
     const n = Number(String(v).replace(/[^\d.-]/g, ''))
@@ -502,6 +511,51 @@ export default function MapPreview({
   const allSearchItems = useMemo(() => {
     return [...osmSearchItems, ...adminSearchItems]
   }, [osmSearchItems, adminSearchItems])
+
+  const applyLayerVisibility = () => {
+    const map = mapRef.current
+    if (!map) return
+
+    const setVis = (id: string, on: boolean) => {
+      if (!map.getLayer(id)) return
+      map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none')
+    }
+
+    const showAny =
+      !!layerCats?.shelters || !!layerCats?.medical || !!layerCats?.aid || !!layerCats?.food
+
+    setVis('osm-clusters', showAny)
+    setVis('osm-cluster-count', showAny)
+
+    const showSchools = !!layerCats?.shelters
+    setVis('osm-schools-layer', showSchools)
+    setVis('osm-schools-labels', showSchools)
+    setVis('osm-unrwa-schools-layer', showSchools)
+    setVis('osm-unrwa-schools-labels', showSchools)
+
+    setVis('osm-medical-layer', !!layerCats?.medical)
+    setVis('osm-medical-labels', !!layerCats?.medical)
+
+    setVis('osm-water-layer', !!layerCats?.aid)
+    setVis('osm-water-labels', !!layerCats?.aid)
+
+    setVis('osm-food-layer', !!layerCats?.food)
+    setVis('osm-food-labels', !!layerCats?.food)
+
+    setVis('admin-shelters-layer', !!layerCats?.shelters)
+    setVis('admin-shelters-labels', !!layerCats?.shelters)
+    setVis('admin-unrwa-shelters-layer', !!layerCats?.shelters)
+    setVis('admin-unrwa-shelters-labels', !!layerCats?.shelters)
+
+    setVis('admin-medical-layer', !!layerCats?.medical)
+    setVis('admin-medical-labels', !!layerCats?.medical)
+
+    setVis('admin-water-layer', !!layerCats?.aid)
+    setVis('admin-water-labels', !!layerCats?.aid)
+
+    setVis('admin-food-layer', !!layerCats?.food)
+    setVis('admin-food-labels', !!layerCats?.food)
+  }
 
   const cleanupOsm = () => {
     const map = mapRef.current
@@ -640,10 +694,17 @@ export default function MapPreview({
         loading: false,
         distanceText: formatDistanceKm(data.distanceKm),
         durationText: formatDurationMin(data.durationMin),
+        error: undefined,
+        warning: undefined,
       })
     } catch (err) {
       console.error(err)
       clearRoute()
+
+      const directKm = haversineKm(userLocation, {
+        lng: place.lng,
+        lat: place.lat,
+      })
 
       map.flyTo({
         center: [place.lng, place.lat],
@@ -653,7 +714,10 @@ export default function MapPreview({
       setSelectedPlace({
         ...cardData,
         loading: false,
-        error: 'تعذر حساب المسار حالياً.',
+        warning: 'تعذر حساب المسار الفعلي، تم عرض تقدير تقريبي حسب وسيلة التنقل.',
+        distanceText: formatDistanceKm(directKm),
+        durationText: formatDurationMin(estimateDurationByProfile(directKm, profile)),
+        error: undefined,
       })
     }
   }
@@ -906,6 +970,38 @@ export default function MapPreview({
   useEffect(() => {
     setSearchResults([])
   }, [selectedLayerFilter])
+
+  useEffect(() => {
+    applyLayerVisibility()
+  }, [layerCats, adminSearchItems, osmSearchItems, osmEnabled])
+
+  useEffect(() => {
+    if (!selectedPlace || !userLocation) return
+
+    const key = [
+      selectedPlace.id,
+      selectedPlace.lng,
+      selectedPlace.lat,
+      profile,
+      routerEngine,
+      userLocation.lng,
+      userLocation.lat,
+    ].join('|')
+
+    if (lastRouteKeyRef.current === key) return
+    lastRouteKeyRef.current = key
+
+    openPlaceCardAndRoute({
+      id: selectedPlace.id,
+      name: selectedPlace.name,
+      kind: selectedPlace.kind,
+      amenity: selectedPlace.amenity,
+      operator: selectedPlace.operator,
+      lng: selectedPlace.lng,
+      lat: selectedPlace.lat,
+      statusText: selectedPlace.statusText,
+    })
+  }, [profile, routerEngine, userLocation, selectedPlace])
 
   useEffect(() => {
     const map = mapRef.current
@@ -1441,6 +1537,8 @@ out center tags;
         attachPlaceCardHandler('osm-water-layer')
         attachPlaceCardHandler('osm-food-layer')
 
+        applyLayerVisibility()
+
         window.setTimeout(() => map.resize(), 60)
       } catch (err) {
         console.error('OSM fetch failed:', err)
@@ -1705,55 +1803,12 @@ out center tags;
       attachAdminHandler('mouseleave', layerId, () => (map.getCanvas().style.cursor = ''))
     })
 
+    applyLayerVisibility()
+
     window.setTimeout(() => map.resize(), 50)
 
     return () => cleanupAdmin()
   }, [adminSearchItems])
-
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-
-    const setVis = (id: string, on: boolean) => {
-      if (!map.getLayer(id)) return
-      map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none')
-    }
-
-    const showAny =
-      !!layerCats?.shelters || !!layerCats?.medical || !!layerCats?.aid || !!layerCats?.food
-
-    setVis('osm-clusters', showAny)
-    setVis('osm-cluster-count', showAny)
-
-    const showSchools = !!layerCats?.shelters
-    setVis('osm-schools-layer', showSchools)
-    setVis('osm-schools-labels', showSchools)
-    setVis('osm-unrwa-schools-layer', showSchools)
-    setVis('osm-unrwa-schools-labels', showSchools)
-
-    setVis('osm-medical-layer', !!layerCats?.medical)
-    setVis('osm-medical-labels', !!layerCats?.medical)
-
-    setVis('osm-water-layer', !!layerCats?.aid)
-    setVis('osm-water-labels', !!layerCats?.aid)
-
-    setVis('osm-food-layer', !!layerCats?.food)
-    setVis('osm-food-labels', !!layerCats?.food)
-
-    setVis('admin-shelters-layer', !!layerCats?.shelters)
-    setVis('admin-shelters-labels', !!layerCats?.shelters)
-    setVis('admin-unrwa-shelters-layer', !!layerCats?.shelters)
-    setVis('admin-unrwa-shelters-labels', !!layerCats?.shelters)
-
-    setVis('admin-medical-layer', !!layerCats?.medical)
-    setVis('admin-medical-labels', !!layerCats?.medical)
-
-    setVis('admin-water-layer', !!layerCats?.aid)
-    setVis('admin-water-labels', !!layerCats?.aid)
-
-    setVis('admin-food-layer', !!layerCats?.food)
-    setVis('admin-food-labels', !!layerCats?.food)
-  }, [layerCats])
 
   const openSearchResult = async (item: UnifiedSearchItem) => {
     setSearchResults([])
@@ -2043,6 +2098,7 @@ out center tags;
                 type="button"
                 onClick={() => {
                   setSelectedPlace(null)
+                  lastRouteKeyRef.current = ''
                   clearRoute()
                 }}
                 style={{
