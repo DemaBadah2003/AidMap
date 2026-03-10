@@ -145,7 +145,7 @@ class IconButtonControl implements maplibregl.IControl {
     btn.onclick = (e) => {
       e.preventDefault()
       this.opts.onClick()
-      this.syncActive()
+      window.setTimeout(() => this.syncActive(), 0)
     }
 
     container.appendChild(btn)
@@ -163,7 +163,7 @@ class IconButtonControl implements maplibregl.IControl {
     this._map = undefined
   }
 
-  private syncActive() {
+  syncActive() {
     if (!this._btn) return
     const isActive = this.opts.active?.() ?? false
     this._btn.style.background = isActive ? '#e5e7eb' : ''
@@ -207,6 +207,8 @@ export default function MapPreview({
   const adminHandlersRef = useRef<HandlerItem[]>([])
 
   const rtlReadyRef = useRef(false)
+  const layersControlRef = useRef<IconButtonControl | null>(null)
+  const queryControlRef = useRef<IconButtonControl | null>(null)
 
   const [layersOpen, setLayersOpen] = useState(false)
   const [queryMode, setQueryMode] = useState(false)
@@ -222,6 +224,8 @@ export default function MapPreview({
   const [searchNotice, setSearchNotice] = useState('')
   const [selectedPlace, setSelectedPlace] = useState<SelectedPlaceCard | null>(null)
   const [osmSearchItems, setOsmSearchItems] = useState<UnifiedSearchItem[]>([])
+  const [searchResults, setSearchResults] = useState<UnifiedSearchItem[]>([])
+  const [isSearching, setIsSearching] = useState(false)
 
   const layerCats = useMemo(() => {
     switch (selectedLayerFilter) {
@@ -260,6 +264,8 @@ export default function MapPreview({
   const ADMIN_LAYERS = [
     'admin-shelters-layer',
     'admin-shelters-labels',
+    'admin-unrwa-shelters-layer',
+    'admin-unrwa-shelters-labels',
     'admin-medical-layer',
     'admin-medical-labels',
     'admin-water-layer',
@@ -270,27 +276,43 @@ export default function MapPreview({
 
   const amenityToArabic = (a: string) => {
     switch (a) {
-      case 'school': return 'مدرسة'
-      case 'hospital': return 'مستشفى'
-      case 'clinic': return 'عيادة'
-      case 'pharmacy': return 'صيدلية'
-      case 'doctors': return 'أطباء'
-      case 'drinking_water': return 'نقطة ماء'
-      case 'community_centre': return 'مركز مجتمعي'
-      case 'social_centre': return 'مركز دعم'
-      case 'marketplace': return 'سوق'
-      default: return a
+      case 'school':
+        return 'مدرسة'
+      case 'hospital':
+        return 'مستشفى'
+      case 'clinic':
+        return 'عيادة'
+      case 'pharmacy':
+        return 'صيدلية'
+      case 'doctors':
+        return 'أطباء'
+      case 'drinking_water':
+        return 'نقطة ماء'
+      case 'community_centre':
+        return 'مركز مجتمعي'
+      case 'social_centre':
+        return 'مركز دعم'
+      case 'marketplace':
+        return 'سوق'
+      default:
+        return a
     }
   }
 
   const kindToArabic = (kind?: string) => {
     switch (kind) {
-      case 'school': return 'مركز إيواء'
-      case 'unrwa_school': return 'مركز إيواء - وكالة'
-      case 'medical': return 'خدمة طبية'
-      case 'water': return 'نقطة توزيع ماء'
-      case 'food': return 'مركز دعم / توزيع'
-      default: return 'موقع'
+      case 'school':
+        return 'مركز إيواء'
+      case 'unrwa_school':
+        return 'مركز إيواء - وكالة'
+      case 'medical':
+        return 'خدمة طبية'
+      case 'water':
+        return 'نقطة توزيع ماء'
+      case 'food':
+        return 'مركز دعم / توزيع'
+      default:
+        return 'موقع'
     }
   }
 
@@ -330,6 +352,21 @@ export default function MapPreview({
     return out.replace(/\uFFFD/g, '').trim()
   }
 
+  const normalizeArabic = (value: string) => {
+    return cleanText(value)
+      .toLowerCase()
+      .replace(/[أإآ]/g, 'ا')
+      .replace(/ة/g, 'ه')
+      .replace(/ى/g, 'ي')
+      .replace(/ؤ/g, 'و')
+      .replace(/ئ/g, 'ي')
+      .replace(/\u0640/g, '')
+      .replace(/[\u064B-\u065F]/g, '')
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
   const formatDistanceKm = (km: number) => {
     if (!Number.isFinite(km)) return '—'
     if (km >= 1) return `${km.toFixed(1)} كم`
@@ -365,6 +402,17 @@ export default function MapPreview({
     return 2 * R * Math.atan2(Math.sqrt(sa), Math.sqrt(1 - sa))
   }
 
+  const itemMatchesCurrentFilter = (item: UnifiedSearchItem) => {
+    if (selectedLayerFilter === 'none') return false
+    if (selectedLayerFilter === 'shelters') {
+      return item.kind === 'school' || item.kind === 'unrwa_school'
+    }
+    if (selectedLayerFilter === 'medical') return item.kind === 'medical'
+    if (selectedLayerFilter === 'aid') return item.kind === 'water'
+    if (selectedLayerFilter === 'food') return item.kind === 'food'
+    return true
+  }
+
   const fetchRouteData = async (from: UserLocation, to: UserLocation) => {
     const url =
       `/api/route?profile=${profile}` +
@@ -395,9 +443,17 @@ export default function MapPreview({
 
   const adminSearchItems = useMemo<UnifiedSearchItem[]>(() => {
     return adminPlaces.map((p) => {
+      const rawName = cleanText(p.name) || 'موقع'
+      const rawOperator = cleanText(p.operator)
+      const isUnrwaShelter =
+        p.type === 'shelter' &&
+        normalizeArabic(`${rawName} ${rawOperator}`).includes(normalizeArabic('اونروا'))
+
       const kind =
         p.type === 'shelter'
-          ? 'school'
+          ? isUnrwaShelter
+            ? 'unrwa_school'
+            : 'school'
           : p.type === 'hospital'
             ? 'medical'
             : p.type === 'water'
@@ -423,7 +479,7 @@ export default function MapPreview({
 
       return {
         id: p.id,
-        name: cleanText(p.name) || 'موقع',
+        name: rawName,
         kind,
         amenity:
           p.type === 'hospital'
@@ -433,7 +489,7 @@ export default function MapPreview({
               : p.type === 'shelter'
                 ? 'school'
                 : 'community_centre',
-        operator: cleanText(p.operator),
+        operator: rawOperator,
         lng: p.lng,
         lat: p.lat,
         statusText,
@@ -603,25 +659,36 @@ export default function MapPreview({
   }
 
   const runShelterSearch = async () => {
-    const q = topSearch.trim().toLowerCase()
+    const q = normalizeArabic(topSearch)
+    setIsSearching(true)
+    setSearchResults([])
+    setSearchNotice('')
 
-    let matches = allSearchItems.filter((item) => {
-      if (selectedLayerFilter === 'none') return false
-      if (selectedLayerFilter === 'shelters') return item.kind === 'school' || item.kind === 'unrwa_school'
-      if (selectedLayerFilter === 'medical') return item.kind === 'medical'
-      if (selectedLayerFilter === 'aid') return item.kind === 'water'
-      if (selectedLayerFilter === 'food') return item.kind === 'food'
-      return true
-    })
+    let matches = allSearchItems.filter(itemMatchesCurrentFilter)
 
-    if (q) {
-      matches = matches.filter((item) => {
-        const hay = `${item.name} ${item.operator || ''} ${item.statusText || ''}`.toLowerCase()
-        return hay.includes(q)
-      })
+    if (!matches.length) {
+      setIsSearching(false)
+      setSearchNotice('لا توجد بيانات متاحة حالياً للبحث.')
+      return
     }
 
-    if (!q) {
+    if (q) {
+      const qTokens = q.split(' ').filter(Boolean)
+
+      matches = matches.filter((item) => {
+        const hay = normalizeArabic(
+          [
+            item.name,
+            item.operator || '',
+            item.statusText || '',
+            kindToArabic(item.kind),
+            item.amenity ? amenityToArabic(item.amenity) : '',
+          ].join(' ')
+        )
+
+        return qTokens.every((token) => hay.includes(token))
+      })
+    } else {
       matches = matches.filter((item) => {
         if (item.kind === 'school' || item.kind === 'unrwa_school') {
           return item.isAvailable !== false
@@ -631,35 +698,40 @@ export default function MapPreview({
     }
 
     if (!matches.length) {
+      setIsSearching(false)
       setSearchNotice('لا توجد نتائج مطابقة للبحث الحالي.')
       return
     }
 
     const sorted = [...matches].sort((a, b) => {
-      if (!userLocation) return a.name.localeCompare(b.name)
+      if (!userLocation) return a.name.localeCompare(b.name, 'ar')
       return (
         haversineKm(userLocation, { lng: a.lng, lat: a.lat }) -
         haversineKm(userLocation, { lng: b.lng, lat: b.lat })
       )
     })
 
-    const first = sorted[0]
-    setSearchNotice(
-      userLocation
-        ? `تم اختيار أقرب نتيجة: ${first.name || 'موقع'}`
-        : `تم اختيار أول نتيجة مطابقة: ${first.name || 'موقع'}`
-    )
+    setSearchResults(sorted.slice(0, 8))
+    setIsSearching(false)
 
-    await openPlaceCardAndRoute({
-      id: first.id,
-      name: first.name,
-      kind: first.kind,
-      amenity: first.amenity,
-      operator: first.operator,
-      lng: first.lng,
-      lat: first.lat,
-      statusText: first.statusText,
-    })
+    if (sorted.length === 1) {
+      const first = sorted[0]
+      setSearchNotice(`تم العثور على نتيجة واحدة: ${first.name || 'موقع'}`)
+      await openPlaceCardAndRoute({
+        id: first.id,
+        name: first.name,
+        kind: first.kind,
+        amenity: first.amenity,
+        operator: first.operator,
+        lng: first.lng,
+        lat: first.lat,
+        statusText: first.statusText,
+      })
+      setSearchResults([])
+      return
+    }
+
+    setSearchNotice(`تم العثور على ${sorted.length} نتيجة. اختر النتيجة المناسبة من القائمة.`)
   }
 
   useEffect(() => {
@@ -707,25 +779,25 @@ export default function MapPreview({
 
     map.addControl(geolocate, 'top-right')
 
-    map.addControl(
-      new IconButtonControl({
-        title: 'Layers',
-        icon: LAYERS_ICON,
-        onClick: () => setLayersOpen((v) => !v),
-        active: () => layersOpen,
-      }),
-      'top-right'
-    )
+    const layersCtrl = new IconButtonControl({
+      title: 'Layers',
+      icon: LAYERS_ICON,
+      onClick: () => setLayersOpen((v) => !v),
+      active: () => layersOpen,
+    })
 
-    map.addControl(
-      new IconButtonControl({
-        title: 'Query feature',
-        icon: QUERY_ICON,
-        onClick: () => setQueryMode((v) => !v),
-        active: () => queryMode,
-      }),
-      'top-right'
-    )
+    const queryCtrl = new IconButtonControl({
+      title: 'Query feature',
+      icon: QUERY_ICON,
+      onClick: () => setQueryMode((v) => !v),
+      active: () => queryMode,
+    })
+
+    layersControlRef.current = layersCtrl
+    queryControlRef.current = queryCtrl
+
+    map.addControl(layersCtrl, 'top-right')
+    map.addControl(queryCtrl, 'top-right')
 
     map.on('load', () => map.resize())
 
@@ -751,6 +823,14 @@ export default function MapPreview({
       mapRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    layersControlRef.current?.syncActive()
+  }, [layersOpen])
+
+  useEffect(() => {
+    queryControlRef.current?.syncActive()
+  }, [queryMode])
 
   useEffect(() => {
     const map = mapRef.current
@@ -824,6 +904,10 @@ export default function MapPreview({
   }, [lng, lat, zoom])
 
   useEffect(() => {
+    setSearchResults([])
+  }, [selectedLayerFilter])
+
+  useEffect(() => {
     const map = mapRef.current
     if (!map) return
 
@@ -876,7 +960,7 @@ export default function MapPreview({
     }
 
     window.setTimeout(() => map.resize(), 60)
-  }, [places, userLocation, profile, routerEngine])
+  }, [places])
 
   useEffect(() => {
     const map = mapRef.current
@@ -957,12 +1041,13 @@ export default function MapPreview({
     }
 
     const isUnrwa = (name: string, operator: string) => {
-      const t = `${name} ${operator}`.toLowerCase()
+      const t = normalizeArabic(`${name} ${operator}`)
       return (
         t.includes('unrwa') ||
-        t.includes('وكالة') ||
-        t.includes('الاونروا') ||
-        t.includes('الأونروا')
+        t.includes(normalizeArabic('وكالة')) ||
+        t.includes(normalizeArabic('الاونروا')) ||
+        t.includes(normalizeArabic('الأونروا')) ||
+        t.includes(normalizeArabic('اونروا'))
       )
     }
 
@@ -1014,7 +1099,7 @@ out center tags;
           })
           .map((el: any, idx: number) => {
             const lon = el.type === 'node' ? el.lon : el.center.lon
-            const lat = el.type === 'node' ? el.lat : el.center.lat
+            const lat2 = el.type === 'node' ? el.lat : el.center.lat
 
             const tags = el.tags || {}
             const rawName =
@@ -1028,7 +1113,7 @@ out center tags;
             const display = cleanText(rawName)
             const op = cleanText(operator)
 
-            let kind: 'school' | 'unrwa_school' | 'medical' | 'water' | 'food' | 'food' = 'food'
+            let kind: 'school' | 'unrwa_school' | 'medical' | 'water' | 'food' = 'food'
             if (amenity === 'school') {
               kind = isUnrwa(display, op) ? 'unrwa_school' : 'school'
             } else if (['hospital', 'clinic', 'pharmacy', 'doctors'].includes(amenity)) {
@@ -1090,7 +1175,7 @@ out center tags;
                 amenity,
                 kind: kind as 'school' | 'unrwa_school',
                 lng: lon,
-                lat,
+                lat: lat2,
                 capacity,
                 occupancy,
                 availableBeds,
@@ -1106,7 +1191,7 @@ out center tags;
               amenity,
               operator: op,
               lng: lon,
-              lat,
+              lat: lat2,
               statusText,
               isAvailable,
               source: 'osm',
@@ -1122,27 +1207,16 @@ out center tags;
                 amenity: amenity || '',
                 kind,
               },
-              geometry: { type: 'Point', coordinates: [lon, lat] },
+              geometry: { type: 'Point', coordinates: [lon, lat2] },
             }
           })
 
         setShelters(rawShelters)
         setOsmSearchItems(rawSearchItems)
 
-        const filteredFeatures = allFeatures.filter((feature: any) => {
-          const kind = feature?.properties?.kind
-          if (selectedLayerFilter === 'all') return true
-          if (selectedLayerFilter === 'none') return false
-          if (selectedLayerFilter === 'shelters') return kind === 'school' || kind === 'unrwa_school'
-          if (selectedLayerFilter === 'medical') return kind === 'medical'
-          if (selectedLayerFilter === 'aid') return kind === 'water'
-          if (selectedLayerFilter === 'food') return kind === 'food'
-          return true
-        })
-
         const geojson = {
           type: 'FeatureCollection',
-          features: filteredFeatures,
+          features: allFeatures,
         } as any
 
         cleanupOsm()
@@ -1394,7 +1468,7 @@ out center tags;
       map.off('zoomend', scheduleRun)
       cleanupOsm()
     }
-  }, [osmEnabled, osmAmenitiesKey, userLocation, profile, routerEngine, selectedLayerFilter])
+  }, [osmEnabled, osmAmenitiesKey])
 
   useEffect(() => {
     const map = mapRef.current
@@ -1407,15 +1481,7 @@ out center tags;
     }
 
     const makeAdminGeojson = () => {
-      const features = adminSearchItems.filter((item) => {
-        if (selectedLayerFilter === 'all') return true
-        if (selectedLayerFilter === 'none') return false
-        if (selectedLayerFilter === 'shelters') return item.kind === 'school' || item.kind === 'unrwa_school'
-        if (selectedLayerFilter === 'medical') return item.kind === 'medical'
-        if (selectedLayerFilter === 'aid') return item.kind === 'water'
-        if (selectedLayerFilter === 'food') return item.kind === 'food'
-        return true
-      }).map((item) => ({
+      const features = adminSearchItems.map((item) => ({
         type: 'Feature',
         properties: {
           id: item.id,
@@ -1467,6 +1533,38 @@ out center tags;
       minzoom: 11,
       layout: {
         'text-field': ['coalesce', ['get', 'display_name'], 'مركز إيواء'],
+        'text-size': 12,
+        'text-offset': [0, 1.2],
+        'text-anchor': 'top',
+      },
+      paint: {
+        'text-color': '#111',
+        'text-halo-color': '#fff',
+        'text-halo-width': 1.2,
+      },
+    })
+
+    map.addLayer({
+      id: 'admin-unrwa-shelters-layer',
+      type: 'circle',
+      source: 'admin-places',
+      filter: ['==', ['get', 'kind'], 'unrwa_school'],
+      paint: {
+        'circle-radius': 7,
+        'circle-color': '#0ea5e9',
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#fff',
+      },
+    })
+
+    map.addLayer({
+      id: 'admin-unrwa-shelters-labels',
+      type: 'symbol',
+      source: 'admin-places',
+      filter: ['==', ['get', 'kind'], 'unrwa_school'],
+      minzoom: 11,
+      layout: {
+        'text-field': ['coalesce', ['get', 'display_name'], 'مركز إيواء - وكالة'],
         'text-size': 12,
         'text-offset': [0, 1.2],
         'text-anchor': 'top',
@@ -1576,6 +1674,7 @@ out center tags;
 
     const adminClickableLayers = [
       'admin-shelters-layer',
+      'admin-unrwa-shelters-layer',
       'admin-medical-layer',
       'admin-water-layer',
       'admin-food-layer',
@@ -1609,7 +1708,7 @@ out center tags;
     window.setTimeout(() => map.resize(), 50)
 
     return () => cleanupAdmin()
-  }, [adminSearchItems, selectedLayerFilter, userLocation, profile, routerEngine])
+  }, [adminSearchItems])
 
   useEffect(() => {
     const map = mapRef.current
@@ -1643,6 +1742,8 @@ out center tags;
 
     setVis('admin-shelters-layer', !!layerCats?.shelters)
     setVis('admin-shelters-labels', !!layerCats?.shelters)
+    setVis('admin-unrwa-shelters-layer', !!layerCats?.shelters)
+    setVis('admin-unrwa-shelters-labels', !!layerCats?.shelters)
 
     setVis('admin-medical-layer', !!layerCats?.medical)
     setVis('admin-medical-labels', !!layerCats?.medical)
@@ -1653,6 +1754,21 @@ out center tags;
     setVis('admin-food-layer', !!layerCats?.food)
     setVis('admin-food-labels', !!layerCats?.food)
   }, [layerCats])
+
+  const openSearchResult = async (item: UnifiedSearchItem) => {
+    setSearchResults([])
+    setTopSearch(item.name)
+    await openPlaceCardAndRoute({
+      id: item.id,
+      name: item.name,
+      kind: item.kind,
+      amenity: item.amenity,
+      operator: item.operator,
+      lng: item.lng,
+      lat: item.lat,
+      statusText: item.statusText,
+    })
+  }
 
   return (
     <div
@@ -1775,7 +1891,13 @@ out center tags;
           >
             <input
               value={topSearch}
-              onChange={(e) => setTopSearch(e.target.value)}
+              onChange={(e) => {
+                setTopSearch(e.target.value)
+                if (!e.target.value.trim()) {
+                  setSearchResults([])
+                  setSearchNotice('')
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault()
@@ -1826,8 +1948,50 @@ out center tags;
             </button>
           </div>
 
+          {searchResults.length > 0 && (
+            <div
+              dir="rtl"
+              style={{
+                marginTop: 8,
+                maxHeight: 240,
+                overflowY: 'auto',
+                border: '1px solid #e5e7eb',
+                borderRadius: 10,
+                background: '#fff',
+              }}
+            >
+              {searchResults.map((item) => (
+                <button
+                  key={`${item.source}-${item.id}`}
+                  type="button"
+                  onClick={() => openSearchResult(item)}
+                  style={{
+                    width: '100%',
+                    textAlign: 'right',
+                    padding: '10px 12px',
+                    border: 'none',
+                    borderBottom: '1px solid #f3f4f6',
+                    background: '#fff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{item.name}</div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>
+                    {kindToArabic(item.kind)}
+                    {item.operator ? ` • ${item.operator}` : ''}
+                    {userLocation
+                      ? ` • ${formatDistanceKm(haversineKm(userLocation, { lng: item.lng, lat: item.lat }))}`
+                      : ''}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
           <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-            {searchNotice || 'حدد موقعك أولاً ثم جرّب البحث أو اضغط على أي نقطة في الخريطة.'}
+            {isSearching
+              ? 'جاري البحث...'
+              : searchNotice || 'حدد موقعك أولاً ثم جرّب البحث أو اضغط على أي نقطة في الخريطة.'}
           </div>
         </div>
 

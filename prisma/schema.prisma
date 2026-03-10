@@ -52,6 +52,23 @@ enum EmergencyLevel {
 }
 
 // =====================
+// Places / Map Enums
+// =====================
+
+enum PlaceType {
+  SHELTER
+  MEDICAL
+  WATER_POINT
+  FOOD_SUPPORT_CENTER
+}
+
+enum PlaceStatus {
+  AVAILABLE
+  FULL
+  UNAVAILABLE
+}
+
+// =====================
 // Camps + Related Tables
 // =====================
 
@@ -380,6 +397,34 @@ model EnterpriseProduct {
   @@index([institutionId])
   @@index([productId])
   @@index([availability])
+}
+
+// =====================
+// Places / Map Model
+// =====================
+
+model Place {
+  id          String    @id @default(uuid())
+  name        String
+  type        PlaceType
+  description String?
+
+  latitude  Decimal @db.Decimal(10, 7)
+  longitude Decimal @db.Decimal(10, 7)
+
+  status   PlaceStatus @default(AVAILABLE)
+  isActive Boolean     @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isTrashed   Boolean  @default(false)
+  isProtected Boolean  @default(false)
+
+  @@index([type])
+  @@index([status])
+  @@index([isActive])
+  @@index([isTrashed])
+  @@index([name])
 }
 
 // =====================
