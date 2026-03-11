@@ -113,7 +113,7 @@ export default function AddPlaces() {
 
       setSuccess('تمت إضافة المكان بنجاح')
       setTimeout(() => {
-        router.push('/project/map-preview')
+        router.push('/project/MapPreview')
       }, 800)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'حدث خطأ غير متوقع')
@@ -265,7 +265,7 @@ export default function AddPlaces() {
 
             <button
               type="button"
-              onClick={() => router.push('/project/map-preview')}
+              onClick={() => router.push('/project/MapPreview')}
               className="inline-flex h-11 items-center justify-center rounded-lg border border-input bg-background px-5 font-medium"
             >
               الذهاب إلى الخريطة

@@ -6,6 +6,7 @@ datasource db {
   provider = "postgresql"
   // url = env("DATABASE_URL")
 }
+
 // =====================
 // Enums
 // =====================
@@ -361,7 +362,7 @@ model Distribution {
   clinic   Clinic? @relation(fields: [clinicId], references: [id], onDelete: SetNull)
 
   placeId String?
-  place   Place? @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  place   Place?  @relation(fields: [placeId], references: [id], onDelete: SetNull)
 
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
@@ -407,20 +408,20 @@ model EnterpriseProduct {
 // =====================
 
 model Place {
-  id          String      @id @default(uuid())
+  id          String    @id @default(uuid())
   name        String
   type        PlaceType
   description String?
 
-  latitude    Decimal     @db.Decimal(10, 7)
-  longitude   Decimal     @db.Decimal(10, 7)
+  latitude  Decimal @db.Decimal(10, 7)
+  longitude Decimal @db.Decimal(10, 7)
 
-  status      PlaceStatus @default(AVAILABLE)
-  isActive    Boolean     @default(true)
+  status   PlaceStatus @default(AVAILABLE)
+  isActive Boolean     @default(true)
 
-  camp        Camps?       @relation("CampPlace")
-  clinic      Clinic?      @relation("ClinicPlace")
-  institution Institution? @relation("InstitutionPlace")
+  camp          Camps?         @relation("CampPlace")
+  clinic        Clinic?        @relation("ClinicPlace")
+  institution   Institution?   @relation("InstitutionPlace")
   distributions Distribution[]
 
   createdAt   DateTime @default(now())

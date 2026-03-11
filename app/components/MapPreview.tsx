@@ -460,8 +460,11 @@ export default function MapPreview({
 
   const osmAmenitiesKey = useMemo(() => osmAmenities.join(','), [osmAmenities])
 
-  const adminSearchItems = useMemo<UnifiedSearchItem[]>(() => {
-    return adminPlaces.map((p) => {
+ const adminSearchItems = useMemo<UnifiedSearchItem[]>(() => {
+  const list = Array.isArray(adminPlaces) ? adminPlaces : []
+
+  return list.map((p) => {
+    
       const rawName = cleanText(p.name) || 'موقع'
       const rawOperator = cleanText(p.operator)
       const isUnrwaShelter =
