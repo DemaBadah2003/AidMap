@@ -59,28 +59,32 @@ export const MENU_SIDEBAR: MenuConfig = [
     title: 'Dashboards',
     icon: LayoutGrid,
     children: [
-      { title: 'Camps Sidebar', path: '/project/camps' },
-      { title: 'beneficiaries Sidebar', path: '/project/beneficiaries' },
-      { title: ' Clinics Sidebar', path: '/project/clinics' },
-       { title: ' shelters Sidebar', path: '/project/shelters' },
-        { title: ' supervisior Sidebar', path: '/project/supervisior' },
-        { title: 'institutions Sidebar', path: '/project/institutions' },
-        { title: 'contacts Sidebar', path: '/project/contacts' },
-         { title: 'address Sidebar', path: '/project/address' },
-       { title: 'Enterprise-Products  Sidebar', path: '/project/Enterprise Products' },
-        { title: 'products Sidebar', path: '/project/products' },
-        { title: 'service Sidebar', path: '/project/service' },
-        { title: 'institutional-services Sidebar', path: '/project/Institutional Services' },
-       { title: 'Emergency  Sidebar', path: '/project/Emergency' },
-        { title: 'Distributions  Sidebar', path: '/project/Distributions' },
-
-
-
-
-
-
-
-
+      {
+        title: 'Project Sidebar',
+        children: [
+          { title: 'Camps Sidebar', path: '/project/camps' },
+          { title: 'beneficiaries Sidebar', path: '/project/beneficiaries' },
+          { title: ' Clinics Sidebar', path: '/project/clinics' },
+          { title: ' shelters Sidebar', path: '/project/shelters' },
+          { title: ' supervisior Sidebar', path: '/project/supervisior' },
+          { title: 'institutions Sidebar', path: '/project/institutions' },
+          { title: 'contacts Sidebar', path: '/project/contacts' },
+          { title: 'address Sidebar', path: '/project/address' },
+          { title: 'Enterprise-Products  Sidebar', path: '/project/Enterprise Products' },
+          { title: 'products Sidebar', path: '/project/products' },
+          { title: 'service Sidebar', path: '/project/service' },
+          { title: 'institutional-services Sidebar', path: '/project/Institutional Services' },
+          { title: 'Emergency  Sidebar', path: '/project/Emergency' },
+          { title: 'Distributions  Sidebar', path: '/project/Distributions' },
+        ],
+      },
+    {
+  title: 'Aid Map Sidebar',
+  children: [
+    { title: 'Map Preview', path: '/project/MapPreview' },
+    { title: 'Add Place', path: '/project/addPlaces' },
+  ],
+},
     ],
   },
   { heading: 'User' },

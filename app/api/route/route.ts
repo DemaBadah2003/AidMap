@@ -94,13 +94,11 @@ function toGeoJsonLine(coords: [number, number][]) {
     coordinates: coords,
   }
 }
-
 function mapProfileForOsrm(profile: UiProfile) {
   if (profile === 'walking') return 'foot'
   if (profile === 'cycling') return 'bike'
   return 'driving'
 }
-
 function mapProfileForGraphhopper(profile: UiProfile) {
   if (profile === 'walking') return 'foot'
   if (profile === 'cycling') return 'bike'
@@ -138,8 +136,8 @@ async function routeWithOsrm(
 
   return {
     geometry: route.geometry,
-    distanceKm: route.distance / 1000,
-    durationMin: route.duration / 60,
+    distanceKm: Number(route.distance || 0) / 1000,
+    durationMin: Number(route.duration || 0) / 60,
   }
 }
 
@@ -177,8 +175,8 @@ async function routeWithGraphhopper(
 
   return {
     geometry: toGeoJsonLine(coords),
-    distanceKm: path.distance / 1000,
-    durationMin: path.time / 1000 / 60,
+    distanceKm: Number(path.distance || 0) / 1000,
+    durationMin: Number(path.time || 0) / 1000 / 60,
   }
 }
 
@@ -227,8 +225,8 @@ async function routeWithValhalla(
 
   return {
     geometry,
-    distanceKm: summary.length ?? 0,
-    durationMin: (summary.time ?? 0) / 60,
+    distanceKm: Number(summary.length ?? 0),
+    durationMin: Number(summary.time ?? 0) / 60,
   }
 }
 
@@ -250,10 +248,7 @@ export async function GET(req: NextRequest) {
       !Number.isFinite(toLng) ||
       !Number.isFinite(toLat)
     ) {
-      return NextResponse.json(
-        { message: 'Invalid coordinates' },
-        { status: 400 }
-      )
+      return NextResponse.json({ message: 'Invalid coordinates' }, { status: 400 })
     }
 
     let result
@@ -264,6 +259,14 @@ export async function GET(req: NextRequest) {
       result = await routeWithValhalla(fromLng, fromLat, toLng, toLat, profile)
     } else {
       result = await routeWithOsrm(fromLng, fromLat, toLng, toLat, profile)
+    }
+
+    if (
+      !result?.geometry ||
+      !Number.isFinite(result?.distanceKm) ||
+      !Number.isFinite(result?.durationMin)
+    ) {
+      return NextResponse.json({ message: 'Invalid route response' }, { status: 500 })
     }
 
     return NextResponse.json(result)

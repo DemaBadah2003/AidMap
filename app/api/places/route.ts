@@ -1,69 +1,123 @@
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs/promises'
-import path from 'path'
+import  prisma  from '@/lib/prisma'
 
-type AdminPlaceType = 'shelter' | 'hospital' | 'water' | 'food'
-
-type AdminPlace = {
-  id: string
-  name: string
-  type: AdminPlaceType
-  lng: number
-  lat: number
-  operator?: string
-  capacity?: number | null
-  occupancy?: number | null
-  availableBeds?: number | null
-  statusText?: string
-  createdAt?: string
-  updatedAt?: string
-}
-
-const DATA_DIR = path.join(process.cwd(), 'data')
-const DATA_FILE = path.join(DATA_DIR, 'places.json')
-
-async function ensureDataFile() {
-  await fs.mkdir(DATA_DIR, { recursive: true })
-
-  try {
-    await fs.access(DATA_FILE)
-  } catch {
-    await fs.writeFile(DATA_FILE, '[]', 'utf-8')
+const mapTypeToDb = (type: string) => {
+  switch (type) {
+    case 'shelter':
+      return 'SHELTER'
+    case 'hospital':
+      return 'MEDICAL'
+    case 'water':
+      return 'WATER_POINT'
+    case 'food':
+      return 'FOOD_SUPPORT_CENTER'
+    default:
+      return null
   }
 }
 
-async function readPlaces(): Promise<AdminPlace[]> {
-  await ensureDataFile()
-  const raw = await fs.readFile(DATA_FILE, 'utf-8')
-
-  try {
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
+const mapDbToUi = (type: string) => {
+  switch (type) {
+    case 'SHELTER':
+      return 'shelter'
+    case 'MEDICAL':
+      return 'hospital'
+    case 'WATER_POINT':
+      return 'water'
+    case 'FOOD_SUPPORT_CENTER':
+      return 'food'
+    default:
+      return 'food'
   }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(req.url)
-    const type = searchParams.get('type')
+    const places = await prisma.place.findMany({
+      where: {
+        isActive: true,
+        isTrashed: false,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    })
 
-    let places = await readPlaces()
+    const normalized = places.map((place) => ({
+      id: place.id,
+      name: place.name,
+      type: mapDbToUi(place.type),
+      lat: Number(place.latitude),
+      lng: Number(place.longitude),
+      statusText: place.description || '',
+    }))
 
-    if (type && ['shelter', 'hospital', 'water', 'food'].includes(type)) {
-      places = places.filter((p) => p.type === type)
+    return NextResponse.json(normalized, { status: 200 })
+  } catch (error) {
+    console.error('GET /api/places failed:', error)
+    return NextResponse.json(
+      { message: 'فشل في جلب الأماكن' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json()
+
+    const dbType = mapTypeToDb(body.type)
+
+    if (!dbType) {
+      return NextResponse.json(
+        { message: 'نوع المكان غير صحيح' },
+        { status: 400 }
+      )
     }
 
-    return NextResponse.json({
-      success: true,
-      count: places.length,
-      data: places,
+    if (!body.name || body.latitude === undefined || body.longitude === undefined) {
+      return NextResponse.json(
+        { message: 'الاسم والإحداثيات مطلوبة' },
+        { status: 400 }
+      )
+    }
+
+    const latitude = Number(body.latitude)
+    const longitude = Number(body.longitude)
+
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+      return NextResponse.json(
+        { message: 'خط العرض غير صحيح' },
+        { status: 400 }
+      )
+    }
+
+    if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      return NextResponse.json(
+        { message: 'خط الطول غير صحيح' },
+        { status: 400 }
+      )
+    }
+
+    const created = await prisma.place.create({
+      data: {
+        name: body.name.trim(),
+        type: dbType as any,
+        description: body.statusText || body.description || null,
+        latitude,
+        longitude,
+        status: 'AVAILABLE',
+        isActive: true,
+        isTrashed: false,
+        isProtected: false,
+      },
     })
+
+    return NextResponse.json(created, { status: 201 })
   } catch (error) {
-    console.error('GET /api/places error:', error)
+    console.error('POST /api/places failed:', error)
     return NextResponse.json(
-      { success: false, message: 'فشل في جلب الأماكن للخريطة' },
+      { message: 'فشل في إضافة المكان' },
       { status: 500 }
     )
   }

@@ -383,6 +383,16 @@ export default function MapPreview({
     return `${m} د`
   }
 
+  const getAdjustedDurationMin = (
+    durationMin: number,
+    mode: 'walking' | 'cycling' | 'driving'
+  ) => {
+    if (!Number.isFinite(durationMin)) return durationMin
+    if (mode === 'driving') return durationMin * 1.8
+    if (mode === 'cycling') return durationMin * 1.15
+    return durationMin
+  }
+
   const estimateDurationByProfile = (
     distanceKm: number,
     mode: 'walking' | 'cycling' | 'driving'
@@ -689,11 +699,16 @@ export default function MapPreview({
       drawRoute(data.geometry)
       fitToGeometry(data.geometry)
 
+      const adjustedDurationMin = getAdjustedDurationMin(
+        Number(data.durationMin),
+        profile
+      )
+
       setSelectedPlace({
         ...cardData,
         loading: false,
-        distanceText: formatDistanceKm(data.distanceKm),
-        durationText: formatDurationMin(data.durationMin),
+        distanceText: formatDistanceKm(Number(data.distanceKm)),
+        durationText: formatDurationMin(adjustedDurationMin),
         error: undefined,
         warning: undefined,
       })
