@@ -27,7 +27,7 @@ export default function ProjectMapPreviewPage() {
         setLoading(true)
         setError('')
 
-        const res = await fetch('/api/places', {
+        const res = await fetch('/api/project/places', {
           cache: 'no-store',
         })
 

@@ -76,6 +76,7 @@ export const MENU_SIDEBAR: MenuConfig = [
           { title: 'institutional-services Sidebar', path: '/project/Institutional Services' },
           { title: 'Emergency  Sidebar', path: '/project/Emergency' },
           { title: 'Distributions  Sidebar', path: '/project/Distributions' },
+
         ],
       },
     {
@@ -83,6 +84,13 @@ export const MENU_SIDEBAR: MenuConfig = [
   children: [
     { title: 'Map Preview', path: '/project/MapPreview' },
     { title: 'Add Place', path: '/project/addPlaces' },
+     { title: 'RegisterBeneficiary', path: '/project/RegisterBeneficiary' },
+          { title: 'login', path: '/project/login' },
+          { title: 'Admin Beneficiary', path: '/project/adminBeneficiary' },
+          { title: 'Add Aid', path: '/project/addAid' },
+          { title: 'Distribute Aid', path: '/project/distributeAid' },
+
+
   ],
 },
     ],

@@ -53,8 +53,28 @@ async function getOrCreateDefaultSupervisorId() {
 /**
  * GET /api/camps
  * يرجع كل المخيمات (مع supervisor)
+ *
+ * ✅ إضافة خاصة بالمستفيد:
+ * GET /api/camps?forBeneficiary=true
+ * يرجع فقط id + name لاستخدامها في dropdown
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const forBeneficiary = req.nextUrl.searchParams.get("forBeneficiary");
+
+  // ✅ هذا الجزء مضاف للمستفيد فقط
+  if (forBeneficiary === "true") {
+    const camps = await prisma.camps.findMany({
+      where: { isTrashed: false },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    return NextResponse.json(camps);
+  }
+
   const camps = await prisma.camps.findMany({
     where: { isTrashed: false },
     orderBy: { createdAt: "desc" },

@@ -97,7 +97,7 @@ export default function AddPlaces() {
         statusText: form.statusText.trim() || null,
       }
 
-      const res = await fetch('/api/places', {
+      const res = await fetch('/api/project/places', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
