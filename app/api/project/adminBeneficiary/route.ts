@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { requireAdminApi } from "@/app/api/project/helpers/api-guards";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -31,7 +32,10 @@ async function getOrCreateDefaultSupervisorId() {
   return created.id;
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const unauthorized = requireAdminApi(req);
+  if (unauthorized) return unauthorized;
+
   try {
     const body = await req.json();
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { DistributeAidFormStatus } from "@prisma/client";
+import { requireAdminApi } from '@/app/api/project/helpers/api-guards'
 
 const distributeSchema = z.object({
   beneficiaryName: z.string().trim().min(1, "اسم المستفيد مطلوب"),
@@ -14,6 +15,9 @@ const distributeSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const unauthorized = requireAdminApi(req);
+  if (unauthorized) return unauthorized;
+
   try {
     let jsonBody: unknown;
 
@@ -79,7 +83,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const unauthorized = requireAdminApi(req);
+  if (unauthorized) return unauthorized;
+
   try {
     const distributions = await prisma.distributeAidForm.findMany({
       orderBy: {

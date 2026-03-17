@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { requireAdmin } from '@/app/(protected)/project/helpers/route-guards'
 
 type PlaceType = 'shelter' | 'hospital' | 'water' | 'food'
 
@@ -33,6 +34,10 @@ const INITIAL_FORM: FormState = {
 
 export default function AddPlaces() {
   const router = useRouter()
+
+  useEffect(() => {
+    requireAdmin(router)
+  }, [router])
 
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [loading, setLoading] = useState(false)
@@ -125,15 +130,15 @@ export default function AddPlaces() {
   return (
     <div className="grid gap-6 p-6">
       <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-      <div className="mb-6 text-right">
-  <h1 className="text-2xl font-bold">
-    إضافة مكان جديد
-  </h1>
+        <div className="mb-6 text-right">
+          <h1 className="text-2xl font-bold">
+            إضافة مكان جديد
+          </h1>
 
-  <p className="mt-2 text-sm text-muted-foreground">
-    من هنا يستطيع الأدمن إضافة مركز إيواء أو مستشفى أو نقطة ماء مع الإحداثيات.
-  </p>
-</div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            من هنا يستطيع الأدمن إضافة مركز إيواء أو مستشفى أو نقطة ماء مع الإحداثيات.
+          </p>
+        </div>
 
         <form onSubmit={onSubmit} className="grid gap-5" dir="rtl">
           <div className="grid gap-2">

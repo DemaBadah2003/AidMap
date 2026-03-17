@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { requireAdminApi } from '@/app/api/project/helpers/api-guards'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
@@ -26,7 +27,10 @@ const validStatuses = [
   'Fully Distributed',
 ]
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const unauthorized = requireAdminApi(req)
+  if (unauthorized) return unauthorized
+
   try {
     const body = await req.json()
 
@@ -135,7 +139,10 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const unauthorized = requireAdminApi(req)
+  if (unauthorized) return unauthorized
+
   try {
     const aids = await prisma.aid.findMany({
       orderBy: {

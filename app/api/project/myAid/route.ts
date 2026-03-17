@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
+import { requireCitizen } from '@/app/(protected)/project/helpers/route-guards'
+import { requireCitizenApi } from "../helpers/api-guards";
+
+
 
 async function hashPassword(password: string) {
   const data = new TextEncoder().encode(password);
@@ -77,7 +81,10 @@ const createSchema = z.object({
     .transform((value) => Number(value)),
 });
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const unauthorized = requireCitizenApi(req);
+  if (unauthorized) return unauthorized;
+
   return NextResponse.json({
     ok: true,
     message: "Beneficiary register API is working",
@@ -85,6 +92,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const unauthorized = requireCitizenApi(req);
+  if (unauthorized) return unauthorized;
+
   try {
     let jsonBody: unknown;
 

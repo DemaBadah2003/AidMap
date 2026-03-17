@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs/promises'
 import path from 'path'
+import { requireAdminApi } from '@/app/api/project/helpers/api-guards'
+
 
 export type AdminPlaceType = 'shelter' | 'hospital' | 'water' | 'food'
 
@@ -95,7 +97,10 @@ function validatePlacePayload(body: any) {
   return errors
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const unauthorized = requireAdminApi(req)
+  if (unauthorized) return unauthorized
+
   try {
     const places = await readPlaces()
 
@@ -114,6 +119,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const unauthorized = requireAdminApi(req)
+  if (unauthorized) return unauthorized
+
   try {
     const body = await req.json()
     const errors = validatePlacePayload(body)
@@ -164,6 +172,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+  const unauthorized = requireAdminApi(req)
+  if (unauthorized) return unauthorized
+
   try {
     const body = await req.json()
 
@@ -226,6 +237,9 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const unauthorized = requireAdminApi(req)
+  if (unauthorized) return unauthorized
+
   try {
     const body = await req.json()
 

@@ -17,6 +17,11 @@ enum UserStatus {
   BLOCKED
 }
 
+enum UserRoleType {
+  CITIZEN
+  ADMIN
+}
+
 enum CampFillStatus {
   NOT_FULL
   FULL
@@ -90,6 +95,12 @@ enum EnterpriseProductAvailability {
   UNAVAILABLE
 }
 
+enum DistributeAidFormStatus {
+  SCHEDULED
+  DONE
+  CANCELED
+}
+
 // =====================
 // Camps + Related Tables
 // =====================
@@ -149,8 +160,9 @@ model Beneficiary {
   numberOfFamily Int     @default(0)
   isTrashed      Boolean @default(false)
   isProtected    Boolean @default(false)
-  campId         String?
-  camp           Camps?  @relation(fields: [campId], references: [id], onDelete: SetNull)
+
+  campId String?
+  camp   Camps?  @relation(fields: [campId], references: [id], onDelete: SetNull)
 
   userId String? @unique
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -393,7 +405,6 @@ model Distribution {
   placeId String?
   place   Place?  @relation(fields: [placeId], references: [id], onDelete: SetNull)
 
-  // صار يدعم Product أو Aid
   productId String?
   product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
@@ -416,12 +427,6 @@ model Distribution {
   @@index([aidId])
   @@index([status])
   @@map("distributions")
-}
-
-enum DistributeAidFormStatus {
-  SCHEDULED
-  DONE
-  CANCELED
 }
 
 model DistributeAidForm {
@@ -503,16 +508,19 @@ model Place {
 // =====================
 
 model User {
-  id          String       @id @default(uuid())
-  email       String       @unique
-  password    String
-  role        String
+  id       String       @id @default(uuid())
+  email    String       @unique
+  password String
+  role     UserRoleType @default(CITIZEN)
+
   beneficiary Beneficiary?
-  userRole    UserRole?    @relation(fields: [userRoleId], references: [id], onDelete: SetNull)
-  userRoleId  String?
-  accounts    Account[]
-  sessions    Session[]
-  systemLogs  SystemLog[]
+
+  userRoleId String?
+  userRole   UserRole? @relation(fields: [userRoleId], references: [id], onDelete: SetNull)
+
+  accounts   Account[]
+  sessions   Session[]
+  systemLogs SystemLog[]
 
   @@index([userRoleId])
   @@index([role])
@@ -658,4 +666,27 @@ model SystemSetting {
   notifySystemErrorRoleIds       String[]
 
   @@map("system_settings")
+}
+
+model RequestAid {
+  id          String  @id @default(uuid())
+  fullName    String
+  nationalId  String
+  phone       String
+  aidType     String
+  familyCount Int
+  address     String
+  notes       String?
+
+  status        DistributionStatus @default(PENDING)
+  requestNumber String             @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([nationalId])
+  @@index([phone])
+  @@index([aidType])
+  @@index([status])
+  @@map("request_aid")
 }

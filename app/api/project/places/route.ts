@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient, PlaceType, Prisma } from '@prisma/client'
+import { requireAdminApi } from '@/app/api/project/helpers/api-guards'
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient
@@ -81,6 +82,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const unauthorized = requireAdminApi(req)
+    if (unauthorized) return unauthorized
+
     const body = await req.json()
 
     const {

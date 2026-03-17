@@ -1,5 +1,7 @@
 import { type LucideIcon } from 'lucide-react';
 
+export type AppRole = 'ADMIN' | 'CITIZEN';
+
 export interface MenuItem {
   title?: string;
   icon?: LucideIcon;
@@ -14,6 +16,7 @@ export interface MenuItem {
   expandTitle?: string;
   badge?: string;
   separator?: boolean;
+  roles?: AppRole[];
 }
 
 export type MenuConfig = MenuItem[];

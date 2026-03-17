@@ -52,7 +52,7 @@ import {
   Briefcase as WorkIcon,
   Zap,
 } from 'lucide-react';
-import { type MenuConfig } from './types';
+import { type MenuConfig, type AppRole, type MenuItem } from './types';
 
 export const MENU_SIDEBAR: MenuConfig = [
   {
@@ -76,23 +76,31 @@ export const MENU_SIDEBAR: MenuConfig = [
           { title: 'institutional-services Sidebar', path: '/project/Institutional Services' },
           { title: 'Emergency  Sidebar', path: '/project/Emergency' },
           { title: 'Distributions  Sidebar', path: '/project/Distributions' },
-
         ],
       },
-    {
-  title: 'Aid Map Sidebar',
-  children: [
-    { title: 'Map Preview', path: '/project/MapPreview' },
-    { title: 'Add Place', path: '/project/addPlaces' },
-     { title: 'RegisterBeneficiary', path: '/project/RegisterBeneficiary' },
-          { title: 'login', path: '/project/login' },
+      {
+        title: 'admin Dahboard',
+        roles: ['ADMIN'],
+        children: [
+          { title: 'Map Preview', path: '/project/MapPreview' },
+          { title: 'Add Place', path: '/project/addPlaces' },
           { title: 'Admin Beneficiary', path: '/project/adminBeneficiary' },
           { title: 'Add Aid', path: '/project/addAid' },
           { title: 'Distribute Aid', path: '/project/distributeAid' },
-
-
-  ],
-},
+          { title: 'login', path: '/project/login' },
+        ],
+      },
+      {
+        title: 'citizen Dahboard',
+        roles: ['CITIZEN'],
+        children: [
+          { title: 'Map Preview', path: '/project/MapPreview' },
+          { title: 'RegisterBeneficiary', path: '/project/RegisterBeneficiary' },
+          { title: 'login', path: '/project/login' },
+          { title: 'My Aid', path: '/project/myAid' },
+          { title: 'Request Aid', path: '/project/requestAid' }
+        ],
+      },
     ],
   },
   { heading: 'User' },
@@ -1594,3 +1602,22 @@ export const MENU_ROOT: MenuConfig = [
     childrenIndex: 7,
   },
 ];
+
+function filterMenuByRole(items: MenuItem[], role: AppRole | null): MenuItem[] {
+  return items
+    .filter((item) => {
+      if (!item.roles || item.roles.length === 0) return true;
+      if (!role) return false;
+      return item.roles.includes(role);
+    })
+    .map((item) => ({
+      ...item,
+      children: item.children
+        ? filterMenuByRole(item.children, role)
+        : undefined,
+    }));
+}
+
+export function getSidebarMenuByRole(role: AppRole | null): MenuConfig {
+  return filterMenuByRole(MENU_SIDEBAR, role);
+}

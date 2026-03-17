@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, type ChangeEvent } from 'react'
+import { useEffect, useState, type ChangeEvent } from 'react'
+import { useRouter } from 'next/navigation'
+import { requireCitizen } from '@/app/(protected)/project/helpers/route-guards'
 import { Card, CardContent } from '../../../../components/ui/card'
 import { Button } from '../../../../components/ui/button'
 import { Input } from '../../../../components/ui/input'
@@ -28,6 +30,12 @@ const phoneRegex = /^(056|059)\d{7}$/
 const twoDigitsRegex = /^\d{2}$/
 
 export default function RegisterBeneficiaryPage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    requireCitizen(router)
+  }, [router])
+
   const [form, setForm] = useState<FormData>({
     name: '',
     email: '',
@@ -150,6 +158,7 @@ export default function RegisterBeneficiaryPage() {
           password: form.password,
           phone: form.phone,
           numberOfFamily: form.numberOfFamily,
+          role: 'CITIZEN',
         }),
       })
 

@@ -117,10 +117,15 @@ export default function LoginPage() {
 
       setSuccessMsg("تم تسجيل الدخول بنجاح");
 
-      // مؤقتًا: بعد نجاح الدخول نحول المستخدم
+      localStorage.setItem("user", JSON.stringify(data.user));
+
       setTimeout(() => {
-        router.push("/");
-      }, 1000);
+        if (data.user.role === "ADMIN") {
+          router.push("/project/MapPreview");
+        } else {
+          router.push("/project/MapPreview");
+        }
+      }, 800);
     } catch (error: any) {
       setErrorMsg(error.message || "حدث خطأ غير متوقع");
     } finally {

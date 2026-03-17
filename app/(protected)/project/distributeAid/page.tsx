@@ -1,6 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { requireAdmin } from '@/app/(protected)/project/helpers/route-guards'
 import { Card, CardContent } from '../../../../components/ui/card'
 import { Button } from '../../../../components/ui/button'
 import { Input } from '../../../../components/ui/input'
@@ -14,6 +16,12 @@ const toIntOnly = (value: string) => {
 }
 
 export default function DistributeAidPage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    requireAdmin(router)
+  }, [router])
+
   const [beneficiaryName, setBeneficiaryName] = useState('')
   const [aidType, setAidType] = useState<AidType | ''>('')
   const [quantity, setQuantity] = useState<number>(0)

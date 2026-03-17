@@ -14,9 +14,7 @@ const loginSchema = z.object({
     .string()
     .min(1, "البريد الإلكتروني مطلوب")
     .email("البريد الإلكتروني غير صالح"),
-  password: z
-    .string()
-    .min(1, "كلمة المرور مطلوبة"),
+  password: z.string().min(1, "كلمة المرور مطلوبة"),
 });
 
 export async function POST(req: NextRequest) {
@@ -44,6 +42,15 @@ export async function POST(req: NextRequest) {
         email: true,
         password: true,
         role: true,
+        beneficiary: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            numberOfFamily: true,
+            userId: true,
+          },
+        },
       },
     });
 
@@ -63,7 +70,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         success: true,
         message: "تم تسجيل الدخول بنجاح",
@@ -71,10 +78,27 @@ export async function POST(req: NextRequest) {
           id: user.id,
           email: user.email,
           role: user.role,
+          beneficiary: user.beneficiary ?? null,
         },
       },
       { status: 200 }
     );
+
+    response.cookies.set("userRole", String(user.role), {
+      path: "/",
+      httpOnly: false,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24,
+    });
+
+    response.cookies.set("userId", user.id, {
+      path: "/",
+      httpOnly: false,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24,
+    });
+
+    return response;
   } catch (e) {
     if (e instanceof z.ZodError) {
       return NextResponse.json(
