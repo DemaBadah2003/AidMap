@@ -8,12 +8,15 @@ type AidResult = {
   found: boolean
   beneficiaryName?: string
   nationalId?: string
+  phone?: string
   aidType?: string
+  numberOfFamily?: number
+  address?: string
+  notes?: string
   status?: string
   requestNumber?: string
-  distributionDate?: string
-  pickupLocation?: string
-  notes?: string
+  distributionDate?: string | null
+  pickupLocation?: string | null
 }
 
 const nationalIdRegex = /^\d{9}$/
@@ -195,11 +198,45 @@ export default function MyAidPage() {
                 </div>
 
                 <div className="grid gap-2">
+                  <label className="text-sm font-medium text-slate-800">رقم الهاتف</label>
+                  <input
+                    type="text"
+                    className="h-12 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-right text-sm outline-none"
+                    value={result.phone || ''}
+                    readOnly
+                  />
+                </div>
+
+                <div className="grid gap-2">
                   <label className="text-sm font-medium text-slate-800">نوع المساعدة</label>
                   <input
                     type="text"
                     className="h-12 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-right text-sm outline-none"
                     value={result.aidType || ''}
+                    readOnly
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium text-slate-800">عدد أفراد الأسرة</label>
+                  <input
+                    type="text"
+                    className="h-12 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-right text-sm outline-none"
+                    value={
+                      result.numberOfFamily !== undefined && result.numberOfFamily !== null
+                        ? String(result.numberOfFamily)
+                        : ''
+                    }
+                    readOnly
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium text-slate-800">العنوان</label>
+                  <input
+                    type="text"
+                    className="h-12 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-right text-sm outline-none"
+                    value={result.address || ''}
                     readOnly
                   />
                 </div>
