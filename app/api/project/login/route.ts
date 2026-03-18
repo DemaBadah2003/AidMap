@@ -12,9 +12,13 @@ async function hashPassword(password: string) {
 const loginSchema = z.object({
   email: z
     .string()
+    .trim()
     .min(1, "البريد الإلكتروني مطلوب")
     .email("البريد الإلكتروني غير صالح"),
-  password: z.string().min(1, "كلمة المرور مطلوبة"),
+  password: z
+    .string()
+    .min(1, "كلمة المرور مطلوبة")
+    .max(255, "كلمة المرور طويلة جدًا"),
 });
 
 export async function POST(req: NextRequest) {
@@ -25,14 +29,17 @@ export async function POST(req: NextRequest) {
       jsonBody = await req.json();
     } catch {
       return NextResponse.json(
-        { message: "البيانات المرسلة ليست JSON صالحًا" },
+        {
+          success: false,
+          message: "البيانات المرسلة ليست JSON صالحًا",
+        },
         { status: 400 }
       );
     }
 
     const body = loginSchema.parse(jsonBody);
 
-    const email = body.email.trim().toLowerCase();
+    const email = body.email.toLowerCase();
     const password = body.password;
 
     const user = await prisma.user.findUnique({
@@ -56,7 +63,10 @@ export async function POST(req: NextRequest) {
 
     if (!user) {
       return NextResponse.json(
-        { message: "البريد الإلكتروني أو كلمة المرور غير صحيحة" },
+        {
+          success: false,
+          message: "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+        },
         { status: 401 }
       );
     }
@@ -65,7 +75,10 @@ export async function POST(req: NextRequest) {
 
     if (user.password !== hashedPassword) {
       return NextResponse.json(
-        { message: "البريد الإلكتروني أو كلمة المرور غير صحيحة" },
+        {
+          success: false,
+          message: "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+        },
         { status: 401 }
       );
     }
@@ -84,25 +97,23 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
 
-    response.cookies.set("userRole", String(user.role), {
+    const cookieOptions = {
       path: "/",
-      httpOnly: false,
-      sameSite: "lax",
+      httpOnly: true,
+      sameSite: "lax" as const,
+      secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 60 * 24,
-    });
+    };
 
-    response.cookies.set("userId", user.id, {
-      path: "/",
-      httpOnly: false,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24,
-    });
+    response.cookies.set("userRole", String(user.role), cookieOptions);
+    response.cookies.set("userId", String(user.id), cookieOptions);
 
     return response;
   } catch (e) {
     if (e instanceof z.ZodError) {
       return NextResponse.json(
         {
+          success: false,
           message: "فشل التحقق من صحة البيانات",
           issues: e.issues.map((issue) => ({
             field: String(issue.path[0] ?? ""),
@@ -113,9 +124,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    console.error("Login API Error:", e);
+
     return NextResponse.json(
       {
-        message: e instanceof Error ? e.message : "حدث خطأ في الخادم",
+        success: false,
+        message: "حدث خطأ في الخادم",
       },
       { status: 500 }
     );
