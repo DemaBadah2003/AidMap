@@ -5,9 +5,6 @@ import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import prisma from "@/lib/prisma";
 
-const DEMO_EMAIL = "demabadah4@gmail.com";
-const DEMO_PASSWORD = "demabadah12345678910D@";
-
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
 
@@ -21,102 +18,152 @@ export const authOptions: NextAuthOptions = {
       },
 
       async authorize(credentials) {
-        // ✅ Fix: narrow types (unknown -> string)
-        if (
-          !credentials ||
-          typeof credentials.email !== "string" ||
-          typeof credentials.password !== "string"
-        ) {
-          throw new Error(
-            JSON.stringify({
-              code: 400,
-              message: "Please enter both email and password.",
-            })
+        console.log("========== AUTH START ==========");
+        console.log("Incoming credentials:", {
+          email: credentials?.email,
+          hasPassword: !!credentials?.password,
+          rememberMe: credentials?.rememberMe,
+        });
+
+        try {
+          if (
+            !credentials ||
+            typeof credentials.email !== "string" ||
+            typeof credentials.password !== "string"
+          ) {
+            console.error("AUTH ERROR: Missing or invalid email/password format");
+            throw new Error(
+              JSON.stringify({
+                code: 400,
+                message: "Please enter both email and password.",
+              })
+            );
+          }
+
+          console.log("Step 1: Looking for user by email:", credentials.email);
+
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email },
+          });
+
+          console.log("Step 2: User query result:", user
+            ? {
+                id: user.id,
+                email: user.email,
+                hasPassword: !!user.password,
+                status: user.status,
+                roleId: user.roleId,
+                name: user.name,
+              }
+            : null
           );
-        }
 
-        const email = credentials.email.trim().toLowerCase();
-        const password = credentials.password;
+          if (!user) {
+            console.error("AUTH ERROR: User not found");
+            throw new Error(
+              JSON.stringify({
+                code: 404,
+                message: "User not found. Please register first.",
+              })
+            );
+          }
 
-        // ✅ دخول ديمو سريع (يحافظ على تجربة Metronic) حتى لو DB فاضية
-        if (email === DEMO_EMAIL && password === DEMO_PASSWORD) {
+          if (!user.password) {
+            console.error("AUTH ERROR: User exists but has no password stored");
+            throw new Error(
+              JSON.stringify({
+                code: 401,
+                message: "This account does not have a password set.",
+              })
+            );
+          }
+
+          console.log("Step 3: Comparing password...");
+
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password,
+            user.password
+          );
+
+          console.log("Step 4: Password comparison result:", isPasswordValid);
+
+          if (!isPasswordValid) {
+            console.error("AUTH ERROR: Invalid password");
+            throw new Error(
+              JSON.stringify({
+                code: 401,
+                message: "Invalid credentials. Incorrect password.",
+              })
+            );
+          }
+
+          // لو بدك تفعيلي فحص الحالة، فعّلي هذا الجزء:
+          /*
+          console.log("Step 5: Checking user status:", user.status);
+
+          if (user.status !== "ACTIVE") {
+            console.error("AUTH ERROR: User is not active");
+            throw new Error(
+              JSON.stringify({
+                code: 403,
+                message: "Account not activated. Please verify your email.",
+              })
+            );
+          }
+          */
+
+          console.log("Step 6: Updating lastSignInAt...");
+
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { lastSignInAt: new Date() },
+          });
+
+          console.log("Step 7: Authentication success for user:", {
+            id: user.id,
+            email: user.email,
+            status: user.status,
+          });
+
+          console.log("========== AUTH SUCCESS ==========");
+
           return {
-            id: "demo-user",
-            email: DEMO_EMAIL,
-            name: "Demo User",
-            roleId: null,
-            status: "ACTIVE",
-            avatar: null,
+            id: user.id,
+            email: user.email,
+            name: user.name || "Anonymous",
+            roleId: user.roleId,
+            status: user.status,
+            avatar: user.avatar,
           } as any;
+        } catch (error: any) {
+          console.error("========== AUTH FAILED ==========");
+          console.error("Authorize catch error:", error);
+
+          if (error instanceof Error) {
+            console.error("Error message:", error.message);
+          }
+
+          throw error;
         }
-
-        const user = await prisma.user.findUnique({
-          where: { email },
-        });
-
-        if (!user) {
-          throw new Error(
-            JSON.stringify({
-              code: 404,
-              message: "User not found. Please register first.",
-            })
-          );
-        }
-
-        const isPasswordValid = await bcrypt.compare(
-          password,
-          user.password ?? ""
-        );
-
-        if (!isPasswordValid) {
-          throw new Error(
-            JSON.stringify({
-              code: 401,
-              message: "Invalid credentials. Incorrect password.",
-            })
-          );
-        }
-
-        if (user.status !== "ACTIVE") {
-          throw new Error(
-            JSON.stringify({
-              code: 403,
-              message: "Account not activated. Please verify your email.",
-            })
-          );
-        }
-
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { lastSignInAt: new Date() },
-        });
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name || "Anonymous",
-          roleId: user.roleId,
-          status: user.status,
-          avatar: user.avatar,
-        } as any;
       },
     }),
 
+    /*
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       allowDangerousEmailAccountLinking: true,
 
       profile(profile) {
-        // NextAuth يحتاج object فيه على الأقل id/email/name
         return {
-          id: profile.sub ?? (profile as any).id,
+          id: profile.sub ?? profile.id,
           name: profile.name,
           email: profile.email,
-          image: (profile as any).picture,
+          image: profile.picture,
         };
       },
     }),
+    */
   ],
 
   session: {
@@ -126,29 +173,47 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async jwt({ token, user, trigger, session }) {
+      console.log("JWT CALLBACK:", {
+        hasUser: !!user,
+        trigger,
+        tokenSub: token.sub,
+      });
+
       if (trigger === "update" && session?.user) {
+        console.log("JWT update trigger, merging session.user into token");
         return { ...token, ...(session.user as any) };
       }
 
       if (user) {
-        // خزّن أي بيانات إضافية في التوكن
         const u = user as any;
         token.id = u.id ?? token.sub;
         (token as any).roleId = u.roleId;
         (token as any).status = u.status;
         (token as any).avatar = u.avatar;
+
+        console.log("JWT enriched with user data:", {
+          id: token.id,
+          roleId: (token as any).roleId,
+          status: (token as any).status,
+        });
       }
 
       return token;
     },
 
     async session({ session, token }) {
+      console.log("SESSION CALLBACK:", {
+        sessionUserExists: !!session.user,
+        tokenId: (token as any).id,
+      });
+
       if (session.user) {
         (session.user as any).id = (token as any).id;
         (session.user as any).roleId = (token as any).roleId;
         (session.user as any).status = (token as any).status;
         (session.user as any).avatar = (token as any).avatar;
       }
+
       return session;
     },
   },
@@ -156,6 +221,8 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/signin",
   },
+
+  debug: true,
 };
 
 export default authOptions;
