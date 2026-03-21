@@ -1,7 +1,7 @@
 import { type LucideIcon } from 'lucide-react';
 
-export type AppRole = 'ADMIN' | 'CITIZEN';
-
+// ✅ توحيد النظام كله
+export type AppRole = 'admin' | 'user';
 export interface MenuItem {
   title?: string;
   icon?: LucideIcon;
@@ -16,6 +16,8 @@ export interface MenuItem {
   expandTitle?: string;
   badge?: string;
   separator?: boolean;
+
+  // ✅ نفس التعديل هنا
   roles?: AppRole[];
 }
 

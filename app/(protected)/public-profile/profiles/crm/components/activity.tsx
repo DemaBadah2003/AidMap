@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { ActivitiesBloggingConference } from '@/partials/activities/blogging-conference';
-import { ActivitiesLogin } from '@/partials/activities/login';
 import { ActivitiesNewProduct } from '@/partials/activities/new-product';
 import { ActivitiesProductSpecific } from '@/partials/activities/product-specific';
 import { ActivitiesProductWebinar } from '@/partials/activities/product-webinar';
@@ -43,10 +42,10 @@ const Activity = () => {
           />
         </div>
       </CardHeader>
+
       <CardContent>
         <ActivitiesNewProduct />
         <ActivitiesProductWebinar />
-        <ActivitiesLogin />
         <ActivitiesBloggingConference
           heading="Email campaign sent to Jenny for a special promotion."
           datetime="1 week ago, 11:45 AM"
@@ -54,6 +53,7 @@ const Activity = () => {
         />
         <ActivitiesProductSpecific />
       </CardContent>
+
       <CardFooter className="justify-center">
         <Button mode="link" underlined="dashed" asChild>
           <Link href="/public-profile/activity">All-time Activities</Link>

@@ -11,7 +11,12 @@ const PageNavbar = () => {
   const { settings } = useSettings();
 
   const role = getCurrentRole();
-  const menu = getSidebarMenuByRole(role);
+
+  // ✅ حل المشكلة: تأكدي أن role موجود
+  if (!role) return null;
+
+  // ✅ تحويل role لنوع مقبول
+  const menu = getSidebarMenuByRole(role as any);
 
   const accountMenuConfig = menu?.['3']?.children;
 

@@ -33,6 +33,7 @@ const Activity = () => {
           <Switch id={id} size="sm" />
         </div>
       </CardHeader>
+
       <CardContent>
         <ActivitiesNewProduct />
         <ActivitiesProductWebinar />
@@ -44,12 +45,12 @@ const Activity = () => {
           image={
             <Fragment>
               <img
-                src={toAbsoluteUrl(`/media/illustrations/10.svg`)}
+                src={toAbsoluteUrl('/media/illustrations/10.svg')}
                 className="dark:hidden max-h-[160px]"
                 alt="image"
               />
               <img
-                src={toAbsoluteUrl(`/media/illustrations/10-dark.svg`)}
+                src={toAbsoluteUrl('/media/illustrations/10-dark.svg')}
                 className="light:hidden max-h-[160px]"
                 alt="image"
               />
@@ -58,6 +59,7 @@ const Activity = () => {
         />
         <ActivitiesProductSpecific />
       </CardContent>
+
       <CardFooter className="justify-center">
         <Button mode="link" underlined="dashed" asChild>
           <Link href="/public-profile/activity">All-time Activities</Link>

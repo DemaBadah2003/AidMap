@@ -79,24 +79,25 @@ export const MENU_SIDEBAR: MenuConfig = [
         ],
       },
       {
-        title: 'admin Dahboard',
-        roles: ['ADMIN'],
+        title:"Admin Dashboard",
+          path: "/store-admin/dashboard",
+        roles: ["admin"],
         children: [
           { title: 'Map Preview', path: '/project/MapPreview' },
           { title: 'Add Place', path: '/project/addPlaces' },
           { title: 'Admin Beneficiary', path: '/project/adminBeneficiary' },
           { title: 'Add Aid', path: '/project/addAid' },
           { title: 'Distribute Aid', path: '/project/distributeAid' },
-          { title: 'login', path: '/project/login' },
         ],
       },
-      {
-        title: 'citizen Dahboard',
-        roles: ['CITIZEN'],
+     {
+  title: "User Pages",
+  path: "/store-client",
+  roles: ["user", "admin"], // الاثنين
+
         children: [
           { title: 'Map Preview', path: '/project/MapPreview' },
           { title: 'RegisterBeneficiary', path: '/project/RegisterBeneficiary' },
-          { title: 'login', path: '/project/login' },
           { title: 'My Aid', path: '/project/myAid' },
           { title: 'Request Aid', path: '/project/requestAid' }
         ],

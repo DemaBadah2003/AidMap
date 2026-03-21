@@ -1,4 +1,4 @@
-export type AppRole = "ADMIN" | "CITIZEN";
+export type AppRole = "admin" | "user";
 
 export type CurrentUser = {
   id: string;
@@ -12,6 +12,17 @@ export type CurrentUser = {
     userId?: string | null;
   } | null;
 };
+
+function normalizeRole(role: string | null | undefined): AppRole | null {
+  if (!role) return null;
+
+  const normalized = role.trim().toLowerCase();
+
+  if (normalized === "admin") return "admin";
+  if (normalized === "citizen" || normalized === "user") return "user";
+
+  return null;
+}
 
 export function getCurrentUser(): CurrentUser | null {
   if (typeof window === "undefined") return null;
@@ -28,35 +39,35 @@ export function getCurrentUser(): CurrentUser | null {
 
 export function getCurrentRole(): AppRole | null {
   const user = getCurrentUser();
-  return user?.role ?? null;
-}
-
-export function getCurrentUserId(): string | null {
-  const user = getCurrentUser();
-  return user?.id ?? null;
+  return normalizeRole(user?.role);
 }
 
 export function isAdmin(): boolean {
-  return getCurrentRole() === "ADMIN";
+  return getCurrentRole() === "admin";
 }
 
 export function isCitizen(): boolean {
-  return getCurrentRole() === "CITIZEN";
+  return getCurrentRole() === "user";
 }
 
+///////////////////////
+// ✅ الإضافة الجديدة
+///////////////////////
 export function saveCurrentUser(user: CurrentUser) {
   if (typeof window === "undefined") return;
-  localStorage.setItem("user", JSON.stringify(user));
-}
 
-export function clearCurrentUser() {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem("user");
-}
+  const normalizedRole = normalizeRole(user.role);
 
-export function logoutClient() {
-  clearCurrentUser();
-  document.cookie = "userRole=; path=/; max-age=0";
-  document.cookie = "userId=; path=/; max-age=0";
-  window.location.href = "/project/login";
+  // حفظ في localStorage
+  localStorage.setItem(
+    "user",
+    JSON.stringify({
+      ...user,
+      role: normalizedRole ?? user.role,
+    })
+  );
+
+  // حفظ في cookies (مهم للـ guards)
+  document.cookie = `userRole=${encodeURIComponent(normalizedRole ?? user.role)}; path=/`;
+  document.cookie = `userId=${encodeURIComponent(user.id)}; path=/`;
 }

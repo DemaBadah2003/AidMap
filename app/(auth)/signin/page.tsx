@@ -24,6 +24,9 @@ import { LoaderCircleIcon } from 'lucide-react';
 import { Icons } from '@/components/common/icons';
 import { getSigninSchema, SigninSchemaType } from '../forms/signin-schema';
 
+// ✅ التعديل الصحيح
+import { saveCurrentUser } from '@/app/api/project/helpers/helpers';
+
 export default function Page() {
   const router = useRouter();
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -33,8 +36,8 @@ export default function Page() {
   const form = useForm<SigninSchemaType>({
     resolver: zodResolver(getSigninSchema()),
     defaultValues: {
-      email: 'demo@kt.com',
-      password: 'demo123',
+      email: '',
+      password: '',
       rememberMe: false,
     },
   });
@@ -51,12 +54,31 @@ export default function Page() {
         rememberMe: values.rememberMe,
       });
 
-      console.log('Sign-in response:', response);
-
       if (response?.error) {
         const errorData = JSON.parse(response.error);
         setError(errorData.message);
       } else {
+        // ✅ جلب session
+        const session = await fetch('/api/auth/session').then((r) => r.json());
+
+        console.log('SESSION AFTER LOGIN:', session);
+
+        // ✅ تحويل roleId → role
+        let role: 'admin' | 'user' = 'user';
+
+        // ⚠️ مهم: هذا ID الأدمن من DB عندك
+        if (session?.user?.roleId === '8bec7f4f-e5a1-42d3-b001-8bbd5059fffd') {
+          role = 'admin';
+        }
+
+        // ✅ تخزين المستخدم (الحل الأساسي للمشكلة)
+        saveCurrentUser({
+          id: session.user.id,
+          email: session.user.email,
+          role,
+        });
+
+        // ✅ توجيه
         router.push('/');
       }
     } catch (err) {
@@ -154,7 +176,7 @@ export default function Page() {
               <div className="relative">
                 <Input
                   placeholder="Your password"
-                  type={passwordVisible ? 'text' : 'password'} // Toggle input type
+                  type={passwordVisible ? 'text' : 'password'}
                   {...field}
                 />
                 <Button
@@ -162,11 +184,8 @@ export default function Page() {
                   variant="ghost"
                   mode="icon"
                   size="sm"
-                  onClick={() => setPasswordVisible(!passwordVisible)} // Toggle visibility
+                  onClick={() => setPasswordVisible(!passwordVisible)}
                   className="absolute end-0 top-1/2 -translate-y-1/2 h-7 w-7 me-1.5 bg-transparent!"
-                  aria-label={
-                    passwordVisible ? 'Hide password' : 'Show password'
-                  }
                 >
                   {passwordVisible ? (
                     <EyeOff className="text-muted-foreground" />
@@ -204,7 +223,9 @@ export default function Page() {
 
         <div className="flex flex-col gap-2.5">
           <Button type="submit" disabled={isProcessing}>
-            {isProcessing ? <LoaderCircleIcon className="size-4 animate-spin" /> : null}
+            {isProcessing ? (
+              <LoaderCircleIcon className="size-4 animate-spin" />
+            ) : null}
             Continue
           </Button>
         </div>
