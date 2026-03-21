@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { getClientIP } from '@/lib/api';
-import { prisma } from '@/lib/prisma';
+import prisma from '@/lib/prisma';
 import { deleteFromS3, uploadToS3 } from '@/lib/s3-upload';
 import { systemLog } from '@/services/system-log';
 import { AccountProfileSchema } from '@/app/(protected)/user-management/account/forms/account-profile-schema';

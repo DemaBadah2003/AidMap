@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { RiCheckboxCircleFill, RiErrorWarningFill } from '@remixicon/react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -91,7 +92,20 @@ const notificationSettings = [
     webField: 'notifySystemErrorWeb',
     roleIdsField: 'notifySystemErrorRoleIds',
   },
-];
+] as const;
+
+const buildDefaultValues = (
+  settings: Partial<NotificationSettingsSchemaType> | null | undefined,
+): Partial<NotificationSettingsSchemaType> =>
+  notificationSettings.reduce<Partial<NotificationSettingsSchemaType>>(
+    (defaults, { emailField, webField, roleIdsField }) => ({
+      ...defaults,
+      [emailField]: settings?.[emailField] ?? false,
+      [webField]: settings?.[webField] ?? false,
+      [roleIdsField]: settings?.[roleIdsField] ?? [],
+    }),
+    {},
+  );
 
 const NotificationSettingsPage = () => {
   const queryClient = useQueryClient();
@@ -99,27 +113,18 @@ const NotificationSettingsPage = () => {
 
   const form = useForm<NotificationSettingsSchemaType>({
     resolver: zodResolver(NotificationSettingsSchema),
-    defaultValues: notificationSettings.reduce<
-      Partial<NotificationSettingsSchemaType>
-    >(
-      (defaults, { emailField, webField, roleIdsField }) => ({
-        ...defaults,
-        [emailField]:
-          (settings as NotificationSettingsSchemaType)[
-            emailField as keyof NotificationSettingsSchemaType
-          ] ?? false,
-        [webField]:
-          (settings as NotificationSettingsSchemaType)[
-            webField as keyof NotificationSettingsSchemaType
-          ] ?? false,
-        [roleIdsField]:
-          (settings as NotificationSettingsSchemaType)[
-            roleIdsField as keyof NotificationSettingsSchemaType
-          ] ?? [],
-      }),
-      {},
-    ),
+    defaultValues: buildDefaultValues(
+      settings as Partial<NotificationSettingsSchemaType> | null | undefined,
+    ) as NotificationSettingsSchemaType,
   });
+
+  useEffect(() => {
+    form.reset(
+      buildDefaultValues(
+        settings as Partial<NotificationSettingsSchemaType> | null | undefined,
+      ) as NotificationSettingsSchemaType,
+    );
+  }, [settings, form]);
 
   const mutation = useMutation({
     mutationFn: async (values: NotificationSettingsSchemaType) => {
@@ -178,19 +183,26 @@ const NotificationSettingsPage = () => {
   };
 
   const handleReset = () => {
-    form.reset();
+    form.reset(
+      buildDefaultValues(
+        settings as Partial<NotificationSettingsSchemaType> | null | undefined,
+      ) as NotificationSettingsSchemaType,
+    );
   };
 
   const toggleRoleSelection = (
     field: keyof NotificationSettingsSchemaType,
     roleId: string,
   ) => {
-    const currentValues = form.getValues()[field] as string[];
+    const currentValues = (form.getValues(field) as string[] | undefined) ?? [];
     const updatedValues = currentValues.includes(roleId)
       ? currentValues.filter((id) => id !== roleId)
       : [...currentValues, roleId];
 
-    form.setValue(field, updatedValues, { shouldDirty: true });
+    form.setValue(field, updatedValues as NotificationSettingsSchemaType[typeof field], {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
   };
 
   const isProcessing = mutation.status === 'pending';
@@ -202,6 +214,7 @@ const NotificationSettingsPage = () => {
           <CardHeader className="border-b border-border">
             <CardTitle>Notification Settings</CardTitle>
           </CardHeader>
+
           <CardContent className="px-0 py-2.5">
             <Table>
               <TableHeader>
@@ -212,18 +225,21 @@ const NotificationSettingsPage = () => {
                       Notification
                     </div>
                   </TableHead>
+
                   <TableHead className="text-muted-foreground">
                     <div className="inline-flex items-center gap-1.5">
                       <Users className="text-muted-foreground size-3.5" />
                       Users
                     </div>
                   </TableHead>
+
                   <TableHead className="w-36 text-center text-muted-foreground">
                     <div className="inline-flex items-center gap-1.5">
                       <MailWarning className="text-muted-foreground size-3.5" />
                       Email
                     </div>
                   </TableHead>
+
                   <TableHead className="w-36 text-center text-muted-foreground pe-6">
                     <div className="inline-flex items-center gap-1.5">
                       <AppWindowMac className="text-muted-foreground size-3.5" />
@@ -232,6 +248,7 @@ const NotificationSettingsPage = () => {
                   </TableHead>
                 </TableRow>
               </TableHeader>
+
               <TableBody>
                 {notificationSettings.map(
                   ({
@@ -240,140 +257,140 @@ const NotificationSettingsPage = () => {
                     emailField,
                     webField,
                     roleIdsField,
-                  }) => (
-                    <TableRow key={label}>
-                      <TableCell className="ps-6">
-                        <div className="space-y-1">
-                          <div className="text-md font-semibold">{label}</div>
-                          <div className="text-muted-foreground font-2sm font-regular">
-                            {description}
+                  }) => {
+                    const selectedRoleIds =
+                      (form.watch(roleIdsField) as string[] | undefined) ?? [];
+
+                    return (
+                      <TableRow key={label}>
+                        <TableCell className="ps-6">
+                          <div className="space-y-1">
+                            <div className="text-md font-semibold">{label}</div>
+                            <div className="text-muted-foreground font-2sm font-regular">
+                              {description}
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                mode="icon"
-                                className="h-7! w-7!"
+                        </TableCell>
+
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  mode="icon"
+                                  className="h-7! w-7!"
+                                  type="button"
+                                >
+                                  <UserPlus className="size-3.5!" />
+                                </Button>
+                              </PopoverTrigger>
+
+                              <PopoverContent
+                                className="w-[200px] p-0"
+                                align="start"
+                                side="bottom"
                               >
-                                <UserPlus className="size-3.5!" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent
-                              className="w-[200px] p-0"
-                              align="start"
-                              side="bottom"
-                            >
-                              <Command>
-                                <CommandInput placeholder="Search roles..." />
-                                <CommandList>
-                                  <CommandEmpty>No roles found.</CommandEmpty>
-                                  <CommandGroup>
-                                    <ScrollArea>
-                                      {roles?.map((role) => {
-                                        const isSelected = (
-                                          form.watch(
-                                            roleIdsField as keyof NotificationSettingsSchemaType,
-                                          ) as string[]
-                                        ).includes(role.id);
-                                        return (
-                                          <CommandItem
-                                            key={role.id}
-                                            onSelect={() =>
-                                              toggleRoleSelection(
-                                                roleIdsField as keyof NotificationSettingsSchemaType,
-                                                role.id,
-                                              )
-                                            }
-                                          >
-                                            <span className="grow">
-                                              {role.name}
-                                            </span>
-                                            {isSelected && <CommandCheck />}
-                                          </CommandItem>
-                                        );
-                                      })}
-                                    </ScrollArea>
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                          <div className="flex items-center flex-wrap gap-2">
-                            {(
-                              form.watch(
-                                roleIdsField as keyof NotificationSettingsSchemaType,
-                              ) as string[]
-                            )?.length > 0 ? (
-                              (
-                                form.watch(
-                                  roleIdsField as keyof NotificationSettingsSchemaType,
-                                ) as string[]
-                              ).map((roleId) => {
-                                const role = roles.find((r) => r.id === roleId);
-                                return (
-                                  <Badge key={roleId} variant="secondary">
-                                    {role?.name}
-                                  </Badge>
-                                );
-                              })
-                            ) : (
-                              <span className="text-muted-foreground">
-                                Not set
-                              </span>
-                            )}
+                                <Command>
+                                  <CommandInput placeholder="Search roles..." />
+                                  <CommandList>
+                                    <CommandEmpty>No roles found.</CommandEmpty>
+                                    <CommandGroup>
+                                      <ScrollArea className="max-h-56">
+                                        {(roles ?? []).map((role) => {
+                                          const isSelected =
+                                            selectedRoleIds.includes(role.id);
+
+                                          return (
+                                            <CommandItem
+                                              key={role.id}
+                                              onSelect={() =>
+                                                toggleRoleSelection(
+                                                  roleIdsField,
+                                                  role.id,
+                                                )
+                                              }
+                                            >
+                                              <span className="grow">
+                                                {role.name}
+                                              </span>
+                                              {isSelected && <CommandCheck />}
+                                            </CommandItem>
+                                          );
+                                        })}
+                                      </ScrollArea>
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+
+                            <div className="flex items-center flex-wrap gap-2">
+                              {selectedRoleIds.length > 0 ? (
+                                selectedRoleIds.map((roleId) => {
+                                  const role = roles?.find((r) => r.id === roleId);
+
+                                  return (
+                                    <Badge key={roleId} variant="secondary">
+                                      {role?.name ?? roleId}
+                                    </Badge>
+                                  );
+                                })
+                              ) : (
+                                <span className="text-muted-foreground">
+                                  Not set
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center pe-2!">
-                        <FormField
-                          control={form.control}
-                          name={
-                            emailField as keyof NotificationSettingsSchemaType
-                          }
-                          render={({ field }) => (
-                            <FormItem className="items-center">
-                              <FormControl>
-                                <Checkbox
-                                  checked={Boolean(field.value)}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center pe-6!">
-                        <FormField
-                          control={form.control}
-                          name={
-                            webField as keyof NotificationSettingsSchemaType
-                          }
-                          render={({ field }) => (
-                            <FormItem className="items-center">
-                              <FormControl>
-                                <Checkbox
-                                  checked={Boolean(field.value)}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ),
+                        </TableCell>
+
+                        <TableCell className="text-center pe-2!">
+                          <FormField
+                            control={form.control}
+                            name={emailField}
+                            render={({ field }) => (
+                              <FormItem className="items-center">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={Boolean(field.value)}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </TableCell>
+
+                        <TableCell className="text-center pe-6!">
+                          <FormField
+                            control={form.control}
+                            name={webField}
+                            render={({ field }) => (
+                              <FormItem className="items-center">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={Boolean(field.value)}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  },
                 )}
               </TableBody>
             </Table>
           </CardContent>
+
           <CardFooter className="flex justify-end gap-4 py-5 px-10">
             <Button type="button" variant="outline" onClick={handleReset}>
               Reset
             </Button>
+
             <Button type="submit" disabled={isProcessing}>
               {isProcessing && <LoaderCircleIcon className="animate-spin" />}
               Save Settings

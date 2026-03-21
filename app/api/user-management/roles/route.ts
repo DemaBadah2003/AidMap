@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
 import { getClientIP } from '@/lib/api';
 import { isUnique } from '@/lib/db';
-import { prisma } from '@/lib/prisma';
+import  prisma  from '@/lib/prisma';
 import { systemLog } from '@/services/system-log';
 import {
   RoleSchema,

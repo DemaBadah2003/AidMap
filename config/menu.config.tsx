@@ -338,10 +338,7 @@ export const MENU_SIDEBAR: MenuConfig = [
         title: 'Account',
         path: '/user-management/account',
       },
-      {
-        title: 'Logs',
-        path: '/user-management/logs',
-      },
+     
       {
         title: 'Settings',
         path: '/user-management/settings',

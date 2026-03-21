@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { RiCheckboxCircleFill, RiErrorWarningFill } from '@remixicon/react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -29,18 +30,31 @@ const SocialSettingsPage = () => {
   const queryClient = useQueryClient();
   const { settings } = useSettings();
 
+  const defaultValues: SocialSettingsSchemaType = {
+    socialFacebook: settings?.socialFacebook || '',
+    socialTwitter: settings?.socialTwitter || '',
+    socialInstagram: settings?.socialInstagram || '',
+    socialLinkedIn: settings?.socialLinkedIn || '',
+    socialPinterest: settings?.socialPinterest || '',
+    socialYoutube: settings?.socialYoutube || '',
+  };
+
   const form = useForm<SocialSettingsSchemaType>({
     resolver: zodResolver(SocialSettingsSchema),
-    defaultValues: {
-      socialFacebook: settings.socialFacebook || '',
-      socialTwitter: settings.socialTwitter || '',
-      socialInstagram: settings.socialInstagram || '',
-      socialLinkedIn: settings.socialLinkedIn || '',
-      socialPinterest: settings.socialPinterest || '',
-      socialYoutube: settings.socialYoutube || '',
-    },
+    defaultValues,
     mode: 'onSubmit',
   });
+
+  useEffect(() => {
+    form.reset({
+      socialFacebook: settings?.socialFacebook || '',
+      socialTwitter: settings?.socialTwitter || '',
+      socialInstagram: settings?.socialInstagram || '',
+      socialLinkedIn: settings?.socialLinkedIn || '',
+      socialPinterest: settings?.socialPinterest || '',
+      socialYoutube: settings?.socialYoutube || '',
+    });
+  }, [settings, form]);
 
   const mutation = useMutation({
     mutationFn: async (values: SocialSettingsSchemaType) => {
@@ -98,7 +112,6 @@ const SocialSettingsPage = () => {
   };
 
   const handleError = (errors: FieldErrors<SocialSettingsSchemaType>) => {
-    // Cast keys as an array of keys of SocialSettingsSchemaType
     const keys = Object.keys(errors) as (keyof SocialSettingsSchemaType)[];
     const firstErrorKey = keys[0];
     const firstErrorMessage = errors[firstErrorKey]?.message;
@@ -228,7 +241,7 @@ const SocialSettingsPage = () => {
               <Button
                 type="reset"
                 variant="outline"
-                onClick={() => form.reset()}
+                onClick={() => form.reset(defaultValues)}
               >
                 Reset
               </Button>
