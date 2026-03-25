@@ -16,7 +16,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { StoreClientTopbar } from '@/app/(protected)/store-client/components/common/topbar';
+
 import { Footer } from './components/footer';
 import { Header } from './components/header';
 import { Sidebar } from './components/sidebar';
@@ -60,49 +60,44 @@ const Demo6Layout = ({ children }: { children: ReactNode }) => {
 
                     <ToolbarActions>
                       <>
-                        {pathname.startsWith('/store-client') ? (
-                          <StoreClientTopbar />
-                        ) : (
-                          <>
-                            <Button variant="outline" asChild>
-                              <Link href={'/account/home/get-started'}>
-                                <Download />
-                                Export
-                              </Link>
+                        <Button variant="outline" asChild>
+                          <Link href={'/account/home/get-started'}>
+                            <Download />
+                            Export
+                          </Link>
+                        </Button>
+
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button id="date" variant="outline">
+                              <CalendarDays />
+                              {date?.from ? (
+                                date.to ? (
+                                  <span>
+                                    {format(date.from, 'LLL dd, y')} -{' '}
+                                    {format(date.to, 'LLL dd, y')}
+                                  </span>
+                                ) : (
+                                  format(date.from, 'LLL dd, y')
+                                )
+                              ) : (
+                                <span>Pick a date range</span>
+                              )}
                             </Button>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button id="date" variant="outline">
-                                  <CalendarDays />
-                                  {date?.from ? (
-                                    date.to ? (
-                                      <span>
-                                        {format(date.from, 'LLL dd, y')} -{' '}
-                                        {format(date.to, 'LLL dd, y')}
-                                      </span>
-                                    ) : (
-                                      format(date.from, 'LLL dd, y')
-                                    )
-                                  ) : (
-                                    <span>Pick a date range</span>
-                                  )}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent
-                                className="w-auto p-0"
-                                align="end"
-                              >
-                                <Calendar
-                                  mode="range"
-                                  defaultMonth={date?.from}
-                                  selected={date}
-                                  onSelect={setDate}
-                                  numberOfMonths={2}
-                                />
-                              </PopoverContent>
-                            </Popover>
-                          </>
-                        )}
+                          </PopoverTrigger>
+                          <PopoverContent
+                            className="w-auto p-0"
+                            align="end"
+                          >
+                            <Calendar
+                              mode="range"
+                              defaultMonth={date?.from}
+                              selected={date}
+                              onSelect={setDate}
+                              numberOfMonths={2}
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </>
                     </ToolbarActions>
                   </Toolbar>

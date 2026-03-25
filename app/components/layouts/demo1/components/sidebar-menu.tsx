@@ -3,7 +3,7 @@
 import { JSX, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MENU_SIDEBAR } from '@/config/menu.config';
+import { MENU_SIDEBAR_COMPACT } from '@/config/menu.config';
 import { MenuConfig, MenuItem } from '@/config/types';
 import { cn } from '@/lib/utils';
 import {
@@ -219,7 +219,7 @@ export function SidebarMenu() {
         collapsible
         classNames={classNames}
       >
-        {buildMenu(MENU_SIDEBAR)}
+        {buildMenu(MENU_SIDEBAR_COMPACT)}
       </AccordionMenu>
     </div>
   );

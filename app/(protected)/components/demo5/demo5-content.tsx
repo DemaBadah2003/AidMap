@@ -1,5 +1,4 @@
 import { Faq } from '@/partials/common/faq';
-import { TeamInfo } from '../../account/members/team-info/components/team-info';
 import { Teams } from '../demo1';
 import { Options } from './components';
 
@@ -9,7 +8,7 @@ export function Demo5Content() {
       <div className="grid lg:grid-cols-3 gap-y-5 lg:gap-7.5 items-stretch">
         <div className="lg:col-span-2">
           <div className="grid grid-cols-1 gap-5 lg:gap-7.5 h-full items-stretch">
-            <TeamInfo />
+            {/* تم حذف TeamInfo */}
           </div>
         </div>
         <div className="lg:col-span-1">
@@ -18,6 +17,7 @@ export function Demo5Content() {
           </div>
         </div>
       </div>
+
       <div className="grid lg:grid-cols-1 gap-5 lg:gap-7.5 items-stretch">
         <Teams />
         <Faq />

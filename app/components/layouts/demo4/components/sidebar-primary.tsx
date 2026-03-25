@@ -60,12 +60,7 @@ const menuItems: MenuItem[] = [
     path: '/network/get-started',
     rootPath: '/network/',
   },
-  {
-    tooltip: 'User Management',
-    icon: ShieldUser,
-    path: '/user-management/users',
-    rootPath: '/user-management/',
-  },
+  
   {
     icon: ShoppingCart,
     tooltip: 'Store - Client',

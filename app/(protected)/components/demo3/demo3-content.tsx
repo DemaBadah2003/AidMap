@@ -1,6 +1,5 @@
 import { CreateTeam } from '@/partials/common/create-team';
 import { toAbsoluteUrl } from '@/lib/helpers';
-import { BlockList } from '../../account/security/privacy-settings/components/block-list';
 import { Highlights, Teams } from '../demo1/light-sidebar/components';
 import { ManageData } from '../demo2/components';
 import { Integrations } from './components';
@@ -46,18 +45,14 @@ export function Demo3Content() {
           <Highlights />
         </div>
       </div>
+
       <div className="grid lg:grid-cols-3 gap-5 lg:gap-7.5 items-stretch">
         <div className="lg:col-span-2">
           <Teams />
         </div>
-        <div className="lg:col-span-1">
-          <BlockList
-            className="h-full"
-            limit={3}
-            text="Users on the block list are unable to send chat requests or messages to you anymore, ever, or again"
-          />
-        </div>
+        {/* تم حذف BlockList */}
       </div>
+
       <div className="grid lg:grid-cols-3 gap-5 lg:gap-7.5 items-stretch">
         <div className="lg:col-span-2">
           <Integrations />

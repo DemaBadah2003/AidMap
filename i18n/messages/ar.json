@@ -51,5 +51,17 @@
     "invalid_input": "إدخال غير صالح. يرجى التحقق من بياناتك والمحاولة مرة أخرى.",
     "data_not_found": "لم يتم العثور على البيانات المطلوبة.",
     "delete_restricted_error": "لا يمكن حذف هذا السجل لأنه مرتبط بسجلات أخرى."
+  },
+  "userMenu": {
+    "pro": "احترافي",
+    "profileSection": "الملف الشخصي",
+    "viewProfile": "عرض الملف الشخصي",
+    "editProfile": "تعديل الملف الشخصي",
+    "preferences": "التفضيلات",
+    "language": "اللغة",
+    "theme": "الثيم",
+    "security": "الأمان",
+    "changePassword": "تغيير كلمة المرور",
+    "logout": "تسجيل الخروج"
   }
 }

@@ -1,4 +1,4 @@
-import Prisma from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 
 export interface SystemLogProps {
@@ -21,10 +21,9 @@ export async function systemLog(
     ipAddress,
     meta,
   }: SystemLogProps,
-  tx?: Prisma.TransactionClient, // Optional transaction
+  tx?: Prisma.TransactionClient,
 ) {
   try {
-    // Use transaction if available, otherwise use Prisma client
     const connection = tx ?? prisma;
 
     await connection.systemLog.create({

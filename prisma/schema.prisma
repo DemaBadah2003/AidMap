@@ -28,6 +28,8 @@ model User {
   emailVerifiedAt DateTime?
   isTrashed       Boolean     @default(false)
   avatar          String?
+  language        String?     @default("en")
+  theme           String?     @default("light")
   invitedByUserId String?
   isProtected     Boolean     @default(false) // Prevents deletion/modification
   role            UserRole    @relation(fields: [roleId], references: [id])

@@ -30,11 +30,7 @@ export function NavbarMenu() {
         path: '/network/get-started',
         partial: '/network',
       },
-      {
-        title: 'User Management',
-        path: '/user-management/users',
-        partial: '/user-management',
-      },
+     
       {
         title: 'Store - Client',
         path: '/store-client/home',

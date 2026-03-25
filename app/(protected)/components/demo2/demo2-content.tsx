@@ -1,5 +1,3 @@
-import { BlockList } from '../../account/security/privacy-settings/components/block-list';
-import { ReportSettings } from '../../account/security/privacy-settings/components/report-settings';
 import { EntryCallout, Teams } from '../demo1/light-sidebar';
 import { Integrations, ManageData, MyBalance, Options } from './components';
 
@@ -16,25 +14,19 @@ export function Demo2Content() {
           <MyBalance className="h-full" />
         </div>
       </div>
+
       <div className="grid lg:grid-cols-3 gap-5 lg:gap-7.5 items-stretch">
         <div className="lg:col-span-2">
           <EntryCallout className="h-full" />
         </div>
-        <div className="lg:col-span-1">
-          <ReportSettings className="h-full" />
-        </div>
       </div>
+
       <div className="grid lg:grid-cols-3 gap-5 lg:gap-7.5 items-stretch">
         <div className="lg:col-span-2">
           <Integrations />
         </div>
-        <div className="lg:col-span-1">
-          <BlockList
-            className="h-full"
-            text="Users on the block list are unable to send chat requests or messages to you anymore, ever, or again"
-          />
-        </div>
       </div>
+
       <div className="grid lg:grid-cols-3 gap-5 lg:gap-7.5 items-stretch">
         <div className="lg:col-span-2">
           <Teams />
