@@ -56,10 +56,7 @@ export const MENU_SIDEBAR: MenuConfig = [
     { title: 'My Aid', path: '/project/myAid' },
     { title: 'Request Aid', path: '/project/requestAid' },
 
-    // 👇 الإضافات الجديدة
-    { title: 'View Profile', path: '/profile-page' },
-    { title: 'Edit Profile', path: '/profile-page/edit' },
-    { title: 'Change Password', path: '/profile-page/security/change-password' }
+
   ],
 },
     ],

@@ -5,7 +5,7 @@ import { JSX, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LucideIcon } from 'lucide-react';
-import { MENU_MEGA_MOBILE } from '@/config/menu.config';
+import { MENU_SIDEBAR} from '@/config/menu.config';
 import { cn } from '@/lib/utils';
 import {
   AccordionMenu,
@@ -219,7 +219,7 @@ export function MegaMenuMobile() {
         collapsible
         classNames={classNames}
       >
-        {buildMenu(MENU_MEGA_MOBILE)}
+        {buildMenu(MENU_SIDEBAR)}
       </AccordionMenu>
     </div>
   );

@@ -3,7 +3,7 @@
 import { JSX, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MENU_SIDEBAR_COMPACT } from '@/config/menu.config';
+import { MENU_SIDEBAR } from '@/config/menu.config';
 import { MenuConfig, MenuItem } from '@/config/types';
 import { cn } from '@/lib/utils';
 import {
@@ -21,14 +21,12 @@ import { Badge } from '@/components/ui/badge';
 export function SidebarMenu() {
   const pathname = usePathname();
 
-  // Memoize matchPath to prevent unnecessary re-renders
   const matchPath = useCallback(
     (path: string): boolean =>
       path === pathname || (path.length > 1 && pathname.startsWith(path)),
     [pathname],
   );
 
-  // Global classNames for consistent styling
   const classNames: AccordionMenuClassNames = {
     root: 'lg:ps-1 space-y-3',
     group: 'gap-px',
@@ -157,11 +155,7 @@ export function SidebarMenu() {
             type="single"
             collapsible
             parentValue={item.path || `child-${level}-${index}`}
-            className={cn(
-              'ps-4',
-              !item.collapse && 'relative',
-              !item.collapse && (level > 0 ? '' : ''),
-            )}
+            className={cn('ps-4', !item.collapse && 'relative')}
           >
             <AccordionMenuGroup>
               {buildMenuItemChildren(
@@ -219,7 +213,7 @@ export function SidebarMenu() {
         collapsible
         classNames={classNames}
       >
-        {buildMenu(MENU_SIDEBAR_COMPACT)}
+        {buildMenu(MENU_SIDEBAR)}
       </AccordionMenu>
     </div>
   );
