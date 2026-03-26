@@ -64,7 +64,7 @@ export default function DistributeAidPage() {
     try {
       setSubmitting(true)
 
-      const res = await fetch('/api/project/distributeAid', {
+      const res = await fetch('/api/project/admins/distributeAid', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

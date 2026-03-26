@@ -6,13 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-// User Modoule
-enum UserStatus {
-  INACTIVE
-  ACTIVE
-  BLOCKED
-}
-
 model User {
   id              String      @id @default(uuid())
   email           String      @unique
@@ -21,23 +14,22 @@ model User {
   timezone        String?
   name            String?
   roleId          String
-  status          UserStatus  @default(INACTIVE) // Status of the invitation
+  status          UserStatus  @default(INACTIVE)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   lastSignInAt    DateTime?
   emailVerifiedAt DateTime?
   isTrashed       Boolean     @default(false)
   avatar          String?
+  invitedByUserId String?
+  isProtected     Boolean     @default(false)
   language        String?     @default("en")
   theme           String?     @default("light")
-  invitedByUserId String?
-  isProtected     Boolean     @default(false) // Prevents deletion/modification
-  role            UserRole    @relation(fields: [roleId], references: [id])
-  systemLog       SystemLog[]
   accounts        Account[]
   Session         Session[]
+  systemLog       SystemLog[]
+  role            UserRole    @relation(fields: [roleId], references: [id])
 
-  // Indexes for efficient querying
   @@index([invitedByUserId])
   @@index([roleId])
   @@index([status])
@@ -68,13 +60,12 @@ model UserPermission {
 }
 
 model UserRolePermission {
-  id           String   @id @default(uuid())
+  id           String         @id @default(uuid())
   roleId       String
   permissionId String
-  assignedAt   DateTime @default(now())
-
-  role       UserRole       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission UserPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  assignedAt   DateTime       @default(now())
+  permission   UserPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         UserRole       @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([roleId, permissionId])
 }
@@ -85,15 +76,14 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId], name: "provider_providerAccountId")
 }
@@ -124,33 +114,30 @@ model SystemLog {
   description String?
   ipAddress   String?
   meta        String?
-
-  user User @relation(fields: [userId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
 }
 
 model SystemSetting {
-  id             String  @id @default(uuid())
-  name           String  @default("My Company")
-  logo           String?
-  active         Boolean @default(true)
-  address        String?
-  websiteURL     String?
-  supportEmail   String?
-  supportPhone   String?
-  language       String  @default("en")
-  timezone       String  @default("UTC")
-  currency       String  @default("USD")
-  currencyFormat String  @default("$ {value}")
-
-  socialFacebook  String?
-  socialTwitter   String?
-  socialInstagram String?
-  socialLinkedIn  String?
-  socialPinterest String?
-  socialYoutube   String?
-
+  id                             String   @id @default(uuid())
+  name                           String   @default("My Company")
+  logo                           String?
+  active                         Boolean  @default(true)
+  address                        String?
+  websiteURL                     String?
+  supportEmail                   String?
+  supportPhone                   String?
+  language                       String   @default("en")
+  timezone                       String   @default("UTC")
+  currency                       String   @default("USD")
+  currencyFormat                 String   @default("$ {value}")
+  socialFacebook                 String?
+  socialTwitter                  String?
+  socialInstagram                String?
+  socialLinkedIn                 String?
+  socialPinterest                String?
+  socialYoutube                  String?
   notifyStockEmail               Boolean  @default(true)
   notifyStockWeb                 Boolean  @default(true)
   notifyStockThreshold           Int      @default(10)
@@ -169,9 +156,286 @@ model SystemSetting {
   notifySystemErrorRoleIds       String[]
 }
 
-// =====================
-// Enums (المستخدمة في نظام الإغاثة)
-// =====================
+model Supervisor {
+  id          String        @id @default(uuid())
+  name        String
+  phone       String?
+  status      GeneralStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  isTrashed   Boolean       @default(false)
+  isProtected Boolean       @default(false)
+  camps       Camps[]
+  emergencies Emergency[]
+
+  @@index([status])
+}
+
+model Camps {
+  id            String         @id @default(uuid())
+  name          String
+  area          String?
+  capacity      Int            @default(0)
+  status        CampFillStatus @default(NOT_FULL)
+  latitude      Decimal?       @db.Decimal(10, 7)
+  longitude     Decimal?       @db.Decimal(10, 7)
+  supervisorId  String
+  placeId       String?        @unique
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  isTrashed     Boolean        @default(false)
+  isProtected   Boolean        @default(false)
+  addresses     Address[]
+  beneficiaries Beneficiary[]
+  place         Place?         @relation("CampPlace", fields: [placeId], references: [id])
+  supervisor    Supervisor     @relation(fields: [supervisorId], references: [id])
+  emergencies   Emergency[]
+
+  @@index([supervisorId])
+  @@index([status])
+}
+
+model Beneficiary {
+  id             String              @id @default(uuid())
+  name           String
+  phone          String              @unique
+  numberOfFamily Int                 @default(0)
+  priority       BeneficiaryPriority @default(NORMAL)
+  campId         String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  role           String              @default("CITIZEN")
+  isActive       Boolean             @default(true)
+  isTrashed      Boolean             @default(false)
+  isProtected    Boolean             @default(false)
+  camp           Camps?              @relation(fields: [campId], references: [id])
+  contacts       Contact[]
+  distributions  Distribution[]
+
+  @@index([campId])
+  @@index([name])
+  @@index([phone])
+  @@index([isActive])
+  @@index([isTrashed])
+}
+
+model Aid {
+  id            String         @id @default(uuid())
+  aidType       String
+  aidName       String
+  quantity      Int
+  dateReceived  DateTime
+  donor         String?
+  status        String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  distributions Distribution[]
+}
+
+model Address {
+  id          String   @id @default(uuid())
+  governorate String?
+  city        String?
+  campId      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  camp        Camps?   @relation(fields: [campId], references: [id])
+}
+
+model Emergency {
+  id            String          @id @default(uuid())
+  emergencyType String
+  description   String?
+  status        EmergencyStatus @default(NEW)
+  level         EmergencyLevel  @default(MEDIUM)
+  campId        String
+  supervisorId  String
+  camp          Camps           @relation(fields: [campId], references: [id], onDelete: Cascade)
+  supervisor    Supervisor      @relation(fields: [supervisorId], references: [id])
+}
+
+model Clinic {
+  id             String         @id @default(uuid())
+  name           String
+  specialty      String?
+  capacityPerDay Int            @default(0)
+  status         ClinicStatus   @default(OPEN)
+  institutionId  String?
+  placeId        String?        @unique
+  institution    Institution?   @relation(fields: [institutionId], references: [id])
+  place          Place?         @relation("ClinicPlace", fields: [placeId], references: [id])
+  distributions  Distribution[]
+}
+
+model Institution {
+  id                  String               @id @default(uuid())
+  name                String
+  instagramId         String?              @unique
+  email               String?
+  serviceType         String?
+  presence            PresenceStatus       @default(AVAILABLE)
+  status              GeneralStatus        @default(ACTIVE)
+  latitude            Decimal?             @db.Decimal(10, 7)
+  longitude           Decimal?             @db.Decimal(10, 7)
+  placeId             String?              @unique
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  isTrashed           Boolean              @default(false)
+  isProtected         Boolean              @default(false)
+  clinics             Clinic[]
+  contacts            Contact[]
+  distributions       Distribution[]
+  enterpriseProducts  EnterpriseProduct[]
+  place               Place?               @relation("InstitutionPlace", fields: [placeId], references: [id])
+  institutionProducts InstitutionProduct[]
+  institutionServices InstitutionService[]
+
+  @@index([status])
+  @@index([presence])
+  @@index([isTrashed])
+}
+
+model Contact {
+  id            String        @id @default(uuid())
+  beneficiaryId String
+  institutionId String
+  status        ContactStatus @default(NOT_DONE)
+  beneficiary   Beneficiary   @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  institution   Institution   @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+}
+
+model Product {
+  id                  String               @id @default(uuid())
+  name                String
+  quantity            Int                  @default(0)
+  status              ActiveStatus         @default(ACTIVE)
+  distributions       Distribution[]
+  enterpriseProducts  EnterpriseProduct[]
+  institutionProducts InstitutionProduct[]
+}
+
+model Service {
+  id                  String               @id @default(uuid())
+  serviceType         String
+  status              GeneralStatus        @default(ACTIVE)
+  institutionServices InstitutionService[]
+}
+
+model InstitutionService {
+  id            String      @id @default(uuid())
+  institutionId String
+  serviceId     String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  service       Service     @relation(fields: [serviceId], references: [id])
+
+  @@unique([institutionId, serviceId])
+}
+
+model InstitutionProduct {
+  id            String      @id @default(uuid())
+  institutionId String
+  productId     String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  product       Product     @relation(fields: [productId], references: [id])
+
+  @@unique([institutionId, productId])
+}
+
+model Distribution {
+  id            String             @id @default(uuid())
+  beneficiaryId String?
+  institutionId String
+  productId     String?
+  quantity      Int                @default(0)
+  status        DistributionStatus @default(PENDING)
+  aidId         String?
+  clinicId      String?
+  placeId       String?
+  aid           Aid?               @relation(fields: [aidId], references: [id])
+  beneficiary   Beneficiary?       @relation(fields: [beneficiaryId], references: [id])
+  clinic        Clinic?            @relation(fields: [clinicId], references: [id])
+  institution   Institution        @relation(fields: [institutionId], references: [id])
+  place         Place?             @relation(fields: [placeId], references: [id])
+  product       Product?           @relation(fields: [productId], references: [id])
+}
+
+model Place {
+  id            String         @id @default(uuid())
+  name          String
+  type          PlaceType
+  description   String?
+  latitude      Decimal        @db.Decimal(10, 7)
+  longitude     Decimal        @db.Decimal(10, 7)
+  status        PlaceStatus    @default(AVAILABLE)
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  isTrashed     Boolean        @default(false)
+  isProtected   Boolean        @default(false)
+  operator      String?
+  capacity      Int?
+  occupancy     Int?
+  availableBeds Int?
+  statusText    String?
+  camp          Camps?         @relation("CampPlace")
+  clinic        Clinic?        @relation("ClinicPlace")
+  distributions Distribution[]
+  institution   Institution?   @relation("InstitutionPlace")
+
+  @@index([type])
+  @@index([status])
+  @@index([isActive])
+  @@index([isTrashed])
+  @@index([name])
+}
+
+model DistributeAidForm {
+  id               String                  @id @default(uuid())
+  beneficiaryName  String
+  aidType          String
+  quantity         Int
+  status           DistributeAidFormStatus @default(SCHEDULED)
+  createdAt        DateTime                @default(now())
+  distributionDate DateTime
+  institutionId    String?
+  notes            String?
+  updatedAt        DateTime                @updatedAt
+
+  @@index([beneficiaryName])
+  @@index([aidType])
+  @@index([status])
+  @@index([distributionDate])
+}
+
+model EnterpriseProduct {
+  id            String                        @id @default(uuid())
+  institutionId String
+  productId     String
+  quantity      Int                           @default(0)
+  availability  EnterpriseProductAvailability @default(AVAILABLE)
+  institution   Institution                   @relation(fields: [institutionId], references: [id])
+  product       Product                       @relation(fields: [productId], references: [id])
+}
+
+model RequestAid {
+  id          String             @id @default(uuid())
+  fullName    String
+  nationalId  String
+  phone       String
+  aidType     String
+  familyCount Int
+  address     String
+  notes       String?
+  status      DistributionStatus @default(PENDING)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+enum UserStatus {
+  INACTIVE
+  ACTIVE
+  BLOCKED
+}
 
 enum CampFillStatus {
   NOT_FULL
@@ -250,315 +514,4 @@ enum DistributeAidFormStatus {
   SCHEDULED
   DONE
   CANCELED
-}
-
-// =====================
-// Camps + Relief System
-// =====================
-
-model Supervisor {
-  id     String        @id @default(uuid())
-  name   String
-  phone  String?
-  status GeneralStatus @default(ACTIVE)
-
-  camps       Camps[]
-  emergencies Emergency[]
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  isTrashed   Boolean  @default(false)
-  isProtected Boolean  @default(false)
-
-  @@index([status])
-}
-
-model Camps {
-  id       String         @id @default(uuid())
-  name     String
-  area     String?
-  capacity Int            @default(0)
-  status   CampFillStatus @default(NOT_FULL)
-
-  latitude  Decimal? @db.Decimal(10, 7)
-  longitude Decimal? @db.Decimal(10, 7)
-
-  supervisorId String
-  supervisor   Supervisor @relation(fields: [supervisorId], references: [id], onDelete: Restrict)
-
-  placeId String? @unique
-  place   Place?  @relation("CampPlace", fields: [placeId], references: [id], onDelete: SetNull)
-
-  beneficiaries Beneficiary[]
-  addresses     Address[]
-  emergencies   Emergency[]
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  isTrashed   Boolean  @default(false)
-  isProtected Boolean  @default(false)
-
-  @@index([supervisorId])
-  @@index([status])
-}
-
-model Beneficiary {
-  id             String              @id @default(uuid())
-  name           String
-  phone          String?
-  numberOfFamily Int                 @default(0)
-  priority       BeneficiaryPriority @default(NORMAL)
-
-  campId String?
-  camp   Camps?  @relation(fields: [campId], references: [id], onDelete: SetNull)
-
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  contacts      Contact[]
-  distributions Distribution[]
-
-  @@index([campId])
-}
-
-model Aid {
-  id           String   @id @default(uuid())
-  aidType      String
-  aidName      String
-  quantity     Int
-  dateReceived DateTime
-  donor        String?
-  status       String
-
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  distributions Distribution[]
-}
-
-model Address {
-  id          String  @id @default(uuid())
-  governorate String?
-  city        String?
-
-  campId String?
-  camp   Camps?  @relation(fields: [campId], references: [id], onDelete: SetNull)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Emergency {
-  id            String          @id @default(uuid())
-  emergencyType String
-  description   String?
-  status        EmergencyStatus @default(NEW)
-  level         EmergencyLevel  @default(MEDIUM)
-
-  campId String
-  camp   Camps  @relation(fields: [campId], references: [id], onDelete: Cascade)
-
-  supervisorId String
-  supervisor   Supervisor @relation(fields: [supervisorId], references: [id], onDelete: Restrict)
-}
-
-// =====================
-// Institutions / Clinics
-// =====================
-
-model Clinic {
-  id             String       @id @default(uuid())
-  name           String
-  specialty      String?
-  capacityPerDay Int          @default(0)
-  status         ClinicStatus @default(OPEN)
-
-  institutionId String?
-  institution   Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
-
-  placeId String? @unique
-  place   Place?  @relation("ClinicPlace", fields: [placeId], references: [id], onDelete: SetNull)
-
-  distributions Distribution[]
-}
-
-model Institution {
-  id          String         @id @default(uuid())
-  name        String
-  instagramId String?        @unique
-  email       String?
-  serviceType String?
-  presence    PresenceStatus @default(AVAILABLE)
-  status      GeneralStatus  @default(ACTIVE)
-
-  latitude  Decimal? @db.Decimal(10, 7)
-  longitude Decimal? @db.Decimal(10, 7)
-
-  placeId String? @unique
-  place   Place?  @relation("InstitutionPlace", fields: [placeId], references: [id], onDelete: SetNull)
-
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  isTrashed           Boolean              @default(false)
-  isProtected         Boolean              @default(false)
-  clinics             Clinic[]
-  contacts            Contact[]
-  institutionServices InstitutionService[]
-  institutionProducts InstitutionProduct[]
-  distributions       Distribution[]
-  enterpriseProducts  EnterpriseProduct[]
-
-  @@index([status])
-  @@index([presence])
-  @@index([isTrashed])
-}
-
-// =====================
-// Relations
-// =====================
-
-model Contact {
-  id String @id @default(uuid())
-
-  beneficiaryId String
-  beneficiary   Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
-
-  institutionId String
-  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-
-  status ContactStatus @default(NOT_DONE)
-}
-
-model Product {
-  id       String       @id @default(uuid())
-  name     String
-  quantity Int          @default(0)
-  status   ActiveStatus @default(ACTIVE)
-
-  institutionProducts InstitutionProduct[]
-  distributions       Distribution[]
-  enterpriseProducts  EnterpriseProduct[]
-}
-
-model Service {
-  id          String        @id @default(uuid())
-  serviceType String
-  status      GeneralStatus @default(ACTIVE)
-
-  institutionServices InstitutionService[]
-}
-
-model InstitutionService {
-  id            String @id @default(uuid())
-  institutionId String
-  serviceId     String
-
-  institution Institution @relation(fields: [institutionId], references: [id])
-  service     Service     @relation(fields: [serviceId], references: [id])
-
-  @@unique([institutionId, serviceId])
-}
-
-model InstitutionProduct {
-  id            String @id @default(uuid())
-  institutionId String
-  productId     String
-
-  institution Institution @relation(fields: [institutionId], references: [id])
-  product     Product     @relation(fields: [productId], references: [id])
-
-  @@unique([institutionId, productId])
-}
-
-// =====================
-// Distribution
-// =====================
-
-model Distribution {
-  id String @id @default(uuid())
-
-  beneficiaryId String?
-  beneficiary   Beneficiary? @relation(fields: [beneficiaryId], references: [id])
-
-  institutionId String
-  institution   Institution @relation(fields: [institutionId], references: [id])
-
-  productId String?
-  product   Product? @relation(fields: [productId], references: [id])
-
-  quantity Int                @default(0)
-  status   DistributionStatus @default(PENDING)
-  aid      Aid?               @relation(fields: [aidId], references: [id])
-  aidId    String?
-  clinic   Clinic?            @relation(fields: [clinicId], references: [id])
-  clinicId String?
-  place    Place?             @relation(fields: [placeId], references: [id])
-  placeId  String?
-}
-
-// =====================
-// Places
-// =====================
-model Place {
-  id          String    @id @default(uuid())
-  name        String
-  type        PlaceType
-  description String?
-
-  latitude  Decimal @db.Decimal(10, 7)
-  longitude Decimal @db.Decimal(10, 7)
-
-  status   PlaceStatus @default(AVAILABLE)
-  isActive Boolean     @default(true)
-
-  camp          Camps?         @relation("CampPlace")
-  clinic        Clinic?        @relation("ClinicPlace")
-  institution   Institution?   @relation("InstitutionPlace")
-  distributions Distribution[]
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  isTrashed   Boolean  @default(false)
-  isProtected Boolean  @default(false)
-
-  @@index([type])
-  @@index([status])
-  @@index([isActive])
-  @@index([isTrashed])
-  @@index([name])
-}
-
-// =====================
-// Extra
-// =====================
-
-model DistributeAidForm {
-  id              String                  @id @default(uuid())
-  beneficiaryName String
-  aidType         String
-  quantity        Int
-  status          DistributeAidFormStatus @default(SCHEDULED)
-}
-
-model EnterpriseProduct {
-  id String @id @default(uuid())
-
-  institutionId String
-  institution   Institution @relation(fields: [institutionId], references: [id])
-
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
-
-  quantity     Int                           @default(0)
-  availability EnterpriseProductAvailability @default(AVAILABLE)
-}
-
-model RequestAid {
-  id          String @id @default(uuid())
-  fullName    String
-  nationalId  String
-  phone       String
-  aidType     String
-  familyCount Int
-  address     String
-
-  status DistributionStatus @default(PENDING)
 }

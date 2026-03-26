@@ -157,7 +157,7 @@ export default function AdminBeneficiaryPage() {
     }
 
     try {
-      const res = await fetch('/api/project/adminBeneficiary', {
+      const res = await fetch('/api/project/admins/adminBeneficiary', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

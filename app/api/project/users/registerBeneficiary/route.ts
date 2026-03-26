@@ -1,198 +1,306 @@
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import prisma from "@/lib/prisma";
+import { NextRequest, NextResponse } from 'next/server'
+import { PrismaClient, Prisma } from '@prisma/client'
+import { requireAdminApi } from '@/app/api/project/helpers/api-guards'
 
-async function hashPassword(password: string) {
-  const data = new TextEncoder().encode(password);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+const globalForPrisma = globalThis as unknown as {
+  prisma?: PrismaClient
 }
 
-const arabicNameRegex = /^[\u0600-\u06FF\s]+$/;
-const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.com$/;
-const phoneRegex = /^(056|059)\d{7}$/;
-const twoDigitsRegex = /^\d{2}$/;
+const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log: ['error'],
+  })
 
-const createSchema = z.object({
-  name: z
-    .string()
-    .min(1, "الاسم مطلوب")
-    .refine((value) => value.trim().length > 0, {
-      message: "الاسم مطلوب",
-    })
-    .refine((value) => value === value.trim(), {
-      message: "الاسم لا يجب أن يبدأ أو ينتهي بمسافة",
-    })
-    .refine((value) => arabicNameRegex.test(value), {
-      message: "الاسم يجب أن يكون باللغة العربية فقط",
-    })
-    .refine((value) => !/\s{2,}/.test(value), {
-      message: "لا يمكن وضع أكثر من مسافة بين الكلمات",
-    }),
-
-  email: z
-    .string()
-    .min(1, "البريد الإلكتروني مطلوب")
-    .refine((value) => value === value.trim(), {
-      message: "البريد الإلكتروني لا يجب أن يبدأ أو ينتهي بمسافة",
-    })
-    .refine((value) => emailRegex.test(value), {
-      message:
-        "البريد الإلكتروني يجب أن يكون بالإنجليزية قبل @، ويحتوي على @، وينتهي بـ .com",
-    }),
-
-  password: z
-    .string()
-    .min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل")
-    .refine((value) => value.trim().length > 0, {
-      message: "كلمة المرور مطلوبة",
-    }),
-
-  phone: z
-    .string()
-    .min(1, "رقم الجوال مطلوب")
-    .refine((value) => value === value.trim(), {
-      message: "رقم الجوال لا يجب أن يبدأ أو ينتهي بمسافة",
-    })
-    .refine((value) => /^\d+$/.test(value), {
-      message: "رقم الجوال يجب أن يحتوي على أرقام فقط",
-    })
-    .refine((value) => phoneRegex.test(value), {
-      message: "رقم الجوال يجب أن يبدأ بـ 056 أو 059 وبعده 7 أرقام",
-    }),
-
-  numberOfFamily: z
-    .string()
-    .min(1, "عدد أفراد الأسرة مطلوب")
-    .refine((value) => value === value.trim(), {
-      message: "عدد أفراد الأسرة لا يجب أن يبدأ أو ينتهي بمسافة",
-    })
-    .refine((value) => /^\d+$/.test(value), {
-      message: "عدد أفراد الأسرة يجب أن يحتوي على أرقام فقط",
-    })
-    .refine((value) => twoDigitsRegex.test(value), {
-      message: "عدد أفراد الأسرة يجب أن يكون مكونًا من رقمين فقط",
-    })
-    .transform((value) => Number(value)),
-});
-
-export async function GET() {
-  return NextResponse.json({
-    ok: true,
-    message: "Beneficiary register API is working",
-  });
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma
 }
 
-export async function POST(req: NextRequest) {
+type CreateBeneficiaryBody = {
+  name?: unknown
+  phone?: unknown
+  numberOfFamily?: unknown
+  campId?: unknown
+  role?: unknown
+}
+
+const ARABIC_NAME_REGEX = /^[\u0600-\u06FF\s]+$/
+const PHONE_REGEX = /^(056|059)\d{7}$/
+const FAMILY_REGEX = /^\d{1,2}$/
+
+const NAME_MIN_LENGTH = 2
+const NAME_MAX_LENGTH = 100
+const MAX_CAMP_LENGTH = 100
+
+function normalizeSpaces(value: string): string {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
+function parseOptionalText(
+  value: unknown,
+  maxLength: number
+): string | null | 'INVALID' {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+
+  if (typeof value !== 'string') {
+    return 'INVALID'
+  }
+
+  const normalized = normalizeSpaces(value)
+
+  if (!normalized) {
+    return null
+  }
+
+  if (normalized.length > maxLength) {
+    return 'INVALID'
+  }
+
+  return normalized
+}
+
+export async function GET(req: NextRequest) {
   try {
-    let jsonBody: unknown;
+    const { searchParams } = new URL(req.url)
+    const campId = searchParams.get('campId')
 
-    try {
-      jsonBody = await req.json();
-    } catch {
-      return NextResponse.json(
-        { message: "البيانات المرسلة ليست JSON صالحًا" },
-        { status: 400 }
-      );
+    const where: Prisma.BeneficiaryWhereInput = {}
+
+    if (campId) {
+      where.campId = campId
     }
 
-    const body = createSchema.parse(jsonBody);
-
-    const normalizedName = body.name.trim();
-    const normalizedEmail = body.email.trim().toLowerCase();
-    const normalizedPhone = body.phone.trim();
-
-    const existingEmailUser = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
-      select: { id: true },
-    });
-
-    if (existingEmailUser) {
-      return NextResponse.json(
-        { field: "email", message: "هذا البريد الإلكتروني مستخدم بالفعل" },
-        { status: 409 }
-      );
-    }
-
-    const existingPhoneBeneficiary = await prisma.beneficiary.findFirst({
-      where: { phone: normalizedPhone },
-      select: { id: true },
-    });
-
-    if (existingPhoneBeneficiary) {
-      return NextResponse.json(
-        { field: "phone", message: "رقم الجوال مستخدم بالفعل" },
-        { status: 409 }
-      );
-    }
-
-    const hashedPassword = await hashPassword(body.password);
-
-    const result = await prisma.$transaction(async (tx) => {
-      const createdUser = await tx.user.create({
-        data: {
-          email: normalizedEmail,
-          password: hashedPassword,
-          role: "CITIZEN",
-        },
-        select: {
-          id: true,
-          email: true,
-          role: true,
-        },
-      });
-
-      const createdBeneficiary = await tx.beneficiary.create({
-        data: {
-          name: normalizedName,
-          phone: normalizedPhone,
-          numberOfFamily: body.numberOfFamily,
-          userId: createdUser.id,
-        },
-        select: {
-          id: true,
-          name: true,
-          phone: true,
-          numberOfFamily: true,
-          userId: true,
-          createdAt: true,
-        },
-      });
-
-      return {
-        user: createdUser,
-        beneficiary: createdBeneficiary,
-      };
-    });
+    const beneficiaries = await prisma.beneficiary.findMany({
+      where,
+      include: {
+        camp: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    })
 
     return NextResponse.json(
       {
         success: true,
-        message: "تم تسجيل المستفيد بنجاح",
-        data: result,
+        count: beneficiaries.length,
+        data: beneficiaries,
       },
-      { status: 201 }
-    );
-  } catch (e) {
-    if (e instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          message: "فشل التحقق من صحة البيانات",
-          issues: e.issues.map((issue) => ({
-            field: String(issue.path[0] ?? ""),
-            message: issue.message,
-          })),
-        },
-        { status: 400 }
-      );
-    }
+      { status: 200 }
+    )
+  } catch (error) {
+    console.error('GET /api/project/admins/adminBeneficiary error:', error)
 
     return NextResponse.json(
       {
-        message: e instanceof Error ? e.message : "حدث خطأ في الخادم",
+        success: false,
+        message: 'فشل في جلب المستفيدين',
+        error: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
-    );
+    )
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const unauthorized = await requireAdminApi(req)
+    if (unauthorized) {
+      return unauthorized
+    }
+
+    const body = (await req.json()) as CreateBeneficiaryBody
+    const { name, phone, numberOfFamily, campId } = body
+
+    if (typeof name !== 'string') {
+      return NextResponse.json(
+        { success: false, message: 'الاسم مطلوب' },
+        { status: 400 }
+      )
+    }
+
+    const normalizedName = normalizeSpaces(name)
+
+    if (!normalizedName) {
+      return NextResponse.json(
+        { success: false, message: 'الاسم مطلوب' },
+        { status: 400 }
+      )
+    }
+
+    if (normalizedName.length < NAME_MIN_LENGTH) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `الاسم يجب أن يكون على الأقل ${NAME_MIN_LENGTH} أحرف`,
+        },
+        { status: 400 }
+      )
+    }
+
+    if (normalizedName.length > NAME_MAX_LENGTH) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `الاسم يجب ألا يزيد عن ${NAME_MAX_LENGTH} حرفًا`,
+        },
+        { status: 400 }
+      )
+    }
+
+    if (!ARABIC_NAME_REGEX.test(normalizedName)) {
+      return NextResponse.json(
+        { success: false, message: 'الاسم يجب أن يكون باللغة العربية فقط' },
+        { status: 400 }
+      )
+    }
+
+    if (/\s{2,}/.test(name)) {
+      return NextResponse.json(
+        { success: false, message: 'لا يمكن وضع أكثر من مسافة بين الكلمات' },
+        { status: 400 }
+      )
+    }
+
+    if (typeof phone !== 'string') {
+      return NextResponse.json(
+        { success: false, message: 'رقم الهاتف مطلوب' },
+        { status: 400 }
+      )
+    }
+
+    if (!/^\d+$/.test(phone)) {
+      return NextResponse.json(
+        { success: false, message: 'رقم الهاتف يجب أن يحتوي على أرقام فقط' },
+        { status: 400 }
+      )
+    }
+
+    if (!PHONE_REGEX.test(phone)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'رقم الهاتف يجب أن يبدأ بـ 056 أو 059 وبعده 7 أرقام',
+        },
+        { status: 400 }
+      )
+    }
+
+    const familyAsString =
+      typeof numberOfFamily === 'number'
+        ? String(numberOfFamily)
+        : typeof numberOfFamily === 'string'
+          ? numberOfFamily
+          : ''
+
+    if (!familyAsString) {
+      return NextResponse.json(
+        { success: false, message: 'عدد أفراد الأسرة مطلوب' },
+        { status: 400 }
+      )
+    }
+
+    if (!/^\d+$/.test(familyAsString)) {
+      return NextResponse.json(
+        { success: false, message: 'عدد أفراد الأسرة يجب أن يحتوي على أرقام فقط' },
+        { status: 400 }
+      )
+    }
+
+    if (!FAMILY_REGEX.test(familyAsString)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'عدد أفراد الأسرة يجب أن يكون من رقم أو رقمين فقط',
+        },
+        { status: 400 }
+      )
+    }
+
+    const parsedNumberOfFamily = Number(familyAsString)
+
+    if (!Number.isInteger(parsedNumberOfFamily) || parsedNumberOfFamily < 1) {
+      return NextResponse.json(
+        { success: false, message: 'عدد أفراد الأسرة غير صالح' },
+        { status: 400 }
+      )
+    }
+
+    const parsedCampName = parseOptionalText(campId, MAX_CAMP_LENGTH)
+    if (parsedCampName === 'INVALID') {
+      return NextResponse.json(
+        { success: false, message: 'قيمة المخيم / المنطقة غير صالحة' },
+        { status: 400 }
+      )
+    }
+
+    const existingBeneficiary = await prisma.beneficiary.findFirst({
+      where: {
+        phone,
+      },
+    })
+
+    if (existingBeneficiary) {
+      return NextResponse.json(
+        { success: false, message: 'رقم الهاتف مسجل مسبقًا' },
+        { status: 409 }
+      )
+    }
+
+    let resolvedCampId: string | null = null
+
+    if (parsedCampName) {
+      const existingCamp = await prisma.camps.findFirst({
+        where: {
+          OR: [
+            { name: parsedCampName },
+            { area: parsedCampName },
+          ],
+        },
+        select: {
+          id: true,
+          name: true,
+          area: true,
+        },
+      })
+
+      if (existingCamp) {
+        resolvedCampId = existingCamp.id
+      }
+    }
+
+    const newBeneficiary = await prisma.beneficiary.create({
+      data: {
+        name: normalizedName,
+        phone,
+        numberOfFamily: parsedNumberOfFamily,
+        campId: resolvedCampId,
+      },
+      include: {
+        camp: true,
+      },
+    })
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'تمت إضافة المستفيد بنجاح',
+        data: newBeneficiary,
+      },
+      { status: 201 }
+    )
+  } catch (error) {
+    console.error('POST /api/project/admins/adminBeneficiary error:', error)
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: 'فشل في إضافة المستفيد',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    )
   }
 }

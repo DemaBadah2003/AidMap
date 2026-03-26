@@ -128,7 +128,7 @@ export default function RequestAidPage() {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/project/requestAid', {
+      const res = await fetch('/api/project/users/requestAid', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

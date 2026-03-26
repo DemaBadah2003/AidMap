@@ -2,46 +2,65 @@
 
 import { useEffect, useState, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { requireCitizen } from '@/app/(protected)/project/helpers/route-guards'
+import { requireAdmin } from '@/app/(protected)/project/helpers/route-guards'
 import { Card, CardContent } from '../../../../../components/ui/card'
 import { Button } from '../../../../../components/ui/button'
 import { Input } from '../../../../../components/ui/input'
 
 type FormData = {
   name: string
-  email: string
-  password: string
   phone: string
   numberOfFamily: string
+  campId: string
 }
 
 type FormErrors = {
   name?: string
-  email?: string
-  password?: string
   phone?: string
   numberOfFamily?: string
+  campId?: string
   general?: string
 }
 
 const arabicNameRegex = /^[\u0600-\u06FF\s]+$/
-const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.com$/
 const phoneRegex = /^(056|059)\d{7}$/
-const twoDigitsRegex = /^\d{2}$/
+const familyRegex = /^\d{1,2}$/
 
-export default function RegisterBeneficiaryPage() {
+const gazaCampOptions = [
+  'مخيم جباليا',
+  'مخيم الشاطئ',
+  'مخيم النصيرات',
+  'مخيم البريج',
+  'مخيم المغازي',
+  'مخيم دير البلح',
+  'مخيم خان يونس',
+  'مخيم رفح',
+  'مخيم الشابورة',
+  'مخيم البرازيل',
+  'الشيخ رضوان',
+  'تل الهوى',
+  'الرمال',
+  'الشجاعية',
+  'الزيتون',
+  'بيت لاهيا',
+  'بيت حانون',
+  'دير البلح',
+  'خان يونس',
+  'رفح',
+]
+
+export default function AdminBeneficiaryPage() {
   const router = useRouter()
 
   useEffect(() => {
-    requireCitizen(router)
+    requireAdmin(router)
   }, [router])
 
   const [form, setForm] = useState<FormData>({
     name: '',
-    email: '',
-    password: '',
     phone: '',
     numberOfFamily: '',
+    campId: '',
   })
 
   const [errors, setErrors] = useState<FormErrors>({})
@@ -63,33 +82,23 @@ export default function RegisterBeneficiaryPage() {
         }
         return ''
 
-      case 'email':
-        if (!value) return 'البريد الإلكتروني مطلوب'
-        if (value !== value.trim()) return 'البريد الإلكتروني لا يجب أن يبدأ أو ينتهي بمسافة'
-        if (!emailRegex.test(value)) {
-          return 'البريد الإلكتروني يجب أن يكون بالإنجليزية قبل @، ويحتوي على @، وينتهي بـ .com'
-        }
-        return ''
-
-      case 'password':
-        if (!value.trim()) return 'كلمة المرور مطلوبة'
-        if (value.length < 6) return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل'
-        return ''
-
       case 'phone':
-        if (!value) return 'رقم الجوال مطلوب'
-        if (!/^\d+$/.test(value)) return 'رقم الجوال يجب أن يحتوي على أرقام فقط'
+        if (!value) return 'رقم الهاتف مطلوب'
+        if (!/^\d+$/.test(value)) return 'رقم الهاتف يجب أن يحتوي على أرقام فقط'
         if (!phoneRegex.test(value)) {
-          return 'رقم الجوال يجب أن يبدأ بـ 056 أو 059 وبعده 7 أرقام'
+          return 'رقم الهاتف يجب أن يبدأ بـ 056 أو 059 وبعده 7 أرقام'
         }
         return ''
 
       case 'numberOfFamily':
         if (!value) return 'عدد أفراد الأسرة مطلوب'
         if (!/^\d+$/.test(value)) return 'عدد أفراد الأسرة يجب أن يحتوي على أرقام فقط'
-        if (!twoDigitsRegex.test(value)) {
-          return 'عدد أفراد الأسرة يجب أن يكون مكونًا من رقمين فقط'
+        if (!familyRegex.test(value)) {
+          return 'عدد أفراد الأسرة يجب أن يكون من رقم أو رقمين فقط'
         }
+        return ''
+
+      case 'campId':
         return ''
 
       default:
@@ -100,17 +109,18 @@ export default function RegisterBeneficiaryPage() {
   const validateForm = () => {
     const newErrors: FormErrors = {
       name: validateField('name', form.name),
-      email: validateField('email', form.email),
-      password: validateField('password', form.password),
       phone: validateField('phone', form.phone),
       numberOfFamily: validateField('numberOfFamily', form.numberOfFamily),
+      campId: validateField('campId', form.campId),
     }
 
     setErrors(newErrors)
     return !Object.values(newErrors).some(Boolean)
   }
 
-  const onChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const onChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target
     let nextValue = value
 
@@ -140,176 +150,173 @@ export default function RegisterBeneficiaryPage() {
     setErrors({})
 
     const isValid = validateForm()
+
     if (!isValid) {
       setLoading(false)
       return
     }
 
     try {
-      await fetch('/api/project/users/registerBeneficiary', {
+      const res = await fetch('/api/project/admins/adminBeneficiary', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, role: 'CITIZEN' }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: form.name,
+          phone: form.phone,
+          numberOfFamily: Number(form.numberOfFamily),
+          campId: form.campId || null,
+          role: 'CITIZEN',
+        }),
       })
 
-      setSuccessMsg('تم إنشاء حساب المستفيد بنجاح')
+      const contentType = res.headers.get('content-type') || ''
+      const data = contentType.includes('application/json')
+        ? await res.json()
+        : null
+
+      if (!res.ok) {
+        throw new Error(data?.message || 'فشل في إضافة المستفيد')
+      }
+
+      setSuccessMsg('تمت إضافة المستفيد بنجاح')
       setForm({
         name: '',
-        email: '',
-        password: '',
         phone: '',
         numberOfFamily: '',
+        campId: '',
       })
+      setErrors({})
     } catch (error: any) {
-      setErrorMsg('حدث خطأ غير متوقع')
+      setErrorMsg(error.message || 'حدث خطأ غير متوقع')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="w-full py-4 sm:py-6 md:py-10" dir="rtl">
-      <div className="mx-auto w-full max-w-[800px] px-3 xs:px-4 sm:px-6">
-        <div className="space-y-4 sm:space-y-6">
-          <div className="text-center px-1">
-            <h1 className="text-lg font-bold leading-tight sm:text-xl md:text-2xl">
-              إضافة مستفيد جديد
-            </h1>
-            <p className="mt-1 text-xs leading-6 text-muted-foreground sm:text-sm">
-              قم بإدخال بيانات المستفيد لإتمام عملية التسجيل
-            </p>
-          </div>
+    <div className="w-full py-10" dir="rtl">
+      <div className="mx-auto w-full max-w-[800px] px-4 sm:px-6 space-y-6">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-slate-900">إضافة مستفيد جديد</h1>
+          <p className="text-sm text-slate-500">
+            أدخل بيانات المستفيد ليتم إضافته من قبل الأدمن إلى النظام
+          </p>
+        </div>
 
-          <Card className="rounded-xl border bg-background shadow-sm sm:rounded-2xl">
-            <CardContent className="p-3 sm:p-5">
-              <div className="space-y-3 text-sm sm:space-y-4">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <Card className="border-0 shadow-none bg-transparent">
+            <CardContent className="p-5">
+              <div className="mx-auto w-full max-w-[700px] space-y-5">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-muted-foreground sm:text-sm">
+                  <label className="text-sm font-medium text-slate-700">
                     الاسم الكامل
                   </label>
                   <Input
                     name="name"
                     value={form.name}
                     onChange={onChange}
-                    className="h-10 text-sm sm:h-11"
+                    placeholder="مثال: علي أحمد"
+                    className="h-10 rounded-md border-slate-200 bg-white px-3 text-right text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-blue-600"
+                    autoComplete="off"
                   />
                   {errors.name && (
-                    <span className="text-xs text-red-500">{errors.name}</span>
+                    <div className="text-right text-sm text-red-600">
+                      {errors.name}
+                    </div>
                   )}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-muted-foreground sm:text-sm">
-                    البريد الإلكتروني
-                  </label>
-                  <Input
-                    name="email"
-                    value={form.email}
-                    onChange={onChange}
-                    className="h-10 text-sm sm:h-11"
-                  />
-                  {errors.email && (
-                    <span className="text-xs text-red-500">{errors.email}</span>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-muted-foreground sm:text-sm">
-                    كلمة المرور
-                  </label>
-                  <Input
-                    name="password"
-                    type="password"
-                    value={form.password}
-                    onChange={onChange}
-                    className="h-10 text-sm sm:h-11"
-                  />
-                  {errors.password && (
-                    <span className="text-xs text-red-500">{errors.password}</span>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-muted-foreground sm:text-sm">
+                  <label className="text-sm font-medium text-slate-700">
                     رقم الهاتف
                   </label>
                   <Input
                     name="phone"
                     value={form.phone}
                     onChange={onChange}
+                    placeholder="059XXXXXXX"
+                    className="h-10 rounded-md border-slate-200 bg-white px-3 text-right text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-blue-600"
+                    autoComplete="off"
                     inputMode="numeric"
-                    className="h-10 text-sm sm:h-11"
+                    maxLength={10}
                   />
                   {errors.phone && (
-                    <span className="text-xs text-red-500">{errors.phone}</span>
+                    <div className="text-right text-sm text-red-600">
+                      {errors.phone}
+                    </div>
                   )}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-muted-foreground sm:text-sm">
+                  <label className="text-sm font-medium text-slate-700">
                     عدد أفراد الأسرة
                   </label>
                   <Input
                     name="numberOfFamily"
+                    type="text"
                     value={form.numberOfFamily}
                     onChange={onChange}
+                    placeholder="مثال: 5"
+                    className="h-10 rounded-md border-slate-200 bg-white px-3 text-right text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-blue-600"
+                    autoComplete="off"
                     inputMode="numeric"
-                    className="h-10 text-sm sm:h-11"
+                    maxLength={2}
                   />
                   {errors.numberOfFamily && (
-                    <span className="text-xs text-red-500">
+                    <div className="text-right text-sm text-red-600">
                       {errors.numberOfFamily}
-                    </span>
+                    </div>
                   )}
                 </div>
-              </div>
 
-              {(successMsg || errorMsg || errors.general) && (
-                <div className="pt-3">
-                  {successMsg && (
-                    <p className="text-xs font-medium text-green-600 sm:text-sm">
-                      {successMsg}
-                    </p>
-                  )}
-                  {errorMsg && (
-                    <p className="text-xs font-medium text-red-500 sm:text-sm">
-                      {errorMsg}
-                    </p>
-                  )}
-                  {errors.general && (
-                    <p className="text-xs font-medium text-red-500 sm:text-sm">
-                      {errors.general}
-                    </p>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-slate-700">
+                    المخيم / المنطقة
+                  </label>
+                  <select
+                    name="campId"
+                    value={form.campId}
+                    onChange={onChange}
+                    className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-right text-sm outline-none transition focus:ring-2 focus:ring-blue-600"
+                  >
+                    <option value="">اختر المخيم أو المنطقة (اختياري)</option>
+                    {gazaCampOptions.map((campName) => (
+                      <option key={campName} value={campName}>
+                        {campName}
+                      </option>
+                    ))}
+                  </select>
+
+                  {errors.campId && (
+                    <div className="text-right text-sm text-red-600">
+                      {errors.campId}
+                    </div>
                   )}
                 </div>
-              )}
 
-              <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-10 w-full text-xs sm:h-9 sm:w-auto sm:px-4"
-                  onClick={() =>
-                    setForm({
-                      name: '',
-                      email: '',
-                      password: '',
-                      phone: '',
-                      numberOfFamily: '',
-                    })
-                  }
-                >
-                  إلغاء
-                </Button>
+                {successMsg && (
+                  <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-right text-sm text-green-700">
+                    {successMsg}
+                  </div>
+                )}
 
-                <Button
-                  type="button"
-                  className="h-10 w-full text-xs sm:h-9 sm:w-auto sm:px-4"
-                  onClick={onSubmit}
-                  disabled={loading}
-                >
-                  {loading ? 'جاري الإنشاء...' : 'إنشاء الحساب'}
-                </Button>
+                {errorMsg && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
+                    {errorMsg}
+                  </div>
+                )}
+
+                <div className="flex justify-center pt-2">
+                  <Button
+                    className="inline-flex h-10 items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+                    onClick={onSubmit}
+                    disabled={loading}
+                  >
+                    {loading ? 'جاري الإضافة...' : 'إضافة المستفيد'}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

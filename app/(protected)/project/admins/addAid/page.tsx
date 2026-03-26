@@ -59,7 +59,7 @@ export default function MyAidPage() {
 
     try {
       const res = await fetch(
-        `/api/project/myAid?nationalId=${encodeURIComponent(nationalId)}`
+        `/api/project/admins/addAid?nationalId=${encodeURIComponent(nationalId)}`
       )
       const data = await res.json()
 

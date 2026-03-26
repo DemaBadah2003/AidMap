@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { Card, CardContent } from '../../../../../components/ui/card'
 import { Button } from '../../../../../components/ui/button'
 import { Input } from '../../../../../components/ui/input'
-
 import {
   Dialog,
   DialogContent,
@@ -16,7 +15,8 @@ import {
 } from '../../../../../components/ui/dialog'
 
 import { Pencil, Trash2, Save, X, Plus, Search } from 'lucide-react'
-import { campsApi, type FillStatus as ApiFillStatus } from '../../../../helpers/campsService' // ✅ عدّل المسار إذا لزم
+import { campsApi, type FillStatus as ApiFillStatus } from '../../../../helpers/campsService'
+
 type Camp = {
   id: string
   nameAr: string
@@ -66,7 +66,6 @@ export default function CampsPage() {
     fillStatus: 'Not Full',
   })
 
-  // ✅ Load from backend
   useEffect(() => {
     const run = async () => {
       setLoading(true)
@@ -78,12 +77,12 @@ export default function CampsPage() {
             nameAr: x.name,
             nameEn: x.name,
             areaAr: x.area ?? '',
-            familiesCount: 0, // UI only
+            familiesCount: 0,
             capacity: x.capacity,
             status: 'مؤقت',
           }))
         )
-        // عشان ينعكس status enum على dropdown
+
         const pick: Record<string, FillStatus> = {}
         data.forEach((x) => {
           pick[x.id] = x.status === 'FULL' ? 'Full' : 'Not Full'
@@ -93,6 +92,7 @@ export default function CampsPage() {
         setLoading(false)
       }
     }
+
     run()
   }, [])
 
@@ -120,7 +120,7 @@ export default function CampsPage() {
     })
   }, [q, items, statusFilter, statusPick])
 
-  useMemo(() => {
+  useEffect(() => {
     setPage(1)
   }, [q, statusFilter, pageSize])
 
@@ -157,7 +157,10 @@ export default function CampsPage() {
       ...prev,
     ])
 
-    setStatusPick((prev) => ({ ...prev, [created.id]: created.status === 'FULL' ? 'Full' : 'Not Full' }))
+    setStatusPick((prev) => ({
+      ...prev,
+      [created.id]: created.status === 'FULL' ? 'Full' : 'Not Full',
+    }))
 
     setNameAr('')
     setAreaAr('')
@@ -209,12 +212,21 @@ export default function CampsPage() {
     setItems((prev) =>
       prev.map((c) =>
         c.id === id
-          ? { ...c, nameAr: updated.name, nameEn: updated.name, areaAr: updated.area ?? '', capacity: updated.capacity }
+          ? {
+              ...c,
+              nameAr: updated.name,
+              nameEn: updated.name,
+              areaAr: updated.area ?? '',
+              capacity: updated.capacity,
+            }
           : c
       )
     )
 
-    setStatusPick((prev) => ({ ...prev, [id]: updated.status === 'FULL' ? 'Full' : 'Not Full' }))
+    setStatusPick((prev) => ({
+      ...prev,
+      [id]: updated.status === 'FULL' ? 'Full' : 'Not Full',
+    }))
     setEditingId(null)
   }
 
@@ -222,38 +234,42 @@ export default function CampsPage() {
   const rangeEnd = Math.min(safePage * pageSize, filtered.length)
 
   return (
-    <div className="w-full px-3 sm:px-6 py-6" dir="rtl">
+    <div className="w-full px-2 py-4 sm:px-4 sm:py-6 lg:px-6" dir="rtl">
       <div className="mb-6" dir="ltr">
         <div className="text-left">
-          <div className="text-2xl font-semibold text-foreground">Camps</div>
-          <div className="mt-1 text-sm text-muted-foreground">
+          <div className="text-xl font-semibold text-foreground sm:text-2xl">Camps</div>
+
+          <div className="mt-1 text-xs text-muted-foreground sm:text-sm">
             Home <span className="mx-1">{'>'}</span>{' '}
             <span className="text-foreground">Camps Management</span>
           </div>
-          {loading && <div className="mt-2 text-sm text-muted-foreground">Loading...</div>}
+
+          {loading && (
+            <div className="mt-2 text-xs text-muted-foreground sm:text-sm">Loading...</div>
+          )}
         </div>
       </div>
 
       <div className="w-full max-w-[1200px]">
         <Card>
           <CardContent className="p-0" dir="ltr">
-            <div className="p-4">
+            <div className="p-3 sm:p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <div className="relative w-full sm:w-[260px]">
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="relative w-full min-w-0 sm:w-[260px]">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Input
                       value={q}
                       onChange={(e: ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
                       placeholder="Search camps"
-                      className="!h-10 !rounded-lg border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:!ring-2 focus:!ring-slate-200"
+                      className="!h-10 !w-full !rounded-lg border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:!ring-2 focus:!ring-slate-200"
                     />
                   </div>
 
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value as 'all' | 'full' | 'notfull')}
-                    className="h-10 w-full sm:w-[160px] rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+                    className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-200 sm:w-[160px]"
                   >
                     <option value="all">All status</option>
                     <option value="full">Full</option>
@@ -261,9 +277,9 @@ export default function CampsPage() {
                   </select>
                 </div>
 
-                <div className="flex items-center gap-2 justify-end">
+                <div className="flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
                   <Button
-                    className="!h-10 !rounded-lg !bg-blue-600 !px-4 !text-sm !font-semibold !text-white hover:!bg-blue-700 inline-flex items-center gap-2"
+                    className="inline-flex w-full items-center justify-center gap-2 !rounded-lg !bg-blue-600 !px-4 !text-sm !font-semibold !text-white hover:!bg-blue-700 sm:w-auto !h-10"
                     onClick={() => setAddOpen(true)}
                   >
                     <Plus className="h-4 w-4" />
@@ -272,7 +288,7 @@ export default function CampsPage() {
 
                   <Button
                     variant="outline"
-                    className="!h-10 !rounded-lg !px-4 !text-sm !font-semibold border-slate-200 text-slate-700 hover:bg-slate-50"
+                    className="w-full rounded-lg border-slate-200 !px-4 !text-sm !font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto !h-10"
                     onClick={async () => {
                       await campsApi.removeAll()
                       setItems([])
@@ -288,17 +304,31 @@ export default function CampsPage() {
 
             <div className="border-t" />
 
-            {/* Table */}
-            <div className="rounded-b-lg overflow-hidden">
-              <div className="w-full overflow-x-auto">
-                <table className="w-full text-sm border-collapse min-w-[820px]">
-                  <thead style={{ backgroundColor: '#F9FAFB', boxShadow: '0 1px 0 rgba(0,0,0,0.06)' }}>
+            <div className="overflow-hidden rounded-b-lg">
+              <div className="w-full">
+                <table className="w-full table-fixed border-collapse text-[11px] sm:text-sm">
+                  <thead
+                    style={{
+                      backgroundColor: '#F9FAFB',
+                      boxShadow: '0 1px 0 rgba(0,0,0,0.06)',
+                    }}
+                  >
                     <tr className="text-left text-foreground/60">
-                      <th className="px-4 py-3 border-b border-r font-normal">Camp Name</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Area</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Capacity</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Status</th>
-                      <th className="px-4 py-3 border-b font-normal">Actions</th>
+                      <th className="w-[24%] border-b border-r px-1 py-2 font-normal sm:px-4 sm:py-3">
+                        Camp Name
+                      </th>
+                      <th className="w-[20%] border-b border-r px-1 py-2 font-normal sm:px-4 sm:py-3">
+                        Area
+                      </th>
+                      <th className="w-[14%] border-b border-r px-1 py-2 font-normal sm:px-4 sm:py-3">
+                        Capacity
+                      </th>
+                      <th className="w-[20%] border-b border-r px-1 py-2 font-normal sm:px-4 sm:py-3">
+                        Status
+                      </th>
+                      <th className="w-[22%] border-b px-1 py-2 font-normal sm:px-4 sm:py-3">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
 
@@ -309,32 +339,36 @@ export default function CampsPage() {
                         statusPick[c.id] ?? defaultFillStatus(c.familiesCount, c.capacity)
 
                       return (
-                        <tr key={c.id} className="hover:bg-muted/30">
-                          <td className="px-4 py-3 border-b border-r font-medium">
+                        <tr key={c.id} className="hover:bg-muted/30 align-top">
+                          <td className="border-b border-r px-1 py-2 font-medium break-words sm:px-4 sm:py-3">
                             {isEditing ? (
                               <Input
                                 value={editDraft.nameAr}
-                                onChange={(e) => setEditDraft((p) => ({ ...p, nameAr: e.target.value }))}
-                                className="h-9"
+                                onChange={(e) =>
+                                  setEditDraft((p) => ({ ...p, nameAr: e.target.value }))
+                                }
+                                className="h-8 text-[11px] sm:h-9 sm:text-sm"
                               />
                             ) : (
-                              c.nameAr
+                              <span className="block break-words leading-4">{c.nameAr}</span>
                             )}
                           </td>
 
-                          <td className="px-4 py-3 border-b border-r">
+                          <td className="border-b border-r px-1 py-2 break-words sm:px-4 sm:py-3">
                             {isEditing ? (
                               <Input
                                 value={editDraft.areaAr}
-                                onChange={(e) => setEditDraft((p) => ({ ...p, areaAr: e.target.value }))}
-                                className="h-9"
+                                onChange={(e) =>
+                                  setEditDraft((p) => ({ ...p, areaAr: e.target.value }))
+                                }
+                                className="h-8 text-[11px] sm:h-9 sm:text-sm"
                               />
                             ) : (
-                              c.areaAr
+                              <span className="block break-words leading-4">{c.areaAr}</span>
                             )}
                           </td>
 
-                          <td className="px-4 py-3 border-b border-r">
+                          <td className="border-b border-r px-1 py-2 sm:px-4 sm:py-3">
                             {isEditing ? (
                               <Input
                                 inputMode="numeric"
@@ -347,21 +381,24 @@ export default function CampsPage() {
                                     capacity: toIntOnly(e.target.value),
                                   }))
                                 }
-                                className="h-9"
+                                className="h-8 text-[11px] sm:h-9 sm:text-sm"
                               />
                             ) : (
-                              c.capacity
+                              <span className="block break-words leading-4">{c.capacity}</span>
                             )}
                           </td>
 
-                          <td className="px-4 py-3 border-b border-r">
+                          <td className="border-b border-r px-1 py-2 sm:px-4 sm:py-3">
                             {isEditing ? (
                               <select
                                 value={editDraft.fillStatus}
                                 onChange={(e) =>
-                                  setEditDraft((p) => ({ ...p, fillStatus: e.target.value as FillStatus }))
+                                  setEditDraft((p) => ({
+                                    ...p,
+                                    fillStatus: e.target.value as FillStatus,
+                                  }))
                                 }
-                                className="h-9 rounded-md border px-3 bg-background"
+                                className="h-8 w-full rounded-md border bg-background px-1 text-[10px] sm:h-9 sm:px-3 sm:text-sm"
                               >
                                 <option value="Full">Full</option>
                                 <option value="Not Full">Not Full</option>
@@ -370,9 +407,12 @@ export default function CampsPage() {
                               <select
                                 value={currentStatus}
                                 onChange={(e) =>
-                                  setStatusPick((prev) => ({ ...prev, [c.id]: e.target.value as FillStatus }))
+                                  setStatusPick((prev) => ({
+                                    ...prev,
+                                    [c.id]: e.target.value as FillStatus,
+                                  }))
                                 }
-                                className="h-9 rounded-md border px-3 bg-background"
+                                className="h-8 w-full rounded-md border bg-background px-1 text-[10px] sm:h-9 sm:px-3 sm:text-sm"
                               >
                                 <option value="Full">Full</option>
                                 <option value="Not Full">Not Full</option>
@@ -380,42 +420,50 @@ export default function CampsPage() {
                             )}
                           </td>
 
-                          <td className="px-4 py-3 border-b">
-                            <div className="flex items-center gap-2">
+                          <td className="border-b px-1 py-2 sm:px-4 sm:py-3">
+                            <div className="flex flex-wrap items-center justify-center gap-1 sm:justify-start sm:gap-2">
                               {!isEditing ? (
                                 <>
                                   <button
                                     type="button"
-                                    className="inline-flex items-center justify-center rounded-md border h-10 w-10 hover:bg-muted"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border hover:bg-muted sm:h-10 sm:w-10"
                                     title="Edit"
                                     onClick={() => startEditRow(c)}
                                   >
-                                    <Pencil className="size-4" />
+                                    <Pencil className="size-3 sm:size-4" />
                                   </button>
 
                                   <button
                                     type="button"
-                                    className="inline-flex items-center justify-center rounded-md border h-10 w-10 hover:bg-muted"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border hover:bg-muted sm:h-10 sm:w-10"
                                     title="Delete"
                                     onClick={() => onDeleteOne(c.id)}
                                   >
-                                    <Trash2 className="size-4" />
+                                    <Trash2 className="size-3 sm:size-4" />
                                   </button>
                                 </>
                               ) : (
                                 <>
                                   <Button
                                     size="sm"
-                                    className="h-10"
+                                    className="h-8 px-2 text-[10px] sm:h-10 sm:px-3 sm:text-sm"
                                     onClick={() => saveEditRow(c.id)}
-                                    disabled={!Number.isInteger(editDraft.capacity) || editDraft.capacity <= 0}
+                                    disabled={
+                                      !Number.isInteger(editDraft.capacity) ||
+                                      editDraft.capacity <= 0
+                                    }
                                   >
-                                    <Save className="size-4 me-2" />
+                                    <Save className="me-1 size-3 sm:me-2 sm:size-4" />
                                     Save
                                   </Button>
 
-                                  <Button size="sm" variant="outline" className="h-10" onClick={cancelEditRow}>
-                                    <X className="size-4 me-2" />
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 px-2 text-[10px] sm:h-10 sm:px-3 sm:text-sm"
+                                    onClick={cancelEditRow}
+                                  >
+                                    <X className="me-1 size-3 sm:me-2 sm:size-4" />
                                     Cancel
                                   </Button>
                                 </>
@@ -437,9 +485,10 @@ export default function CampsPage() {
                 </table>
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 border-t">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex flex-col gap-3 border-t p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
                   <span>Rows per page</span>
+
                   <select
                     value={pageSize}
                     onChange={(e) => setPageSize(Number(e.target.value))}
@@ -451,18 +500,30 @@ export default function CampsPage() {
                   </select>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="text-sm text-muted-foreground">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="text-xs text-muted-foreground sm:text-sm">
                     {rangeStart} - {rangeEnd} of {filtered.length}
                   </div>
 
-                  <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                    Previous
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={safePage <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    >
+                      Previous
+                    </Button>
 
-                  <Button variant="outline" size="sm" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-                    Next
-                  </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={safePage >= totalPages}
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    >
+                      Next
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -470,7 +531,7 @@ export default function CampsPage() {
         </Card>
 
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogContent className="sm:max-w-[560px]">
+          <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[560px]">
             <DialogHeader dir="rtl" className="text-right">
               <DialogTitle>إضافة مخيم</DialogTitle>
               <DialogDescription>إدخال بيانات المخيم</DialogDescription>
@@ -479,12 +540,20 @@ export default function CampsPage() {
             <div dir="rtl" className="grid gap-3">
               <div className="grid gap-2">
                 <div className="text-sm">اسم المخيم</div>
-                <Input value={nameAr} onChange={(e) => setNameAr(e.target.value)} placeholder="مثال: مخيم الشمال A" />
+                <Input
+                  value={nameAr}
+                  onChange={(e) => setNameAr(e.target.value)}
+                  placeholder="مثال: مخيم الشمال A"
+                />
               </div>
 
               <div className="grid gap-2">
                 <div className="text-sm">المنطقة</div>
-                <Input value={areaAr} onChange={(e) => setAreaAr(e.target.value)} placeholder="مثال: شمال غزة" />
+                <Input
+                  value={areaAr}
+                  onChange={(e) => setAreaAr(e.target.value)}
+                  placeholder="مثال: شمال غزة"
+                />
               </div>
 
               <div className="grid gap-2">
@@ -500,11 +569,20 @@ export default function CampsPage() {
               </div>
             </div>
 
-            <DialogFooter dir="rtl" className="gap-2">
-              <Button variant="outline" onClick={() => setAddOpen(false)}>
+            <DialogFooter dir="rtl" className="flex-col gap-2 sm:flex-row">
+              <Button
+                variant="outline"
+                onClick={() => setAddOpen(false)}
+                className="w-full sm:w-auto"
+              >
                 إغلاق
               </Button>
-              <Button onClick={onAdd} disabled={!Number.isInteger(capacity) || capacity <= 0}>
+
+              <Button
+                onClick={onAdd}
+                disabled={!Number.isInteger(capacity) || capacity <= 0}
+                className="w-full sm:w-auto"
+              >
                 إضافة
               </Button>
             </DialogFooter>

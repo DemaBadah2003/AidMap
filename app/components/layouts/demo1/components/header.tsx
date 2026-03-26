@@ -46,14 +46,9 @@ export function Header() {
       )}
     >
       <Container className="flex items-center w-full lg:gap-4">
-        {/* Left Side (Logo + Mobile Buttons) */}
         <div className="flex items-center gap-2.5 lg:hidden">
-          <Link href="/" className="shrink-0">
-            <img
-              src={toAbsoluteUrl('/media/app/mini-logo.svg')}
-              className="h-[25px] w-full"
-              alt="mini-logo"
-            />
+          <Link href="/" className="shrink-0 text-lg font-bold text-mono">
+            Relief System
           </Link>
 
           <div className="flex items-center">
@@ -105,7 +100,6 @@ export function Header() {
           </div>
         </div>
 
-        {/* Middle Content */}
         <div className="flex flex-1 items-center justify-center lg:justify-start">
           {pathname.startsWith('/account') ? (
             <Breadcrumb />
@@ -114,7 +108,6 @@ export function Header() {
           )}
         </div>
 
-        {/* Right Side (User Image) */}
         <div className="ms-auto flex items-center gap-3">
           <UserDropdownMenu
             trigger={

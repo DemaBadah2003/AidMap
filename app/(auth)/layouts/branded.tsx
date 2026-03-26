@@ -1,7 +1,7 @@
-import { ReactNode } from 'react';
-import Link from 'next/link';
-import { toAbsoluteUrl } from '@/lib/helpers';
-import { Card, CardContent } from '@/components/ui/card';
+import { ReactNode } from 'react'
+import Link from 'next/link'
+import { toAbsoluteUrl } from '@/lib/helpers'
+import { Card, CardContent } from '@/components/ui/card'
 
 export function BrandedLayout({ children }: { children: ReactNode }) {
   return (
@@ -25,12 +25,8 @@ export function BrandedLayout({ children }: { children: ReactNode }) {
 
         <div className="lg:rounded-xl lg:border lg:border-border lg:m-5 order-1 lg:order-2 bg-top xxl:bg-center xl:bg-cover bg-no-repeat branded-bg">
           <div className="flex flex-col p-8 lg:p-16 gap-4">
-            <Link href="/">
-              <img
-                src={toAbsoluteUrl('/media/app/mini-logo.svg')}
-                className="h-[28px] max-w-none"
-                alt=""
-              />
+            <Link href="/" className="text-xl font-bold text-mono">
+              Relief System
             </Link>
 
             <div className="flex flex-col gap-3">
@@ -51,5 +47,5 @@ export function BrandedLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
     </>
-  );
+  )
 }

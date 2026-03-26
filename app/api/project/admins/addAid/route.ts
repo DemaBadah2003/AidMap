@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
       { status: 200 }
     )
   } catch (error) {
-    console.error('GET /api/project/users/myAid error:', error)
+    console.error('GET /api/project/admins/addAid error:', error)
 
     return NextResponse.json(
       {
