@@ -79,7 +79,7 @@ export default function Page() {
         });
 
         // ✅ توجيه
-        router.push('/');
+        router.push('/dashboard');
       }
     } catch (err) {
       setError(

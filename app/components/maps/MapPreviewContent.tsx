@@ -460,11 +460,10 @@ export default function MapPreview({
 
   const osmAmenitiesKey = useMemo(() => osmAmenities.join(','), [osmAmenities])
 
- const adminSearchItems = useMemo<UnifiedSearchItem[]>(() => {
-  const list = Array.isArray(adminPlaces) ? adminPlaces : []
+  const adminSearchItems = useMemo<UnifiedSearchItem[]>(() => {
+    const list = Array.isArray(adminPlaces) ? adminPlaces : []
 
-  return list.map((p) => {
-    
+    return list.map((p) => {
       const rawName = cleanText(p.name) || 'موقع'
       const rawOperator = cleanText(p.operator)
       const isUnrwaShelter =
@@ -516,7 +515,7 @@ export default function MapPreview({
         lat: p.lat,
         statusText,
         isAvailable,
-        source: 'admin',
+        source: 'admin' as const,
       }
     })
   }, [adminPlaces])
@@ -857,6 +856,11 @@ export default function MapPreview({
       }
       setUserLocation(current)
       setSearchNotice('تم تحديد موقعك. يمكنك الآن البحث وعرض أقرب النتائج.')
+
+      map.flyTo({
+        center: [current.lng, current.lat],
+        zoom: Math.max(map.getZoom(), 13),
+      })
     })
 
     map.addControl(geolocate, 'top-right')
@@ -1588,244 +1592,262 @@ out center tags;
 
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !map.loaded()) return
+    if (!map) return
 
-    const attachAdminHandler = (type: HandlerItem['type'], layerId: string, handler: any) => {
-      if (!map.getLayer(layerId)) return
-      map.on(type, layerId, handler)
-      adminHandlersRef.current.push({ type, layerId, handler })
-    }
+    let cancelled = false
 
-    const makeAdminGeojson = () => {
-      const features = adminSearchItems.map((item) => ({
-        type: 'Feature',
-        properties: {
-          id: item.id,
-          name: item.name,
-          display_name: item.name,
-          kind: item.kind,
-          amenity: item.amenity || '',
-          operator: item.operator || '',
-          statusText: item.statusText || '',
-          source: 'admin',
-        },
-        geometry: {
-          type: 'Point',
-          coordinates: [item.lng, item.lat],
-        },
-      }))
+    const attachAdminLayers = () => {
+      if (cancelled) return
 
-      return {
-        type: 'FeatureCollection',
-        features,
-      } as any
-    }
-
-    cleanupAdmin()
-
-    map.addSource('admin-places', {
-      type: 'geojson',
-      data: makeAdminGeojson(),
-    })
-
-    map.addLayer({
-      id: 'admin-shelters-layer',
-      type: 'circle',
-      source: 'admin-places',
-      filter: ['==', ['get', 'kind'], 'school'],
-      paint: {
-        'circle-radius': 7,
-        'circle-color': '#16a34a',
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#fff',
-      },
-    })
-
-    map.addLayer({
-      id: 'admin-shelters-labels',
-      type: 'symbol',
-      source: 'admin-places',
-      filter: ['==', ['get', 'kind'], 'school'],
-      minzoom: 11,
-      layout: {
-        'text-field': ['coalesce', ['get', 'display_name'], 'مركز إيواء'],
-        'text-size': 12,
-        'text-offset': [0, 1.2],
-        'text-anchor': 'top',
-      },
-      paint: {
-        'text-color': '#111',
-        'text-halo-color': '#fff',
-        'text-halo-width': 1.2,
-      },
-    })
-
-    map.addLayer({
-      id: 'admin-unrwa-shelters-layer',
-      type: 'circle',
-      source: 'admin-places',
-      filter: ['==', ['get', 'kind'], 'unrwa_school'],
-      paint: {
-        'circle-radius': 7,
-        'circle-color': '#0ea5e9',
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#fff',
-      },
-    })
-
-    map.addLayer({
-      id: 'admin-unrwa-shelters-labels',
-      type: 'symbol',
-      source: 'admin-places',
-      filter: ['==', ['get', 'kind'], 'unrwa_school'],
-      minzoom: 11,
-      layout: {
-        'text-field': ['coalesce', ['get', 'display_name'], 'مركز إيواء - وكالة'],
-        'text-size': 12,
-        'text-offset': [0, 1.2],
-        'text-anchor': 'top',
-      },
-      paint: {
-        'text-color': '#111',
-        'text-halo-color': '#fff',
-        'text-halo-width': 1.2,
-      },
-    })
-
-    map.addLayer({
-      id: 'admin-medical-layer',
-      type: 'circle',
-      source: 'admin-places',
-      filter: ['==', ['get', 'kind'], 'medical'],
-      paint: {
-        'circle-radius': 7,
-        'circle-color': '#dc2626',
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#fff',
-      },
-    })
-
-    map.addLayer({
-      id: 'admin-medical-labels',
-      type: 'symbol',
-      source: 'admin-places',
-      filter: ['==', ['get', 'kind'], 'medical'],
-      minzoom: 11,
-      layout: {
-        'text-field': ['coalesce', ['get', 'display_name'], 'مستشفى'],
-        'text-size': 12,
-        'text-offset': [0, 1.2],
-        'text-anchor': 'top',
-      },
-      paint: {
-        'text-color': '#111',
-        'text-halo-color': '#fff',
-        'text-halo-width': 1.2,
-      },
-    })
-
-    map.addLayer({
-      id: 'admin-water-layer',
-      type: 'circle',
-      source: 'admin-places',
-      filter: ['==', ['get', 'kind'], 'water'],
-      paint: {
-        'circle-radius': 7,
-        'circle-color': '#2563eb',
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#fff',
-      },
-    })
-
-    map.addLayer({
-      id: 'admin-water-labels',
-      type: 'symbol',
-      source: 'admin-places',
-      filter: ['==', ['get', 'kind'], 'water'],
-      minzoom: 11,
-      layout: {
-        'text-field': ['coalesce', ['get', 'display_name'], 'نقطة ماء'],
-        'text-size': 12,
-        'text-offset': [0, 1.2],
-        'text-anchor': 'top',
-      },
-      paint: {
-        'text-color': '#111',
-        'text-halo-color': '#fff',
-        'text-halo-width': 1.2,
-      },
-    })
-
-    map.addLayer({
-      id: 'admin-food-layer',
-      type: 'circle',
-      source: 'admin-places',
-      filter: ['==', ['get', 'kind'], 'food'],
-      paint: {
-        'circle-radius': 7,
-        'circle-color': '#f59e0b',
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#fff',
-      },
-    })
-
-    map.addLayer({
-      id: 'admin-food-labels',
-      type: 'symbol',
-      source: 'admin-places',
-      filter: ['==', ['get', 'kind'], 'food'],
-      minzoom: 11,
-      layout: {
-        'text-field': ['coalesce', ['get', 'display_name'], 'مركز دعم / توزيع'],
-        'text-size': 12,
-        'text-offset': [0, 1.2],
-        'text-anchor': 'top',
-      },
-      paint: {
-        'text-color': '#111',
-        'text-halo-color': '#fff',
-        'text-halo-width': 1.2,
-      },
-    })
-
-    const adminClickableLayers = [
-      'admin-shelters-layer',
-      'admin-unrwa-shelters-layer',
-      'admin-medical-layer',
-      'admin-water-layer',
-      'admin-food-layer',
-    ]
-
-    adminClickableLayers.forEach((layerId) => {
-      const onClick = async (e: any) => {
-        const f = e.features?.[0]
-        if (!f) return
-
-        const p = f.properties || {}
-        const [clickedLng, clickedLat] = f.geometry.coordinates
-
-        await openPlaceCardAndRoute({
-          id: String(p.id),
-          name: cleanText(p.display_name || p.name || 'موقع'),
-          kind: cleanText(p.kind),
-          amenity: cleanText(p.amenity),
-          operator: cleanText(p.operator),
-          lng: clickedLng,
-          lat: clickedLat,
-          statusText: cleanText(p.statusText) || defaultStatusByKind(cleanText(p.kind)),
-        })
+      const attachAdminHandler = (
+        type: HandlerItem['type'],
+        layerId: string,
+        handler: any
+      ) => {
+        if (!map.getLayer(layerId)) return
+        map.on(type, layerId, handler)
+        adminHandlersRef.current.push({ type, layerId, handler })
       }
 
-      attachAdminHandler('click', layerId, onClick)
-      attachAdminHandler('mouseenter', layerId, () => (map.getCanvas().style.cursor = 'pointer'))
-      attachAdminHandler('mouseleave', layerId, () => (map.getCanvas().style.cursor = ''))
-    })
+      const makeAdminGeojson = () => {
+        const features = adminSearchItems.map((item) => ({
+          type: 'Feature',
+          properties: {
+            id: item.id,
+            name: item.name,
+            display_name: item.name,
+            kind: item.kind,
+            amenity: item.amenity || '',
+            operator: item.operator || '',
+            statusText: item.statusText || '',
+            source: 'admin',
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [item.lng, item.lat],
+          },
+        }))
 
-    applyLayerVisibility()
+        return {
+          type: 'FeatureCollection',
+          features,
+        } as any
+      }
 
-    window.setTimeout(() => map.resize(), 50)
+      cleanupAdmin()
 
-    return () => cleanupAdmin()
+      map.addSource('admin-places', {
+        type: 'geojson',
+        data: makeAdminGeojson(),
+      })
+
+      map.addLayer({
+        id: 'admin-shelters-layer',
+        type: 'circle',
+        source: 'admin-places',
+        filter: ['==', ['get', 'kind'], 'school'],
+        paint: {
+          'circle-radius': 7,
+          'circle-color': '#16a34a',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#fff',
+        },
+      })
+
+      map.addLayer({
+        id: 'admin-shelters-labels',
+        type: 'symbol',
+        source: 'admin-places',
+        filter: ['==', ['get', 'kind'], 'school'],
+        minzoom: 11,
+        layout: {
+          'text-field': ['coalesce', ['get', 'display_name'], 'مركز إيواء'],
+          'text-size': 12,
+          'text-offset': [0, 1.2],
+          'text-anchor': 'top',
+        },
+        paint: {
+          'text-color': '#111',
+          'text-halo-color': '#fff',
+          'text-halo-width': 1.2,
+        },
+      })
+
+      map.addLayer({
+        id: 'admin-unrwa-shelters-layer',
+        type: 'circle',
+        source: 'admin-places',
+        filter: ['==', ['get', 'kind'], 'unrwa_school'],
+        paint: {
+          'circle-radius': 7,
+          'circle-color': '#0ea5e9',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#fff',
+        },
+      })
+
+      map.addLayer({
+        id: 'admin-unrwa-shelters-labels',
+        type: 'symbol',
+        source: 'admin-places',
+        filter: ['==', ['get', 'kind'], 'unrwa_school'],
+        minzoom: 11,
+        layout: {
+          'text-field': ['coalesce', ['get', 'display_name'], 'مركز إيواء - وكالة'],
+          'text-size': 12,
+          'text-offset': [0, 1.2],
+          'text-anchor': 'top',
+        },
+        paint: {
+          'text-color': '#111',
+          'text-halo-color': '#fff',
+          'text-halo-width': 1.2,
+        },
+      })
+
+      map.addLayer({
+        id: 'admin-medical-layer',
+        type: 'circle',
+        source: 'admin-places',
+        filter: ['==', ['get', 'kind'], 'medical'],
+        paint: {
+          'circle-radius': 7,
+          'circle-color': '#dc2626',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#fff',
+        },
+      })
+
+      map.addLayer({
+        id: 'admin-medical-labels',
+        type: 'symbol',
+        source: 'admin-places',
+        filter: ['==', ['get', 'kind'], 'medical'],
+        minzoom: 11,
+        layout: {
+          'text-field': ['coalesce', ['get', 'display_name'], 'مستشفى'],
+          'text-size': 12,
+          'text-offset': [0, 1.2],
+          'text-anchor': 'top',
+        },
+        paint: {
+          'text-color': '#111',
+          'text-halo-color': '#fff',
+          'text-halo-width': 1.2,
+        },
+      })
+
+      map.addLayer({
+        id: 'admin-water-layer',
+        type: 'circle',
+        source: 'admin-places',
+        filter: ['==', ['get', 'kind'], 'water'],
+        paint: {
+          'circle-radius': 7,
+          'circle-color': '#2563eb',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#fff',
+        },
+      })
+
+      map.addLayer({
+        id: 'admin-water-labels',
+        type: 'symbol',
+        source: 'admin-places',
+        filter: ['==', ['get', 'kind'], 'water'],
+        minzoom: 11,
+        layout: {
+          'text-field': ['coalesce', ['get', 'display_name'], 'نقطة ماء'],
+          'text-size': 12,
+          'text-offset': [0, 1.2],
+          'text-anchor': 'top',
+        },
+        paint: {
+          'text-color': '#111',
+          'text-halo-color': '#fff',
+          'text-halo-width': 1.2,
+        },
+      })
+
+      map.addLayer({
+        id: 'admin-food-layer',
+        type: 'circle',
+        source: 'admin-places',
+        filter: ['==', ['get', 'kind'], 'food'],
+        paint: {
+          'circle-radius': 7,
+          'circle-color': '#f59e0b',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#fff',
+        },
+      })
+
+      map.addLayer({
+        id: 'admin-food-labels',
+        type: 'symbol',
+        source: 'admin-places',
+        filter: ['==', ['get', 'kind'], 'food'],
+        minzoom: 11,
+        layout: {
+          'text-field': ['coalesce', ['get', 'display_name'], 'مركز دعم / توزيع'],
+          'text-size': 12,
+          'text-offset': [0, 1.2],
+          'text-anchor': 'top',
+        },
+        paint: {
+          'text-color': '#111',
+          'text-halo-color': '#fff',
+          'text-halo-width': 1.2,
+        },
+      })
+
+      const adminClickableLayers = [
+        'admin-shelters-layer',
+        'admin-unrwa-shelters-layer',
+        'admin-medical-layer',
+        'admin-water-layer',
+        'admin-food-layer',
+      ]
+
+      adminClickableLayers.forEach((layerId) => {
+        const onClick = async (e: any) => {
+          const f = e.features?.[0]
+          if (!f) return
+
+          const p = f.properties || {}
+          const [clickedLng, clickedLat] = f.geometry.coordinates
+
+          await openPlaceCardAndRoute({
+            id: String(p.id),
+            name: cleanText(p.display_name || p.name || 'موقع'),
+            kind: cleanText(p.kind),
+            amenity: cleanText(p.amenity),
+            operator: cleanText(p.operator),
+            lng: clickedLng,
+            lat: clickedLat,
+            statusText: cleanText(p.statusText) || defaultStatusByKind(cleanText(p.kind)),
+          })
+        }
+
+        attachAdminHandler('click', layerId, onClick)
+        attachAdminHandler('mouseenter', layerId, () => (map.getCanvas().style.cursor = 'pointer'))
+        attachAdminHandler('mouseleave', layerId, () => (map.getCanvas().style.cursor = ''))
+      })
+
+      applyLayerVisibility()
+      window.setTimeout(() => map.resize(), 50)
+    }
+
+    if (map.loaded()) {
+      attachAdminLayers()
+    } else {
+      map.once('load', attachAdminLayers)
+    }
+
+    return () => {
+      cancelled = true
+      cleanupAdmin()
+    }
   }, [adminSearchItems])
 
   const openSearchResult = async (item: UnifiedSearchItem) => {
@@ -2356,6 +2378,7 @@ out center tags;
             boxShadow: '0 10px 24px rgba(0,0,0,.14)',
           }}
         >
+       
           <div style={{ display: 'grid', gap: 4 }}>
             <span style={{ fontSize: 13, color: '#111827', fontWeight: 600 }}>
               اختر العناصر التي تريد عرضها
@@ -2371,6 +2394,7 @@ out center tags;
                 fontSize: 13,
                 background: '#fff',
               }}
+              
             >
               <option value="all">إظهار الكل</option>
               <option value="shelters">مراكز الإيواء فقط</option>

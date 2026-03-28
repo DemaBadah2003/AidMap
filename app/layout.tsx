@@ -11,31 +11,34 @@ import { ModulesProvider } from '@/providers/modules-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 
-const inter = Inter({ subsets: ['latin'] });
-
 import '@/css/styles.css';
 import '@/components/keenicons/assets/styles.css';
-
-// ✅ خلي CSS الخاص بـ MapLibre آخر شي (أفضل لتفادي تعارض CSS)
 import 'maplibre-gl/dist/maplibre-gl.css';
+
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: {
     template: '%s | Metronic',
-    default: 'Metronic', // a default is required when creating a template
-  }
+    default: 'Metronic',
+  },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: ReactNode;
 }) {
   return (
-    <html className="h-full" suppressHydrationWarning>
+    <html
+      lang="ar"
+      dir="rtl"
+      suppressHydrationWarning
+      className="h-full w-full"
+    >
       <body
         className={cn(
-          'antialiased flex h-full text-base text-foreground bg-background',
+          'h-full w-full m-0 p-0 antialiased text-base text-foreground bg-background',
           inter.className,
         )}
       >
@@ -46,7 +49,9 @@ export default async function RootLayout({
                 <I18nProvider>
                   <TooltipsProvider>
                     <ModulesProvider>
-                      <Suspense>{children}</Suspense>
+                      <div className="h-screen w-screen overflow-hidden">
+                        <Suspense fallback={null}>{children}</Suspense>
+                      </div>
                       <Toaster />
                     </ModulesProvider>
                   </TooltipsProvider>

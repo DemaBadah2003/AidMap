@@ -10,7 +10,7 @@ import {
   DialogContent,
 } from '../../../../../../components/ui/dialog';
 
-import MapLibrePreview from '@/app/components/MapPreview';
+import MapLibrePreview from '../../../../../components/maps/MapPreviewContent';
 
 const gazaPlaces = [
   { id: 'shelter_01', name: 'مأوى الأزهر', type: 'Shelter', lng: 34.4667, lat: 31.5017 },

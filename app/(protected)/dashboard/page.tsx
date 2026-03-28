@@ -2,11 +2,11 @@
 
 import { useSettings } from '@/providers/settings-provider';
 
-import { Demo1LightSidebarPage } from './components/demo1';
-import { Demo2Page } from './components/demo2';
-import { Demo3Page } from './components/demo3';
-import { Demo4Page } from './components/demo4';
-import { Demo5Page } from './components/demo5';
+import { Demo1LightSidebarPage } from '../components/demo1';
+import { Demo2Page } from '../components/demo2';
+import { Demo3Page } from '../components/demo3';
+import { Demo4Page } from '../components/demo4';
+import { Demo5Page } from '../components/demo5';
 
 import { ScreenLoader } from '@/components/common/screen-loader';
 

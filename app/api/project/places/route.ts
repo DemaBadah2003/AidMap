@@ -135,13 +135,15 @@ function parseOptionalInteger(value: unknown): number | null | 'INVALID' {
 
   return value
 }
-
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const typeParam = searchParams.get('type')
 
-    const where: Prisma.PlaceWhereInput = {}
+    const where: Prisma.PlaceWhereInput = {
+      isActive: true,
+      isTrashed: false,
+    }
 
     if (typeParam && isValidFrontPlaceType(typeParam)) {
       where.type = mapFrontTypeToPrismaType(typeParam)
@@ -154,11 +156,31 @@ export async function GET(req: NextRequest) {
       },
     })
 
+    const mappedPlaces = places.map((place) => ({
+      id: place.id,
+      name: place.name,
+      type:
+        place.type === PlaceType.SHELTER
+          ? 'shelter'
+          : place.type === PlaceType.MEDICAL
+            ? 'hospital'
+            : place.type === PlaceType.WATER_POINT
+              ? 'water'
+              : 'food',
+      lat: place.latitude != null ? Number(place.latitude) : 0,
+      lng: place.longitude != null ? Number(place.longitude) : 0,
+      operator: place.operator ?? '',
+      capacity: place.capacity ?? 0,
+      occupancy: place.occupancy ?? 0,
+      availableBeds: place.availableBeds ?? 0,
+      statusText: place.statusText ?? '',
+    }))
+
     return NextResponse.json(
       {
         success: true,
-        count: places.length,
-        data: places,
+        count: mappedPlaces.length,
+        data: mappedPlaces,
       },
       { status: 200 }
     )
@@ -175,7 +197,6 @@ export async function GET(req: NextRequest) {
     )
   }
 }
-
 export async function POST(req: NextRequest) {
   try {
     const unauthorized = await requireAdminApi(req)
@@ -367,25 +388,24 @@ export async function POST(req: NextRequest) {
         )
       }
     }
-
-    const newPlace = await prisma.place.create({
-      data: {
-        name: normalizedName,
-        type: mapFrontTypeToPrismaType(type),
-        latitude: lat,
-        longitude: lng,
-        description: parsedDescription,
-        operator: parsedOperator,
-        capacity: type === 'shelter' ? parsedCapacity : null,
-        occupancy: type === 'shelter' ? parsedOccupancy : null,
-        availableBeds: type === 'shelter' ? parsedAvailableBeds : null,
-        statusText: parsedStatusText,
-        status: mapStatusTextToPrismaStatus(parsedStatusText),
-        isActive: true,
-        isProtected: false,
-        isTrashed: false,
-      },
-    })
+const newPlace = await prisma.place.create({
+  data: {
+    name: normalizedName,
+    type: mapFrontTypeToPrismaType(type),
+    latitude: lat,
+    longitude: lng,
+    description: parsedDescription,
+    operator: parsedOperator,
+    capacity: type === 'shelter' ? (parsedCapacity ?? 0) : 0,
+    occupancy: type === 'shelter' ? (parsedOccupancy ?? 0) : 0,
+    availableBeds: type === 'shelter' ? (parsedAvailableBeds ?? 0) : 0,
+    statusText: parsedStatusText,
+    status: mapStatusTextToPrismaStatus(parsedStatusText),
+    isActive: true,
+    isProtected: false,
+    isTrashed: false,
+  },
+})
 
     return NextResponse.json(
       {

@@ -46,18 +46,7 @@ export const MENU_SIDEBAR: MenuConfig = [
           { title: 'Distribute Aid', path: '/project/admins/distributeAid' },
         ],
       },
-    {
-  title: 'User Pages',
-  path: '/store-client',
-  roles: ['user', 'admin'],
-  children: [
-{ title: 'Map Preview', path: '/project/MapPreview' },
-    { title: 'RegisterBeneficiary', path: '/project/users/RegisterBeneficiary' },
-    { title: 'My Aid', path: '/project/users/myAid' },
-    { title: 'Request Aid', path: '/project/users/requestAid' },
-
-  ],
-},
+   
     ],
   },
 ];
