@@ -7,17 +7,17 @@ function toDbStatus(fillStatus: 'Full' | 'Not Full') {
 }
 
 const createSchema = z.object({
-  nameAr: z.string().trim().min(1, 'Camp name is required'),
+  nameAr: z.string().trim().min(1, 'اسم المخيم مطلوب'),
   areaAr: z.string().trim().optional().default(''),
-  capacity: z.coerce.number().int().positive('Capacity must be > 0'),
+  capacity: z.coerce.number().int().positive('يجب أن تكون السعة أكبر من 0'),
   fillStatus: z.enum(['Full', 'Not Full']).default('Not Full'),
   supervisorId: z.string().uuid().optional(),
 })
 
 const updateSchema = z.object({
-  nameAr: z.string().trim().min(1).optional(),
+  nameAr: z.string().trim().min(1, 'اسم المخيم مطلوب').optional(),
   areaAr: z.string().trim().optional(),
-  capacity: z.coerce.number().int().positive().optional(),
+  capacity: z.coerce.number().int().positive('يجب أن تكون السعة أكبر من 0').optional(),
   fillStatus: z.enum(['Full', 'Not Full']).optional(),
   supervisorId: z.string().uuid().optional(),
 })
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(camps)
   } catch (e) {
     return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'Server error' },
+      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
       { status: 500 }
     )
   }
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
 
     if (exists) {
       return NextResponse.json(
-        { message: 'Camp already exists (duplicate name).' },
+        { message: 'المخيم موجود بالفعل (اسم مكرر).' },
         { status: 409 }
       )
     }
@@ -112,13 +112,13 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     if (e instanceof z.ZodError) {
       return NextResponse.json(
-        { message: 'Validation failed', issues: e.issues },
+        { message: 'فشل التحقق من صحة البيانات', issues: e.issues },
         { status: 400 }
       )
     }
 
     return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'Server error' },
+      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
       { status: 500 }
     )
   }
@@ -128,7 +128,7 @@ export async function PUT(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id')
 
   if (!id) {
-    return NextResponse.json({ message: 'Missing id' }, { status: 400 })
+    return NextResponse.json({ message: 'معرّف المخيم مفقود' }, { status: 400 })
   }
 
   try {
@@ -145,7 +145,7 @@ export async function PUT(req: NextRequest) {
 
       if (exists) {
         return NextResponse.json(
-          { message: 'Camp already exists (duplicate name).' },
+          { message: 'المخيم موجود بالفعل (اسم مكرر).' },
           { status: 409 }
         )
       }
@@ -169,13 +169,13 @@ export async function PUT(req: NextRequest) {
   } catch (e) {
     if (e instanceof z.ZodError) {
       return NextResponse.json(
-        { message: 'Validation failed', issues: e.issues },
+        { message: 'فشل التحقق من صحة البيانات', issues: e.issues },
         { status: 400 }
       )
     }
 
     return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'Server error' },
+      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
       { status: 500 }
     )
   }
@@ -188,12 +188,11 @@ export async function DELETE(req: NextRequest) {
   try {
     if (all === 'true') {
       await prisma.camps.deleteMany()
-
       return NextResponse.json({ ok: true })
     }
 
     if (!id) {
-      return NextResponse.json({ message: 'Missing id' }, { status: 400 })
+      return NextResponse.json({ message: 'معرّف المخيم مفقود' }, { status: 400 })
     }
 
     await prisma.camps.delete({
@@ -203,7 +202,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: true })
   } catch (e) {
     return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'Server error' },
+      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
       { status: 500 }
     )
   }
