@@ -259,12 +259,17 @@ export default function CampsPage() {
     fillStatus: 'Not Full',
   })
 
-  const unifiedButtonClass =
-    'h-11 rounded-lg px-5 text-sm font-bold sm:h-12 sm:text-base'
-  const unifiedIconButtonClass =
-    'inline-flex h-11 w-11 items-center justify-center rounded-lg border sm:h-12 sm:w-12'
-  const unifiedSmallButtonClass =
-    'h-11 rounded-lg px-5 text-sm font-semibold sm:h-12 sm:text-base'
+  const topControlHeight = 'h-10 sm:h-11'
+  const fixedButtonClass =
+    'h-10 sm:h-11 min-w-[110px] sm:min-w-[130px] px-4 sm:px-5 rounded-lg text-xs sm:text-sm shrink-0 flex-none whitespace-nowrap'
+  const fixedIconButtonClass =
+    'inline-flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 flex-none items-center justify-center rounded-lg border'
+  const tableBtnClass =
+    'h-9 sm:h-10 rounded-lg px-3 sm:px-4 text-xs sm:text-sm font-semibold shrink-0 flex-none whitespace-nowrap'
+  const selectBaseClass =
+    'w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-right text-xs sm:text-sm outline-none focus:ring-2 focus:ring-slate-200'
+  const inputBaseClass =
+    'w-full min-w-0 rounded-lg border-slate-200 bg-white text-right text-xs sm:text-sm outline-none focus:!ring-2 focus:!ring-slate-200'
 
   useEffect(() => {
     const run = async () => {
@@ -496,64 +501,70 @@ export default function CampsPage() {
   const rangeEnd = Math.min(safePage * pageSize, filtered.length)
 
   return (
-    <div className="w-full px-2 py-4 sm:px-4 sm:py-6 lg:px-6" dir="rtl">
-      <div className="mb-6 text-right">
-        <div className="text-xl font-semibold text-foreground sm:text-2xl">المخيمات</div>
+    <div className="w-full px-2 py-3 sm:px-4 sm:py-5 lg:px-6" dir="rtl">
+      <div className="mb-4 sm:mb-6 text-right">
+        <div className="text-base font-semibold text-foreground sm:text-xl lg:text-2xl">
+          المخيمات
+        </div>
 
-        <div className="mt-1 text-xs text-muted-foreground sm:text-sm">
-          الرئيسية <span className="mx-1">{'>'}</span>{' '}
+        <div className="mt-1 text-[11px] text-muted-foreground sm:text-sm">
+          الرئيسية <span className="mx-1">{'>'}</span>
           <span className="text-foreground">إدارة المخيمات</span>
         </div>
 
         {loading && (
-          <div className="mt-2 text-xs text-muted-foreground sm:text-sm">جارٍ التحميل...</div>
+          <div className="mt-2 text-[11px] text-muted-foreground sm:text-sm">جارٍ التحميل...</div>
         )}
 
-        {!!error && <div className="mt-2 text-xs text-red-600 sm:text-sm">{error}</div>}
+        {!!error && <div className="mt-2 text-[11px] text-red-600 sm:text-sm">{error}</div>}
       </div>
 
-      <div className="w-full max-w-[1200px]">
-        <Card>
+      <div className="w-full max-w-full">
+        <Card className="overflow-hidden">
           <CardContent className="p-0" dir="rtl">
-            <div className="p-3 sm:p-4">
+            <div className="p-2 sm:p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="order-1 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center lg:justify-start">
-                  <div className="relative w-full min-w-0 sm:w-[260px]">
+                <div className="flex min-w-0 flex-nowrap items-center gap-2 sm:gap-3 overflow-x-auto pb-1">
+                  <div className="relative min-w-[170px] flex-1 sm:min-w-[220px] sm:max-w-[280px]">
                     <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Input
                       value={q}
                       onChange={(e: ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
                       placeholder="ابحث عن مخيم"
-                      className="!h-10 !w-full !rounded-lg border-slate-200 bg-white pr-9 pl-3 text-right text-sm outline-none focus:!ring-2 focus:!ring-slate-200"
+                      className={`${inputBaseClass} ${topControlHeight} pr-9 pl-3`}
                     />
                   </div>
 
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as 'all' | 'full' | 'notfull')}
-                    className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-right text-sm outline-none focus:ring-2 focus:ring-slate-200 sm:w-[160px]"
-                  >
-                    <option value="all">كل الحالات</option>
-                    <option value="full">ممتلئ</option>
-                    <option value="notfull">غير ممتلئ</option>
-                  </select>
+                  <div className="min-w-[120px] max-w-[140px] sm:min-w-[150px] sm:max-w-[160px] shrink-0">
+                    <select
+                      value={statusFilter}
+                      onChange={(e) =>
+                        setStatusFilter(e.target.value as 'all' | 'full' | 'notfull')
+                      }
+                      className={`${selectBaseClass} ${topControlHeight} truncate`}
+                    >
+                      <option value="all">كل الحالات</option>
+                      <option value="full">ممتلئ</option>
+                      <option value="notfull">غير ممتلئ</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div className="order-2 flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   <Button
-                    className={`inline-flex w-full items-center justify-center gap-2 !bg-blue-600 !text-white hover:!bg-blue-700 sm:w-auto ${unifiedButtonClass}`}
+                    className={`!bg-blue-600 !text-white hover:!bg-blue-700 ${fixedButtonClass}`}
                     onClick={() => {
                       setAddFormError('')
                       setAddOpen(true)
                     }}
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="ms-1 h-4 w-4 shrink-0" />
                     إضافة مخيم
                   </Button>
 
                   <Button
                     variant="outline"
-                    className="h-11 w-full rounded-lg border-slate-200 px-5 text-sm font-normal text-slate-700 hover:bg-slate-50 sm:h-12 sm:w-auto sm:text-base"
+                    className={`border-slate-200 text-slate-700 hover:bg-slate-50 ${fixedButtonClass}`}
                     onClick={onDeleteAll}
                   >
                     حذف الكل
@@ -566,7 +577,10 @@ export default function CampsPage() {
 
             <div className="overflow-hidden rounded-b-lg">
               <div className="w-full overflow-x-auto">
-                <table className="w-full table-fixed border-collapse text-sm sm:text-base" dir="rtl">
+                <table
+                  className="w-full min-w-[760px] sm:min-w-[860px] lg:min-w-[980px] table-fixed border-collapse text-xs sm:text-sm lg:text-base"
+                  dir="rtl"
+                >
                   <thead
                     style={{
                       backgroundColor: '#F9FAFB',
@@ -574,19 +588,19 @@ export default function CampsPage() {
                     }}
                   >
                     <tr className="text-right text-foreground/60">
-                      <th className="w-[24%] border-b border-l px-3 py-4 text-right text-sm font-medium sm:px-5 sm:py-4 sm:text-base">
+                      <th className="w-[24%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
                         اسم المخيم
                       </th>
-                      <th className="w-[20%] border-b border-l px-3 py-4 text-right text-sm font-medium sm:px-5 sm:py-4 sm:text-base">
+                      <th className="w-[18%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
                         المنطقة
                       </th>
-                      <th className="w-[14%] border-b border-l px-3 py-4 text-right text-sm font-medium sm:px-5 sm:py-4 sm:text-base">
+                      <th className="w-[12%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
                         السعة
                       </th>
-                      <th className="w-[20%] border-b border-l px-3 py-4 text-right text-sm font-medium sm:px-5 sm:py-4 sm:text-base">
+                      <th className="w-[20%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
                         الحالة
                       </th>
-                      <th className="w-[22%] border-b px-3 py-4 text-right text-sm font-medium sm:px-5 sm:py-4 sm:text-base">
+                      <th className="w-[26%] border-b px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
                         الإجراءات
                       </th>
                     </tr>
@@ -600,39 +614,39 @@ export default function CampsPage() {
 
                       return (
                         <tr key={c.id} className="align-top hover:bg-muted/30">
-                          <td className="border-b border-l px-3 py-4 text-right font-medium break-words sm:px-5 sm:py-4">
+                          <td className="border-b border-l px-2 py-3 text-right font-medium break-words sm:px-4 sm:py-4 lg:px-5">
                             {isEditing ? (
                               <Input
                                 value={editDraft.nameAr}
                                 onChange={(e) =>
                                   setEditDraft((p) => ({ ...p, nameAr: e.target.value }))
                                 }
-                                className="h-12 rounded-lg text-right text-base font-medium sm:h-14 sm:text-lg"
+                                className="h-9 sm:h-10 lg:h-11 rounded-lg text-right text-xs sm:text-sm lg:text-base font-medium"
                               />
                             ) : (
-                              <span className="block break-words text-base font-medium leading-7 sm:text-lg">
+                              <span className="block break-words text-xs sm:text-sm lg:text-base font-medium leading-6 sm:leading-7">
                                 {c.nameAr}
                               </span>
                             )}
                           </td>
 
-                          <td className="border-b border-l px-3 py-4 text-right break-words sm:px-5 sm:py-4">
+                          <td className="border-b border-l px-2 py-3 text-right break-words sm:px-4 sm:py-4 lg:px-5">
                             {isEditing ? (
                               <Input
                                 value={editDraft.areaAr}
                                 onChange={(e) =>
                                   setEditDraft((p) => ({ ...p, areaAr: e.target.value }))
                                 }
-                                className="h-12 rounded-lg text-right text-base font-medium sm:h-14 sm:text-lg"
+                                className="h-9 sm:h-10 lg:h-11 rounded-lg text-right text-xs sm:text-sm lg:text-base font-medium"
                               />
                             ) : (
-                              <span className="block break-words text-base font-medium leading-7 sm:text-lg">
+                              <span className="block break-words text-xs sm:text-sm lg:text-base font-medium leading-6 sm:leading-7">
                                 {c.areaAr}
                               </span>
                             )}
                           </td>
 
-                          <td className="border-b border-l px-3 py-4 text-right sm:px-5 sm:py-4">
+                          <td className="border-b border-l px-2 py-3 text-right sm:px-4 sm:py-4 lg:px-5">
                             {isEditing ? (
                               <Input
                                 inputMode="numeric"
@@ -645,54 +659,56 @@ export default function CampsPage() {
                                     capacity: toIntOnly(e.target.value),
                                   }))
                                 }
-                                className="h-12 rounded-lg text-right text-base font-medium sm:h-14 sm:text-lg"
+                                className="h-9 sm:h-10 lg:h-11 rounded-lg text-right text-xs sm:text-sm lg:text-base font-medium"
                               />
                             ) : (
-                              <span className="block break-words text-base font-medium leading-7 sm:text-lg">
+                              <span className="block break-words text-xs sm:text-sm lg:text-base font-medium leading-6 sm:leading-7">
                                 {c.capacity}
                               </span>
                             )}
                           </td>
 
-                          <td className="border-b border-l px-3 py-4 text-right sm:px-5 sm:py-4">
-                            {isEditing ? (
-                              <select
-                                value={editDraft.fillStatus}
-                                onChange={(e) =>
-                                  setEditDraft((p) => ({
-                                    ...p,
-                                    fillStatus: e.target.value as FillStatus,
-                                  }))
-                                }
-                                className="h-12 min-w-[150px] rounded-lg border bg-background px-4 text-right text-base sm:h-14 sm:text-lg"
-                              >
-                                <option value="Full">ممتلئ</option>
-                                <option value="Not Full">غير ممتلئ</option>
-                              </select>
-                            ) : (
-                              <select
-                                value={currentStatus}
-                                onChange={(e) =>
-                                  setStatusPick((prev) => ({
-                                    ...prev,
-                                    [c.id]: e.target.value as FillStatus,
-                                  }))
-                                }
-                                className="h-12 min-w-[150px] rounded-lg border bg-background px-4 text-right text-base sm:h-14 sm:text-lg"
-                              >
-                                <option value="Full">ممتلئ</option>
-                                <option value="Not Full">غير ممتلئ</option>
-                              </select>
-                            )}
+                          <td className="border-b border-l px-2 py-3 text-right sm:px-4 sm:py-4 lg:px-5">
+                            <div className="w-[120px] sm:w-[135px] lg:w-[150px] max-w-full">
+                              {isEditing ? (
+                                <select
+                                  value={editDraft.fillStatus}
+                                  onChange={(e) =>
+                                    setEditDraft((p) => ({
+                                      ...p,
+                                      fillStatus: e.target.value as FillStatus,
+                                    }))
+                                  }
+                                  className="h-9 sm:h-10 lg:h-11 w-full min-w-0 rounded-lg border bg-background px-2 sm:px-3 text-right text-xs sm:text-sm lg:text-base truncate"
+                                >
+                                  <option value="Full">ممتلئ</option>
+                                  <option value="Not Full">غير ممتلئ</option>
+                                </select>
+                              ) : (
+                                <select
+                                  value={currentStatus}
+                                  onChange={(e) =>
+                                    setStatusPick((prev) => ({
+                                      ...prev,
+                                      [c.id]: e.target.value as FillStatus,
+                                    }))
+                                  }
+                                  className="h-9 sm:h-10 lg:h-11 w-full min-w-0 rounded-lg border bg-background px-2 sm:px-3 text-right text-xs sm:text-sm lg:text-base truncate"
+                                >
+                                  <option value="Full">ممتلئ</option>
+                                  <option value="Not Full">غير ممتلئ</option>
+                                </select>
+                              )}
+                            </div>
                           </td>
 
-                          <td className="border-b px-3 py-4 sm:px-5 sm:py-4">
-                            <div className="flex flex-wrap items-center justify-start gap-2">
+                          <td className="border-b px-2 py-3 sm:px-4 sm:py-4 lg:px-5">
+                            <div className="flex flex-nowrap items-center justify-start gap-2 overflow-x-auto">
                               {!isEditing ? (
                                 <>
                                   <button
                                     type="button"
-                                    className={`${unifiedIconButtonClass} hover:bg-muted`}
+                                    className={`${fixedIconButtonClass} hover:bg-muted`}
                                     title="تعديل"
                                     onClick={() => startEditRow(c)}
                                   >
@@ -701,7 +717,7 @@ export default function CampsPage() {
 
                                   <button
                                     type="button"
-                                    className={`${unifiedIconButtonClass} hover:bg-muted`}
+                                    className={`${fixedIconButtonClass} hover:bg-muted`}
                                     title="حذف"
                                     onClick={() => onDeleteOne(c.id)}
                                   >
@@ -711,7 +727,7 @@ export default function CampsPage() {
                               ) : (
                                 <>
                                   <Button
-                                    className={unifiedSmallButtonClass}
+                                    className={tableBtnClass}
                                     onClick={() => saveEditRow(c.id)}
                                     disabled={
                                       !editDraft.nameAr.trim() ||
@@ -720,16 +736,16 @@ export default function CampsPage() {
                                       editDraft.capacity <= 0
                                     }
                                   >
-                                    <Save className="ms-2 size-4" />
+                                    <Save className="ms-1 size-4" />
                                     حفظ
                                   </Button>
 
                                   <Button
                                     variant="outline"
-                                    className={unifiedSmallButtonClass}
+                                    className={tableBtnClass}
                                     onClick={cancelEditRow}
                                   >
-                                    <X className="ms-2 size-4" />
+                                    <X className="ms-1 size-4" />
                                     إلغاء
                                   </Button>
                                 </>
@@ -752,13 +768,13 @@ export default function CampsPage() {
               </div>
 
               <div className="flex flex-col gap-3 border-t p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground sm:text-sm">
                   <span>عدد الصفوف</span>
 
                   <select
                     value={pageSize}
                     onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="h-9 rounded-md border bg-background px-2 text-sm"
+                    className="h-8 sm:h-9 rounded-md border bg-background px-2 text-xs sm:text-sm"
                   >
                     <option value={5}>5</option>
                     <option value={10}>10</option>
@@ -767,7 +783,7 @@ export default function CampsPage() {
                 </div>
 
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <div className="text-xs text-muted-foreground sm:text-sm">
+                  <div className="text-[11px] text-muted-foreground sm:text-sm">
                     {rangeStart} - {rangeEnd} من {filtered.length}
                   </div>
 
@@ -776,7 +792,7 @@ export default function CampsPage() {
                       variant="outline"
                       disabled={safePage <= 1}
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      className={unifiedSmallButtonClass}
+                      className={tableBtnClass}
                     >
                       السابق
                     </Button>
@@ -785,7 +801,7 @@ export default function CampsPage() {
                       variant="outline"
                       disabled={safePage >= totalPages}
                       onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      className={unifiedSmallButtonClass}
+                      className={tableBtnClass}
                     >
                       التالي
                     </Button>
@@ -805,7 +821,10 @@ export default function CampsPage() {
             }
           }}
         >
-          <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[560px]" dir="rtl">
+          <DialogContent
+            className="w-[95vw] max-w-[95vw] rounded-xl sm:max-w-[560px]"
+            dir="rtl"
+          >
             <DialogHeader className="text-right">
               <DialogTitle>إضافة مخيم</DialogTitle>
               <DialogDescription>إدخال بيانات المخيم</DialogDescription>
@@ -821,7 +840,7 @@ export default function CampsPage() {
                     if (addFormError) setAddFormError('')
                   }}
                   placeholder="مثال: مخيم الشمال A"
-                  className="text-right"
+                  className="h-10 text-right sm:h-11"
                 />
               </div>
 
@@ -834,7 +853,7 @@ export default function CampsPage() {
                     if (addFormError) setAddFormError('')
                   }}
                   placeholder="مثال: شمال غزة"
-                  className="text-right"
+                  className="h-10 text-right sm:h-11"
                 />
               </div>
 
@@ -850,7 +869,7 @@ export default function CampsPage() {
                     if (addFormError) setAddFormError('')
                   }}
                   placeholder="مثال: 1500"
-                  className="text-right"
+                  className="h-10 text-right sm:h-11"
                 />
               </div>
 
@@ -862,7 +881,7 @@ export default function CampsPage() {
                     setFillStatus(e.target.value as FillStatus)
                     if (addFormError) setAddFormError('')
                   }}
-                  className={`h-10 rounded-md border bg-background px-3 text-right ${
+                  className={`h-10 rounded-md border bg-background px-3 text-right sm:h-11 ${
                     addFormError ? 'border-red-500' : ''
                   }`}
                 >
@@ -883,7 +902,7 @@ export default function CampsPage() {
                   setAddOpen(false)
                   setAddFormError('')
                 }}
-                className={`w-full sm:w-auto ${unifiedButtonClass}`}
+                className={`w-full sm:w-auto ${fixedButtonClass}`}
               >
                 إغلاق
               </Button>
@@ -891,7 +910,7 @@ export default function CampsPage() {
               <Button
                 onClick={onAdd}
                 disabled={submitting || !isAddFormValid}
-                className={`w-full sm:w-auto ${unifiedButtonClass}`}
+                className={`w-full sm:w-auto ${fixedButtonClass}`}
               >
                 {submitting ? 'جارٍ الإضافة...' : 'إضافة'}
               </Button>

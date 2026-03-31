@@ -20,7 +20,7 @@ export const MENU_SIDEBAR: MenuConfig = [
         children: [
           { title: 'Camps Sidebar', path: '/project/projects/camps' },
           { title: 'beneficiaries Sidebar', path: '/project/projects/beneficiaries' },
-          { title: ' Clinics Sidebar', path: '/project/projects/clinics' },
+          { title: ' Clinic Sidebar', path: '/project/projects/clinic' },
           { title: ' shelters Sidebar', path: '/project/projects/shelters' },
           { title: ' supervisior Sidebar', path: '/project/projects/supervisior' },
           { title: 'institutions Sidebar', path: '/project/projects/institutions' },

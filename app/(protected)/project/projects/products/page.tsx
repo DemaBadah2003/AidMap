@@ -17,48 +17,35 @@ import {
 
 import { Pencil, Trash2, Save, X, Plus, Search } from 'lucide-react'
 
-type ProductStatus = 'Active' | 'Inactive'
+type ProductStatus = 'نشط' | 'غير نشط'
 
 type Product = {
   id: string
   nameAr: string
   categoryAr: string
-  unitAr: string // كرتون/قطعة/كيلو...
+  unitAr: string
   quantity: number
   price: number
   status: ProductStatus
 }
 
-// Seed
-const productsSeed: Product[] = [
-  {
-    id: 'pr_01',
-    nameAr: 'طحين',
-    categoryAr: 'مواد غذائية',
-    unitAr: 'كرتون',
-    quantity: 120,
-    price: 35,
-    status: 'Active',
-  },
-  {
-    id: 'pr_02',
-    nameAr: 'معلبات',
-    categoryAr: 'مواد غذائية',
-    unitAr: 'كرتون',
-    quantity: 80,
-    price: 50,
-    status: 'Active',
-  },
-  {
-    id: 'pr_03',
-    nameAr: 'بطانية',
-    categoryAr: 'مواد إغاثية',
-    unitAr: 'قطعة',
-    quantity: 200,
-    price: 20,
-    status: 'Inactive',
-  },
-]
+type ApiProduct = {
+  id: string
+  nameAr: string
+  quantity: number
+  status: ProductStatus
+}
+
+// تحويل بيانات الـ API إلى شكل الجدول الحالي
+const mapApiProductToUi = (product: ApiProduct): Product => ({
+  id: product.id,
+  nameAr: product.nameAr,
+  categoryAr: '',
+  unitAr: '',
+  quantity: product.quantity,
+  price: 0,
+  status: product.status,
+})
 
 // ✅ أرقام فقط
 const toIntOnly = (value: string) => {
@@ -69,7 +56,6 @@ const toIntOnly = (value: string) => {
 // ✅ رقم عشري (سعر)
 const toDecimalOnly = (value: string) => {
   const cleaned = value.replace(/[^\d.]/g, '')
-  // منع أكثر من نقطة
   const parts = cleaned.split('.')
   const safe = parts.length <= 2 ? cleaned : `${parts[0]}.${parts.slice(1).join('')}`
   const n = Number(safe)
@@ -78,7 +64,10 @@ const toDecimalOnly = (value: string) => {
 
 export default function ProductsPage() {
   const [q, setQ] = useState('')
-  const [items, setItems] = useState<Product[]>(productsSeed)
+  const [items, setItems] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   // Filter: status من فوق
   const [statusFilter, setStatusFilter] = useState<'all' | ProductStatus>('all')
@@ -94,7 +83,7 @@ export default function ProductsPage() {
   const [unitAr, setUnitAr] = useState('')
   const [quantity, setQuantity] = useState<number>(0)
   const [price, setPrice] = useState<number>(0)
-  const [status, setStatus] = useState<ProductStatus>('Active')
+  const [status, setStatus] = useState<ProductStatus>('نشط')
 
   // Inline Edit
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -111,8 +100,36 @@ export default function ProductsPage() {
     unitAr: '',
     quantity: 0,
     price: 0,
-    status: 'Active',
+    status: 'نشط',
   })
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true)
+      setErrorMessage('')
+
+      const res = await fetch('/api/project/projects/products', {
+        method: 'GET',
+        cache: 'no-store',
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data?.message || 'تعذر جلب المنتجات')
+      }
+
+      setItems((data as ApiProduct[]).map(mapApiProductToUi))
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء جلب المنتجات')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchProducts()
+  }, [])
 
   // ✅ فلترة Search + Status
   const filtered = useMemo(() => {
@@ -133,7 +150,6 @@ export default function ProductsPage() {
     })
   }, [q, items, statusFilter])
 
-  // ✅ reset page عند تغيير البحث/الفلتر/حجم الصفحة
   useEffect(() => {
     setPage(1)
   }, [q, statusFilter, pageSize])
@@ -146,38 +162,103 @@ export default function ProductsPage() {
     return filtered.slice(start, start + pageSize)
   }, [filtered, safePage, pageSize])
 
-  const onAdd = () => {
+  const onAdd = async () => {
     const n = nameAr.trim()
-    const c = categoryAr.trim()
-    const u = unitAr.trim()
 
-    if (!n || !c || !u) return
+    if (!n) return
     if (!Number.isInteger(quantity) || quantity < 0) return
-    if (!Number.isFinite(price) || price < 0) return
 
-    const newItem: Product = {
-      id: `pr_${Math.random().toString(16).slice(2, 8)}`,
-      nameAr: n,
-      categoryAr: c,
-      unitAr: u,
-      quantity,
-      price,
-      status,
+    try {
+      setSubmitting(true)
+      setErrorMessage('')
+
+      const res = await fetch('/api/project/projects/products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nameAr: n,
+          quantity,
+          status,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data?.message || 'تعذر إنشاء المنتج')
+      }
+
+      const created = mapApiProductToUi(data as ApiProduct)
+
+      // نحافظ على القيم المحلية غير المخزنة في DB داخل الجدول فقط
+      created.categoryAr = categoryAr.trim()
+      created.unitAr = unitAr.trim()
+      created.price = price
+
+      setItems((prev) => [created, ...prev])
+
+      setNameAr('')
+      setCategoryAr('')
+      setUnitAr('')
+      setQuantity(0)
+      setPrice(0)
+      setStatus('نشط')
+      setAddOpen(false)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء إضافة المنتج')
+    } finally {
+      setSubmitting(false)
     }
-
-    setItems((prev) => [newItem, ...prev])
-    setNameAr('')
-    setCategoryAr('')
-    setUnitAr('')
-    setQuantity(0)
-    setPrice(0)
-    setStatus('Active')
-    setAddOpen(false)
   }
 
-  const onDeleteOne = (id: string) => {
-    if (editingId === id) setEditingId(null)
-    setItems((prev) => prev.filter((x) => x.id !== id))
+  const onDeleteOne = async (id: string) => {
+    try {
+      setSubmitting(true)
+      setErrorMessage('')
+
+      const res = await fetch(`/api/project/projects/products?id=${id}`, {
+        method: 'DELETE',
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data?.message || 'تعذر حذف المنتج')
+      }
+
+      if (editingId === id) setEditingId(null)
+      setItems((prev) => prev.filter((x) => x.id !== id))
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء حذف المنتج')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const onDeleteAll = async () => {
+    try {
+      setSubmitting(true)
+      setErrorMessage('')
+
+      const res = await fetch('/api/project/projects/products?all=true', {
+        method: 'DELETE',
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data?.message || 'تعذر حذف جميع المنتجات')
+      }
+
+      setItems([])
+      setEditingId(null)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء حذف جميع المنتجات')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const startEditRow = (p: Product) => {
@@ -194,105 +275,158 @@ export default function ProductsPage() {
 
   const cancelEditRow = () => setEditingId(null)
 
-  const saveEditRow = (id: string) => {
+  const saveEditRow = async (id: string) => {
     const n = editDraft.nameAr.trim()
-    const c = editDraft.categoryAr.trim()
-    const u = editDraft.unitAr.trim()
 
-    if (!n || !c || !u) return
+    if (!n) return
     if (!Number.isInteger(editDraft.quantity) || editDraft.quantity < 0) return
-    if (!Number.isFinite(editDraft.price) || editDraft.price < 0) return
 
-    setItems((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              nameAr: n,
-              categoryAr: c,
-              unitAr: u,
-              quantity: editDraft.quantity,
-              price: editDraft.price,
-              status: editDraft.status,
-            }
-          : p
+    try {
+      setSubmitting(true)
+      setErrorMessage('')
+
+      const res = await fetch(`/api/project/projects/products?id=${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nameAr: n,
+          quantity: editDraft.quantity,
+          status: editDraft.status,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data?.message || 'تعذر تعديل المنتج')
+      }
+
+      setItems((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                nameAr: n,
+                categoryAr: editDraft.categoryAr,
+                unitAr: editDraft.unitAr,
+                quantity: editDraft.quantity,
+                price: editDraft.price,
+                status: editDraft.status,
+              }
+            : p
+        )
       )
-    )
 
-    setEditingId(null)
+      setEditingId(null)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء تعديل المنتج')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  // Pagination label
+  const updateStatusDirectly = async (id: string, nextStatus: ProductStatus) => {
+    try {
+      setSubmitting(true)
+      setErrorMessage('')
+
+      const res = await fetch(`/api/project/projects/products?id=${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: nextStatus,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data?.message || 'تعذر تحديث حالة المنتج')
+      }
+
+      setItems((prev) => prev.map((x) => (x.id === id ? { ...x, status: nextStatus } : x)))
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء تحديث الحالة')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const rangeStart = filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1
   const rangeEnd = Math.min(safePage * pageSize, filtered.length)
 
   return (
     <div className="w-full px-3 sm:px-6 py-6" dir="rtl">
       {/* Header */}
-      <div className="mb-6" dir="ltr">
-        <div className="text-left">
-          <div className="text-2xl font-semibold text-foreground">Products</div>
+      <div className="mb-6" dir="rtl">
+        <div className="text-right">
+          <div className="text-2xl font-semibold text-foreground">المنتجات</div>
 
           <div className="mt-1 text-sm text-muted-foreground">
-            Home <span className="mx-1">{'>'}</span>{' '}
-            <span className="text-foreground">Products Management</span>
+            الرئيسية <span className="mx-1">{'>'}</span>{' '}
+            <span className="text-foreground">إدارة المنتجات</span>
           </div>
         </div>
       </div>
 
       <div className="w-full max-w-[1200px]">
         <Card>
-          <CardContent className="p-0" dir="ltr">
+          <CardContent className="p-0" dir="rtl">
             {/* Toolbar */}
             <div className="p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                {/* Left */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  {/* Search */}
                   <div className="relative w-full sm:w-[260px]">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Input
                       value={q}
                       onChange={(e: ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
-                      placeholder="Search products"
+                      placeholder="ابحث عن المنتجات"
                       className="!h-10 !rounded-lg border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:!ring-2 focus:!ring-slate-200"
                     />
                   </div>
 
-                  {/* Status filter */}
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value as 'all' | ProductStatus)}
                     className="h-10 w-full sm:w-[160px] rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
                   >
-                    <option value="all">All status</option>
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
+                    <option value="all">كل الحالات</option>
+                    <option value="نشط">نشط</option>
+                    <option value="غير نشط">غير نشط</option>
                   </select>
                 </div>
 
-                {/* Right */}
                 <div className="flex items-center gap-2 justify-end">
                   <Button
                     className="!h-10 !rounded-lg !bg-blue-600 !px-4 !text-sm !font-semibold !text-white hover:!bg-blue-700 inline-flex items-center gap-2"
                     onClick={() => setAddOpen(true)}
+                    disabled={submitting}
                   >
                     <Plus className="h-4 w-4" />
-                    Add product
+                    إضافة منتج
                   </Button>
 
                   <Button
                     variant="outline"
                     className="!h-10 !rounded-lg !px-4 !text-sm !font-semibold border-slate-200 text-slate-700 hover:bg-slate-50"
-                    onClick={() => {
-                      setItems([])
-                      setEditingId(null)
-                    }}
+                    onClick={onDeleteAll}
+                    disabled={submitting || items.length === 0}
                   >
-                    Delete all
+                    حذف الكل
                   </Button>
                 </div>
               </div>
+
+              {errorMessage && (
+                <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {errorMessage}
+                </div>
+              )}
             </div>
 
             <div className="border-t" />
@@ -307,161 +441,170 @@ export default function ProductsPage() {
                       boxShadow: '0 1px 0 rgba(0,0,0,0.06)',
                     }}
                   >
-                    <tr className="text-left text-foreground/60">
-                      <th className="px-4 py-3 border-b border-r font-normal">Product Name</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Category</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Unit</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Quantity</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Price</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Status</th>
-                      <th className="px-4 py-3 border-b font-normal">Actions</th>
+                    <tr className="text-right text-foreground/60">
+                      <th className="px-4 py-3 border-b border-r font-normal">اسم المنتج</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">الفئة</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">الوحدة</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">الكمية</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">السعر</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">الحالة</th>
+                      <th className="px-4 py-3 border-b font-normal">الإجراءات</th>
                     </tr>
                   </thead>
 
                   <tbody>
-                    {pageItems.map((p) => {
-                      const isEditing = editingId === p.id
-
-                      return (
-                        <tr key={p.id} className="hover:bg-muted/30">
-                          <td className="px-4 py-3 border-b border-r font-medium">
-                            {isEditing ? (
-                              <Input
-                                value={editDraft.nameAr}
-                                onChange={(e) => setEditDraft((d) => ({ ...d, nameAr: e.target.value }))}
-                                className="h-10"
-                              />
-                            ) : (
-                              p.nameAr
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3 border-b border-r">
-                            {isEditing ? (
-                              <Input
-                                value={editDraft.categoryAr}
-                                onChange={(e) => setEditDraft((d) => ({ ...d, categoryAr: e.target.value }))}
-                                className="h-10"
-                              />
-                            ) : (
-                              p.categoryAr
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3 border-b border-r">
-                            {isEditing ? (
-                              <Input
-                                value={editDraft.unitAr}
-                                onChange={(e) => setEditDraft((d) => ({ ...d, unitAr: e.target.value }))}
-                                className="h-10"
-                              />
-                            ) : (
-                              p.unitAr
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3 border-b border-r">
-                            {isEditing ? (
-                              <Input
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                type="text"
-                                value={Number.isInteger(editDraft.quantity) ? String(editDraft.quantity) : ''}
-                                onChange={(e) => setEditDraft((d) => ({ ...d, quantity: toIntOnly(e.target.value) }))}
-                                className="h-10"
-                              />
-                            ) : (
-                              p.quantity
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3 border-b border-r">
-                            {isEditing ? (
-                              <Input
-                                inputMode="decimal"
-                                type="text"
-                                value={String(editDraft.price ?? '')}
-                                onChange={(e) => setEditDraft((d) => ({ ...d, price: toDecimalOnly(e.target.value) }))}
-                                className="h-10"
-                              />
-                            ) : (
-                              p.price
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3 border-b border-r">
-                            {isEditing ? (
-                              <select
-                                value={editDraft.status}
-                                onChange={(e) => setEditDraft((d) => ({ ...d, status: e.target.value as ProductStatus }))}
-                                className="h-10 rounded-md border px-3 bg-background"
-                              >
-                                <option value="Active">Active</option>
-                                <option value="Inactive">Inactive</option>
-                              </select>
-                            ) : (
-                              <select
-                                value={p.status}
-                                onChange={(e) =>
-                                  setItems((prev) =>
-                                    prev.map((x) => (x.id === p.id ? { ...x, status: e.target.value as ProductStatus } : x))
-                                  )
-                                }
-                                className="h-10 rounded-md border px-3 bg-background"
-                              >
-                                <option value="Active">Active</option>
-                                <option value="Inactive">Inactive</option>
-                              </select>
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3 border-b">
-                            <div className="flex items-center gap-2">
-                              {!isEditing ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    className="inline-flex items-center justify-center rounded-md border h-10 w-10 hover:bg-muted"
-                                    title="Edit"
-                                    onClick={() => startEditRow(p)}
-                                  >
-                                    <Pencil className="size-4" />
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    className="inline-flex items-center justify-center rounded-md border h-10 w-10 hover:bg-muted"
-                                    title="Delete"
-                                    onClick={() => onDeleteOne(p.id)}
-                                  >
-                                    <Trash2 className="size-4" />
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <Button size="sm" className="h-10" onClick={() => saveEditRow(p.id)}>
-                                    <Save className="size-4 me-2" />
-                                    Save
-                                  </Button>
-
-                                  <Button size="sm" variant="outline" className="h-10" onClick={cancelEditRow}>
-                                    <X className="size-4 me-2" />
-                                    Cancel
-                                  </Button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-
-                    {!pageItems.length && (
+                    {loading ? (
                       <tr>
                         <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
-                          No products found
+                          جاري تحميل المنتجات...
                         </td>
                       </tr>
+                    ) : (
+                      <>
+                        {pageItems.map((p) => {
+                          const isEditing = editingId === p.id
+
+                          return (
+                            <tr key={p.id} className="hover:bg-muted/30">
+                              <td className="px-4 py-3 border-b border-r font-medium">
+                                {isEditing ? (
+                                  <Input
+                                    value={editDraft.nameAr}
+                                    onChange={(e) => setEditDraft((d) => ({ ...d, nameAr: e.target.value }))}
+                                    className="h-10"
+                                  />
+                                ) : (
+                                  p.nameAr
+                                )}
+                              </td>
+
+                              <td className="px-4 py-3 border-b border-r">
+                                {isEditing ? (
+                                  <Input
+                                    value={editDraft.categoryAr}
+                                    onChange={(e) => setEditDraft((d) => ({ ...d, categoryAr: e.target.value }))}
+                                    className="h-10"
+                                  />
+                                ) : (
+                                  p.categoryAr || '-'
+                                )}
+                              </td>
+
+                              <td className="px-4 py-3 border-b border-r">
+                                {isEditing ? (
+                                  <Input
+                                    value={editDraft.unitAr}
+                                    onChange={(e) => setEditDraft((d) => ({ ...d, unitAr: e.target.value }))}
+                                    className="h-10"
+                                  />
+                                ) : (
+                                  p.unitAr || '-'
+                                )}
+                              </td>
+
+                              <td className="px-4 py-3 border-b border-r">
+                                {isEditing ? (
+                                  <Input
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    type="text"
+                                    value={Number.isInteger(editDraft.quantity) ? String(editDraft.quantity) : ''}
+                                    onChange={(e) => setEditDraft((d) => ({ ...d, quantity: toIntOnly(e.target.value) }))}
+                                    className="h-10"
+                                  />
+                                ) : (
+                                  p.quantity
+                                )}
+                              </td>
+
+                              <td className="px-4 py-3 border-b border-r">
+                                {isEditing ? (
+                                  <Input
+                                    inputMode="decimal"
+                                    type="text"
+                                    value={String(editDraft.price ?? '')}
+                                    onChange={(e) => setEditDraft((d) => ({ ...d, price: toDecimalOnly(e.target.value) }))}
+                                    className="h-10"
+                                  />
+                                ) : (
+                                  p.price || 0
+                                )}
+                              </td>
+
+                              <td className="px-4 py-3 border-b border-r">
+                                {isEditing ? (
+                                  <select
+                                    value={editDraft.status}
+                                    onChange={(e) => setEditDraft((d) => ({ ...d, status: e.target.value as ProductStatus }))}
+                                    className="h-10 rounded-md border px-3 bg-background"
+                                  >
+                                    <option value="نشط">نشط</option>
+                                    <option value="غير نشط">غير نشط</option>
+                                  </select>
+                                ) : (
+                                  <select
+                                    value={p.status}
+                                    onChange={(e) => updateStatusDirectly(p.id, e.target.value as ProductStatus)}
+                                    className="h-10 rounded-md border px-3 bg-background"
+                                    disabled={submitting}
+                                  >
+                                    <option value="نشط">نشط</option>
+                                    <option value="غير نشط">غير نشط</option>
+                                  </select>
+                                )}
+                              </td>
+
+                              <td className="px-4 py-3 border-b">
+                                <div className="flex items-center gap-2">
+                                  {!isEditing ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="inline-flex items-center justify-center rounded-md border h-10 w-10 hover:bg-muted disabled:opacity-50"
+                                        title="تعديل"
+                                        onClick={() => startEditRow(p)}
+                                        disabled={submitting}
+                                      >
+                                        <Pencil className="size-4" />
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        className="inline-flex items-center justify-center rounded-md border h-10 w-10 hover:bg-muted disabled:opacity-50"
+                                        title="حذف"
+                                        onClick={() => onDeleteOne(p.id)}
+                                        disabled={submitting}
+                                      >
+                                        <Trash2 className="size-4" />
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Button size="sm" className="h-10" onClick={() => saveEditRow(p.id)} disabled={submitting}>
+                                        <Save className="size-4 me-2" />
+                                        حفظ
+                                      </Button>
+
+                                      <Button size="sm" variant="outline" className="h-10" onClick={cancelEditRow} disabled={submitting}>
+                                        <X className="size-4 me-2" />
+                                        إلغاء
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+
+                        {!pageItems.length && (
+                          <tr>
+                            <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                              لا توجد منتجات
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     )}
                   </tbody>
                 </table>
@@ -470,7 +613,7 @@ export default function ProductsPage() {
               {/* Pagination */}
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 border-t">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>Rows per page</span>
+                  <span>عدد الصفوف لكل صفحة</span>
                   <select
                     value={pageSize}
                     onChange={(e) => setPageSize(Number(e.target.value))}
@@ -484,11 +627,11 @@ export default function ProductsPage() {
 
                 <div className="flex items-center gap-2">
                   <div className="text-sm text-muted-foreground">
-                    {rangeStart} - {rangeEnd} of {filtered.length}
+                    {rangeStart} - {rangeEnd} من {filtered.length}
                   </div>
 
                   <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                    Previous
+                    السابق
                   </Button>
 
                   <Button
@@ -497,7 +640,7 @@ export default function ProductsPage() {
                     disabled={safePage >= totalPages}
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   >
-                    Next
+                    التالي
                   </Button>
                 </div>
               </div>
@@ -559,27 +702,19 @@ export default function ProductsPage() {
                   onChange={(e) => setStatus(e.target.value as ProductStatus)}
                   className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
                 >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
+                  <option value="نشط">نشط</option>
+                  <option value="غير نشط">غير نشط</option>
                 </select>
               </div>
             </div>
 
             <DialogFooter dir="rtl" className="gap-2">
-              <Button variant="outline" onClick={() => setAddOpen(false)}>
+              <Button variant="outline" onClick={() => setAddOpen(false)} disabled={submitting}>
                 إغلاق
               </Button>
               <Button
                 onClick={onAdd}
-                disabled={
-                  !nameAr.trim() ||
-                  !categoryAr.trim() ||
-                  !unitAr.trim() ||
-                  !Number.isInteger(quantity) ||
-                  quantity < 0 ||
-                  !Number.isFinite(price) ||
-                  price < 0
-                }
+                disabled={!nameAr.trim() || !Number.isInteger(quantity) || quantity < 0 || submitting}
               >
                 إضافة
               </Button>

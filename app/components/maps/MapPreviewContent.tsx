@@ -108,6 +108,12 @@ const DEFAULT_OSM_CATEGORIES = {
   food: true,
 } as const
 
+declare global {
+  interface Window {
+    __maplibreRTLInitialized?: boolean
+  }
+}
+
 class IconButtonControl implements maplibregl.IControl {
   private _map?: maplibregl.Map
   private _container?: HTMLDivElement
@@ -206,7 +212,6 @@ export default function MapPreview({
   const osmHandlersRef = useRef<HandlerItem[]>([])
   const adminHandlersRef = useRef<HandlerItem[]>([])
 
-  const rtlReadyRef = useRef(false)
   const layersControlRef = useRef<IconButtonControl | null>(null)
   const queryControlRef = useRef<IconButtonControl | null>(null)
   const lastRouteKeyRef = useRef('')
@@ -320,7 +325,7 @@ export default function MapPreview({
   const defaultStatusByKind = (kind?: string) => {
     switch (kind) {
       case 'school':
-      case 'unrwa_school':
+      case'unrwa_school':
         return 'مركز إيواء'
       case 'medical':
         return 'خدمة طبية'
@@ -820,15 +825,15 @@ export default function MapPreview({
     if (!el) return
     if (mapRef.current) return
 
-    if (typeof window !== 'undefined' && !rtlReadyRef.current) {
-      rtlReadyRef.current = true
-      const anyMap: any = maplibregl as any
+    if (typeof window !== 'undefined' && !window.__maplibreRTLInitialized) {
+      const anyMap: any = maplibregl
       if (typeof anyMap.setRTLTextPlugin === 'function') {
         anyMap.setRTLTextPlugin(
           'https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.2.3/mapbox-gl-rtl-text.js',
           () => {},
           true
         )
+        window.__maplibreRTLInitialized = true
       }
     }
 
@@ -2378,7 +2383,6 @@ out center tags;
             boxShadow: '0 10px 24px rgba(0,0,0,.14)',
           }}
         >
-       
           <div style={{ display: 'grid', gap: 4 }}>
             <span style={{ fontSize: 13, color: '#111827', fontWeight: 600 }}>
               اختر العناصر التي تريد عرضها
@@ -2394,7 +2398,6 @@ out center tags;
                 fontSize: 13,
                 background: '#fff',
               }}
-              
             >
               <option value="all">إظهار الكل</option>
               <option value="shelters">مراكز الإيواء فقط</option>
