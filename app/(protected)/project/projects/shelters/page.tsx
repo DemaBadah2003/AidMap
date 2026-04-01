@@ -1,11 +1,11 @@
 'use client'
 
-import {useEffect, useMemo, useState, type ChangeEvent} from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
+import { z } from 'zod'
 
-import {Card, CardContent} from '../../../../../components/ui/card'
-import {Button} from '../../../../../components/ui/button'
-import {Input} from '../../../../../components/ui/input'
-
+import { Card, CardContent } from '../../../../../components/ui/card'
+import { Button } from '../../../../../components/ui/button'
+import { Input } from '../../../../../components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,9 @@ import {
   DialogFooter,
 } from '../../../../../components/ui/dialog'
 
-import {Pencil, Trash2, Save, X, Plus, Search} from 'lucide-react'
+import { Pencil, Trash2, Save, X, Plus, Search } from 'lucide-react'
+
+type FillStatus = 'ممتلئ' | 'غير ممتلئ'
 
 type Shelter = {
   id: string
@@ -28,17 +30,46 @@ type Shelter = {
   fillStatus?: FillStatus
 }
 
-type FillStatus = 'ممتلئ' | 'غير ممتلئ'
-
-type ApiErrorResponse = {
-  message?: string
-  fieldErrors?: Partial<
-    Record<
-      'nameAr' | 'areaAr' | 'supervisorAr' | 'phone' | 'capacity' | 'familiesCount' | 'fillStatus' | 'placeId',
-      string
-    >
-  >
+type ShelterApiItem = {
+  id: string
+  nameAr: string
+  areaAr: string
+  supervisorAr: string
+  phone: string
+  familiesCount: number
+  capacity: number
+  fillStatus?: FillStatus
 }
+
+const BASE_URL = '/api/project/projects/shelter'
+
+const createShelterSchema = z.object({
+  nameAr: z.string().trim().min(1, 'اسم المركز مطلوب'),
+  areaAr: z.string().trim().min(1, 'المنطقة مطلوبة'),
+  supervisorAr: z.string().trim().min(1, 'اسم المشرف مطلوب'),
+  phone: z
+    .string()
+    .trim()
+    .min(1, 'رقم الهاتف مطلوب')
+    .regex(/^(056|059)\d{7}$/, 'رقم الهاتف يجب أن يبدأ بـ 056 أو 059 وبعده 7 أرقام'),
+  capacity: z.coerce.number().int().positive('يجب أن تكون السعة أكبر من 0'),
+  fillStatus: z.enum(['ممتلئ', 'غير ممتلئ']).optional(),
+})
+
+const updateShelterSchema = z
+  .object({
+    nameAr: z.string().trim().min(1, 'اسم المركز مطلوب').optional(),
+    areaAr: z.string().trim().min(1, 'المنطقة مطلوبة').optional(),
+    supervisorAr: z.string().trim().min(1, 'اسم المشرف مطلوب').optional(),
+    phone: z
+      .string()
+      .trim()
+      .regex(/^(056|059)\d{7}$/, 'رقم الهاتف يجب أن يبدأ بـ 056 أو 059 وبعده 7 أرقام')
+      .optional(),
+    capacity: z.coerce.number().int().positive('يجب أن تكون السعة أكبر من 0').optional(),
+    fillStatus: z.enum(['ممتلئ', 'غير ممتلئ']).optional(),
+  })
+  .strict()
 
 const defaultFillStatus = (families: number, capacity: number): FillStatus =>
   families >= capacity ? 'ممتلئ' : 'غير ممتلئ'
@@ -48,14 +79,200 @@ const toIntOnly = (value: string) => {
   return digits ? Number(digits) : 0
 }
 
-const hasEdgeSpaces = (value: string) => value !== value.trim()
-const normalizeSpaces = (value: string) => value.trim().replace(/\s+/g, ' ')
 const toPhoneDigitsOnly = (value: string) => value.replace(/\D/g, '').slice(0, 10)
-const isValidPhone = (value: string) => /^(056|059)\d{7}$/.test(value)
+
+const normalizeText = (value: string) =>
+  value
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+
+function getErrorMessage(err: unknown) {
+  if (err instanceof z.ZodError) {
+    return err.issues[0]?.message ?? 'البيانات المدخلة غير صحيحة'
+  }
+
+  return err instanceof Error ? err.message : 'حدث خطأ غير متوقع'
+}
+
+async function requestJSON<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options?.headers ?? {}),
+    },
+    cache: 'no-store',
+  })
+
+  const text = await res.text()
+  let data: any = null
+
+  try {
+    data = text ? JSON.parse(text) : null
+  } catch {
+    data = text || null
+  }
+
+  if (!res.ok) {
+    const msg = data?.message ?? `فشل الطلب: ${res.status}`
+    throw new Error(msg)
+  }
+
+  return data as T
+}
+
+async function readShelters(): Promise<ShelterApiItem[]> {
+  return requestJSON<ShelterApiItem[]>(BASE_URL)
+}
+
+function findDuplicateShelter(
+  shelters: ShelterApiItem[],
+  input: { nameAr: string; areaAr: string; supervisorAr: string; phone: string },
+  excludeId?: string
+) {
+  const normalizedName = normalizeText(input.nameAr)
+  const normalizedArea = normalizeText(input.areaAr)
+  const normalizedSupervisor = normalizeText(input.supervisorAr)
+  const normalizedPhone = input.phone.trim()
+
+  const duplicate = shelters.find(
+    (s) =>
+      s.id !== excludeId &&
+      normalizeText(s.nameAr ?? '') === normalizedName &&
+      normalizeText(s.areaAr ?? '') === normalizedArea &&
+      normalizeText(s.supervisorAr ?? '') === normalizedSupervisor &&
+      (s.phone ?? '').trim() === normalizedPhone
+  )
+
+  if (duplicate) {
+    return 'بيانات مركز الإيواء مكررة بالفعل.'
+  }
+
+  return ''
+}
+
+async function assertShelterBusinessValidation(
+  input: {
+    nameAr: string
+    areaAr: string
+    supervisorAr: string
+    phone: string
+    capacity: number
+    fillStatus?: FillStatus
+  },
+  excludeId?: string
+) {
+  const normalizedName = normalizeText(input.nameAr)
+  const normalizedArea = normalizeText(input.areaAr)
+  const normalizedSupervisor = normalizeText(input.supervisorAr)
+  const phone = input.phone.trim()
+
+  if (!normalizedName) {
+    throw new Error('اسم المركز مطلوب')
+  }
+
+  if (!normalizedArea) {
+    throw new Error('المنطقة مطلوبة')
+  }
+
+  if (!normalizedSupervisor) {
+    throw new Error('اسم المشرف مطلوب')
+  }
+
+  if (!/^(056|059)\d{7}$/.test(phone)) {
+    throw new Error('رقم الهاتف يجب أن يبدأ بـ 056 أو 059 وبعده 7 أرقام')
+  }
+
+  if (!Number.isInteger(input.capacity) || input.capacity <= 0) {
+    throw new Error('يجب أن تكون السعة أكبر من 0')
+  }
+
+  const current = await readShelters()
+  const duplicateMessage = findDuplicateShelter(current, input, excludeId)
+
+  if (duplicateMessage) {
+    throw new Error(duplicateMessage)
+  }
+}
+
+async function createShelter(input: unknown): Promise<ShelterApiItem> {
+  const body = createShelterSchema.parse(input)
+
+  await assertShelterBusinessValidation({
+    nameAr: body.nameAr,
+    areaAr: body.areaAr,
+    supervisorAr: body.supervisorAr,
+    phone: body.phone,
+    capacity: body.capacity,
+    fillStatus: body.fillStatus,
+  })
+
+  return requestJSON<ShelterApiItem>(BASE_URL, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+async function updateShelter(id: string, input: unknown): Promise<ShelterApiItem> {
+  if (!id) throw new Error('معرّف مركز الإيواء مفقود')
+
+  const body = updateShelterSchema.parse(input)
+
+  const current = await readShelters()
+  const existing = current.find((s) => s.id === id)
+
+  if (!existing) {
+    throw new Error('مركز الإيواء غير موجود')
+  }
+
+  const merged = {
+    nameAr: body.nameAr ?? existing.nameAr ?? '',
+    areaAr: body.areaAr ?? existing.areaAr ?? '',
+    supervisorAr: body.supervisorAr ?? existing.supervisorAr ?? '',
+    phone: body.phone ?? existing.phone ?? '',
+    capacity: body.capacity ?? existing.capacity,
+    fillStatus:
+      body.fillStatus ??
+      existing.fillStatus ??
+      defaultFillStatus(existing.familiesCount, existing.capacity),
+  }
+
+  await assertShelterBusinessValidation(merged, id)
+
+  return requestJSON<ShelterApiItem>(`${BASE_URL}?id=${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+}
+
+async function deleteShelter(id: string): Promise<void> {
+  if (!id) throw new Error('معرّف مركز الإيواء مفقود')
+
+  await requestJSON(`${BASE_URL}?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
+}
+
+async function deleteAllShelters(): Promise<void> {
+  await requestJSON(`${BASE_URL}?all=true`, {
+    method: 'DELETE',
+  })
+}
+
+const sheltersApi = {
+  list: readShelters,
+  create: createShelter,
+  update: updateShelter,
+  remove: deleteShelter,
+  removeAll: deleteAllShelters,
+}
 
 export default function SheltersPage() {
   const [q, setQ] = useState('')
   const [items, setItems] = useState<Shelter[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const [statusFilter, setStatusFilter] = useState<'الكل' | 'ممتلئ' | 'غير ممتلئ'>('الكل')
   const [statusPick, setStatusPick] = useState<Record<string, FillStatus>>({})
@@ -69,6 +286,9 @@ export default function SheltersPage() {
   const [supervisorAr, setSupervisorAr] = useState('')
   const [phone, setPhone] = useState('')
   const [capacity, setCapacity] = useState<number>(0)
+  const [fillStatus, setFillStatus] = useState<FillStatus>('غير ممتلئ')
+  const [submitting, setSubmitting] = useState(false)
+  const [addFormError, setAddFormError] = useState('')
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<{
@@ -87,122 +307,64 @@ export default function SheltersPage() {
     fillStatus: 'غير ممتلئ',
   })
 
-  const [loading, setLoading] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
-
-  const [phoneError, setPhoneError] = useState('')
-  const [editPhoneError, setEditPhoneError] = useState('')
-
-  const [capacityError, setCapacityError] = useState('')
-  const [editCapacityError, setEditCapacityError] = useState('')
-
   const topControlHeight = 'h-10 sm:h-11'
   const fixedButtonClass =
     'h-10 sm:h-11 min-w-[110px] sm:min-w-[130px] px-4 sm:px-5 rounded-lg text-xs sm:text-sm shrink-0 flex-none whitespace-nowrap'
   const fixedIconButtonClass =
-    'inline-flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 flex-none items-center justify-center rounded-lg border'
+    'inline-flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 flex-none items-center justify-center rounded-lg border'
   const tableBtnClass =
-    'h-8 sm:h-10 rounded-lg px-2.5 sm:px-4 text-[11px] sm:text-sm font-semibold shrink-0 flex-none whitespace-nowrap'
+    'h-9 sm:h-10 rounded-lg px-3 sm:px-4 text-xs sm:text-sm font-semibold shrink-0 flex-none whitespace-nowrap'
   const selectBaseClass =
     'w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-right text-xs sm:text-sm outline-none focus:ring-2 focus:ring-slate-200'
   const inputBaseClass =
     'w-full min-w-0 rounded-lg border-slate-200 bg-white text-right text-xs sm:text-sm outline-none focus:!ring-2 focus:!ring-slate-200'
 
-  const clearAddFieldErrors = () => {
-    setPhoneError('')
-    setCapacityError('')
-  }
-
-  const clearEditFieldErrors = () => {
-    setEditPhoneError('')
-    setEditCapacityError('')
-  }
-
-  const getPhoneError = (value: string) => {
-    if (!value) return 'رقم الهاتف مطلوب'
-    if (!/^\d+$/.test(value)) return 'رقم الهاتف يجب أن يحتوي على أرقام فقط'
-    if (value.length !== 10) return 'رقم الهاتف يجب أن يكون 10 أرقام'
-    if (!value.startsWith('056') && !value.startsWith('059')) {
-      return 'رقم الهاتف يجب أن يبدأ بـ 056 أو 059'
-    }
-    if (!isValidPhone(value)) {
-      return 'رقم الهاتف يجب أن يبدأ بـ 056 أو 059 وبعده 7 أرقام'
-    }
-    return ''
-  }
-
-  const validateShelterInputs = (values: {
-    nameAr: string
-    areaAr: string
-    supervisorAr: string
-    phone: string
-    capacity: number
-  }) => {
-    if (!values.nameAr || !values.areaAr || !values.supervisorAr || !values.phone) {
-      return 'جميع الحقول مطلوبة'
-    }
-
-    if (hasEdgeSpaces(values.nameAr)) {
-      return 'اسم المركز لا يجب أن يبدأ أو ينتهي بمسافة'
-    }
-
-    if (hasEdgeSpaces(values.areaAr)) {
-      return 'المنطقة لا يجب أن تبدأ أو تنتهي بمسافة'
-    }
-
-    if (hasEdgeSpaces(values.supervisorAr)) {
-      return 'اسم المشرف لا يجب أن يبدأ أو ينتهي بمسافة'
-    }
-
-    if (!Number.isInteger(values.capacity) || values.capacity <= 0) {
-      return 'يجب أن تكون السعة أكبر من 0'
-    }
-
-    return ''
-  }
-
-  const fetchShelters = async () => {
-    try {
-      setLoading(true)
-      setErrorMessage('')
-
-      const res = await fetch('/api/project/projects/shelter', {
-        method: 'GET',
-        cache: 'no-store',
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'فشل في جلب مراكز الإيواء')
-      }
-
-      const normalizedItems: Shelter[] = Array.isArray(data) ? data : []
-      setItems(normalizedItems)
-
-      const nextStatusPick: Record<string, FillStatus> = {}
-      normalizedItems.forEach((item) => {
-        nextStatusPick[item.id] =
-          item.fillStatus ?? defaultFillStatus(item.familiesCount, item.capacity)
-      })
-      setStatusPick(nextStatusPick)
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء جلب البيانات')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   useEffect(() => {
-    fetchShelters()
+    const run = async () => {
+      setLoading(true)
+      setError('')
+
+      try {
+        const data = await sheltersApi.list()
+
+        setItems(
+          data.map((x) => ({
+            id: x.id,
+            nameAr: x.nameAr,
+            areaAr: x.areaAr,
+            supervisorAr: x.supervisorAr,
+            phone: x.phone,
+            familiesCount: x.familiesCount ?? 0,
+            capacity: x.capacity,
+            fillStatus: x.fillStatus,
+          }))
+        )
+
+        const pick: Record<string, FillStatus> = {}
+        data.forEach((x) => {
+          pick[x.id] = x.fillStatus ?? defaultFillStatus(x.familiesCount ?? 0, x.capacity)
+        })
+        setStatusPick(pick)
+      } catch (err) {
+        setError(getErrorMessage(err))
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    run()
   }, [])
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
 
     return items.filter((sh) => {
-      const matchSearch = !s || sh.nameAr.trim().toLowerCase().includes(s)
+      const matchSearch =
+        !s ||
+        sh.nameAr.toLowerCase().includes(s) ||
+        sh.areaAr.toLowerCase().includes(s) ||
+        sh.supervisorAr.toLowerCase().includes(s) ||
+        sh.phone.includes(q)
 
       const rowStatus: FillStatus =
         statusPick[sh.id] ?? sh.fillStatus ?? defaultFillStatus(sh.familiesCount, sh.capacity)
@@ -230,110 +392,81 @@ export default function SheltersPage() {
     return filtered.slice(start, start + pageSize)
   }, [filtered, safePage, pageSize])
 
-  const handleDuplicateOrFieldErrorsForAdd = (data: ApiErrorResponse) => {
-    const duplicateMessage =
-      data?.fieldErrors?.capacity ||
-      (data?.message?.includes('مكررة') ? data.message : '') ||
-      (data?.fieldErrors?.nameAr || data?.fieldErrors?.areaAr || data?.fieldErrors?.supervisorAr
-        ? 'البيانات مكررة'
-        : '')
-
-    if (duplicateMessage) {
-      setCapacityError(duplicateMessage)
-      setErrorMessage('')
-      return true
-    }
-
-    if (data?.fieldErrors?.phone) {
-      setPhoneError(data.fieldErrors.phone)
-      setErrorMessage('')
-      return true
-    }
-
-    return false
+  const resetAddForm = () => {
+    setNameAr('')
+    setAreaAr('')
+    setSupervisorAr('')
+    setPhone('')
+    setCapacity(0)
+    setFillStatus('غير ممتلئ')
+    setAddFormError('')
   }
 
-  const handleDuplicateOrFieldErrorsForEdit = (data: ApiErrorResponse) => {
-    const duplicateMessage =
-      data?.fieldErrors?.capacity ||
-      (data?.message?.includes('مكررة') ? data.message : '') ||
-      (data?.fieldErrors?.nameAr || data?.fieldErrors?.areaAr || data?.fieldErrors?.supervisorAr
-        ? 'البيانات مكررة'
-        : '')
-
-    if (duplicateMessage) {
-      setEditCapacityError(duplicateMessage)
-      setErrorMessage('')
-      return true
-    }
-
-    if (data?.fieldErrors?.phone) {
-      setEditPhoneError(data.fieldErrors.phone)
-      setErrorMessage('')
-      return true
-    }
-
-    return false
-  }
+  const isAddFormValid =
+    !!nameAr.trim() &&
+    !!areaAr.trim() &&
+    !!supervisorAr.trim() &&
+    /^(056|059)\d{7}$/.test(phone.trim()) &&
+    Number.isInteger(capacity) &&
+    capacity > 0 &&
+    !!fillStatus
 
   const onAdd = async () => {
-    clearAddFieldErrors()
+    const ar = nameAr.trim()
+    const area = areaAr.trim()
+    const supervisor = supervisorAr.trim()
+    const phoneValue = phone.trim()
 
-    const payload = {
-      nameAr,
-      areaAr,
-      supervisorAr,
-      phone,
-      capacity,
-    }
-
-    const validationMessage = validateShelterInputs(payload)
-    if (validationMessage) {
-      setErrorMessage(validationMessage)
+    if (
+      !ar ||
+      !area ||
+      !supervisor ||
+      !/^(056|059)\d{7}$/.test(phoneValue) ||
+      !Number.isInteger(capacity) ||
+      capacity <= 0
+    ) {
+      setAddFormError('يرجى تعبئة جميع الحقول المطلوبة بشكل صحيح')
       return
     }
 
-    const nextPhoneError = getPhoneError(phone)
-    setPhoneError(nextPhoneError)
-    if (nextPhoneError) return
+    setSubmitting(true)
+    setError('')
+    setAddFormError('')
 
     try {
-      setSubmitting(true)
-      setErrorMessage('')
-
-      const res = await fetch('/api/project/projects/shelter', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nameAr: normalizeSpaces(nameAr),
-          areaAr: normalizeSpaces(areaAr),
-          supervisorAr: normalizeSpaces(supervisorAr),
-          phone,
-          capacity,
-        }),
+      const created = await sheltersApi.create({
+        nameAr: ar,
+        areaAr: area,
+        supervisorAr: supervisor,
+        phone: phoneValue,
+        capacity,
+        fillStatus,
       })
 
-      const data: ApiErrorResponse = await res.json()
+      setItems((prev) => [
+        {
+          id: created.id,
+          nameAr: created.nameAr,
+          areaAr: created.areaAr,
+          supervisorAr: created.supervisorAr,
+          phone: created.phone,
+          familiesCount: created.familiesCount ?? 0,
+          capacity: created.capacity,
+          fillStatus: created.fillStatus,
+        },
+        ...prev,
+      ])
 
-      if (!res.ok) {
-        const handled = handleDuplicateOrFieldErrorsForAdd(data)
-        if (handled) return
-        throw new Error(data?.message || 'فشلت إضافة مركز الإيواء')
-      }
+      setStatusPick((prev) => ({
+        ...prev,
+        [created.id]:
+          created.fillStatus ?? defaultFillStatus(created.familiesCount ?? 0, created.capacity),
+      }))
 
-      setNameAr('')
-      setAreaAr('')
-      setSupervisorAr('')
-      setPhone('')
-      setCapacity(0)
-      clearAddFieldErrors()
+      resetAddForm()
       setAddOpen(false)
-
-      await fetchShelters()
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء الإضافة')
+    } catch (err) {
+      setAddFormError(getErrorMessage(err))
     } finally {
       setSubmitting(false)
     }
@@ -341,50 +474,19 @@ export default function SheltersPage() {
 
   const onDeleteOne = async (id: string) => {
     try {
-      setSubmitting(true)
-      setErrorMessage('')
-
-      const res = await fetch(`/api/project/projects/shelter?id=${id}`, {
-        method: 'DELETE',
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'فشل حذف مركز الإيواء')
-      }
+      setError('')
+      await sheltersApi.remove(id)
 
       if (editingId === id) setEditingId(null)
 
-      await fetchShelters()
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء الحذف')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const onDeleteAll = async () => {
-    try {
-      setSubmitting(true)
-      setErrorMessage('')
-
-      const res = await fetch('/api/project/projects/shelter?all=true', {
-        method: 'DELETE',
+      setItems((prev) => prev.filter((x) => x.id !== id))
+      setStatusPick((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
       })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'فشل حذف جميع مراكز الإيواء')
-      }
-
-      setEditingId(null)
-      await fetchShelters()
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء حذف الكل')
-    } finally {
-      setSubmitting(false)
+    } catch (err) {
+      setError(getErrorMessage(err))
     }
   }
 
@@ -401,100 +503,105 @@ export default function SheltersPage() {
       capacity: sh.capacity,
       fillStatus: currentStatus,
     })
-    clearEditFieldErrors()
-    setErrorMessage('')
   }
 
-  const cancelEditRow = () => {
-    setEditingId(null)
-    clearEditFieldErrors()
-  }
+  const cancelEditRow = () => setEditingId(null)
 
   const saveEditRow = async (id: string) => {
-    clearEditFieldErrors()
+    const ar = editDraft.nameAr.trim()
+    const area = editDraft.areaAr.trim()
+    const supervisor = editDraft.supervisorAr.trim()
+    const phoneValue = editDraft.phone.trim()
 
-    const payload = {
-      nameAr: editDraft.nameAr,
-      areaAr: editDraft.areaAr,
-      supervisorAr: editDraft.supervisorAr,
-      phone: editDraft.phone,
-      capacity: editDraft.capacity,
-    }
-
-    const validationMessage = validateShelterInputs(payload)
-    if (validationMessage) {
-      setErrorMessage(validationMessage)
+    if (
+      !ar ||
+      !area ||
+      !supervisor ||
+      !/^(056|059)\d{7}$/.test(phoneValue) ||
+      !Number.isInteger(editDraft.capacity) ||
+      editDraft.capacity <= 0
+    ) {
+      setError('يرجى تعبئة البيانات بشكل صحيح قبل الحفظ')
       return
     }
 
-    const nextPhoneError = getPhoneError(editDraft.phone)
-    setEditPhoneError(nextPhoneError)
-    if (nextPhoneError) return
-
     try {
-      setSubmitting(true)
-      setErrorMessage('')
+      setError('')
 
-      const res = await fetch(`/api/project/projects/shelter?id=${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nameAr: normalizeSpaces(editDraft.nameAr),
-          areaAr: normalizeSpaces(editDraft.areaAr),
-          supervisorAr: normalizeSpaces(editDraft.supervisorAr),
-          phone: editDraft.phone,
-          capacity: editDraft.capacity,
-          fillStatus: editDraft.fillStatus,
-        }),
+      const updated = await sheltersApi.update(id, {
+        nameAr: ar,
+        areaAr: area,
+        supervisorAr: supervisor,
+        phone: phoneValue,
+        capacity: editDraft.capacity,
+        fillStatus: editDraft.fillStatus,
       })
 
-      const data: ApiErrorResponse = await res.json()
+      setItems((prev) =>
+        prev.map((sh) =>
+          sh.id === id
+            ? {
+                ...sh,
+                nameAr: updated.nameAr,
+                areaAr: updated.areaAr,
+                supervisorAr: updated.supervisorAr,
+                phone: updated.phone,
+                capacity: updated.capacity,
+                familiesCount: updated.familiesCount ?? sh.familiesCount,
+                fillStatus: updated.fillStatus,
+              }
+            : sh
+        )
+      )
 
-      if (!res.ok) {
-        const handled = handleDuplicateOrFieldErrorsForEdit(data)
-        if (handled) return
-        throw new Error(data?.message || 'فشل تعديل مركز الإيواء')
-      }
+      setStatusPick((prev) => ({
+        ...prev,
+        [id]: updated.fillStatus ?? defaultFillStatus(updated.familiesCount ?? 0, updated.capacity),
+      }))
 
       setEditingId(null)
-      clearEditFieldErrors()
-      await fetchShelters()
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء التعديل')
-    } finally {
-      setSubmitting(false)
+    } catch (err) {
+      setError(getErrorMessage(err))
     }
   }
 
   const updateStatusDirectly = async (shelter: Shelter, nextStatus: FillStatus) => {
     try {
-      setSubmitting(true)
-      setErrorMessage('')
+      setError('')
 
-      const res = await fetch(`/api/project/projects/shelter?id=${shelter.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          fillStatus: nextStatus,
-        }),
+      const updated = await sheltersApi.update(shelter.id, {
+        fillStatus: nextStatus,
       })
 
-      const data = await res.json()
+      setItems((prev) =>
+        prev.map((sh) =>
+          sh.id === shelter.id
+            ? {
+                ...sh,
+                fillStatus: updated.fillStatus ?? nextStatus,
+              }
+            : sh
+        )
+      )
 
-      if (!res.ok) {
-        throw new Error(data?.message || 'فشل تحديث الحالة')
-      }
+      setStatusPick((prev) => ({
+        ...prev,
+        [shelter.id]: updated.fillStatus ?? nextStatus,
+      }))
+    } catch (err) {
+      setError(getErrorMessage(err))
+    }
+  }
 
-      setStatusPick((prev) => ({...prev, [shelter.id]: nextStatus}))
-      await fetchShelters()
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء تحديث الحالة')
-    } finally {
-      setSubmitting(false)
+  const onDeleteAll = async () => {
+    try {
+      setError('')
+      await sheltersApi.removeAll()
+      setItems([])
+      setStatusPick({})
+      setEditingId(null)
+    } catch (err) {
+      setError(getErrorMessage(err))
     }
   }
 
@@ -514,14 +621,10 @@ export default function SheltersPage() {
         </div>
 
         {loading && (
-          <div className="mt-2 text-[11px] text-muted-foreground sm:text-sm">
-            جاري تحميل البيانات...
-          </div>
+          <div className="mt-2 text-[11px] text-muted-foreground sm:text-sm">جارٍ التحميل...</div>
         )}
 
-        {!!errorMessage && (
-          <div className="mt-2 text-[11px] text-red-600 sm:text-sm">{errorMessage}</div>
-        )}
+        {!!error && <div className="mt-2 text-[11px] text-red-600 sm:text-sm">{error}</div>}
       </div>
 
       <div className="w-full max-w-full">
@@ -535,7 +638,7 @@ export default function SheltersPage() {
                     <Input
                       value={q}
                       onChange={(e: ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
-                      placeholder="ابحث باسم مركز الإيواء"
+                      placeholder="ابحث عن مركز إيواء"
                       className={`${inputBaseClass} ${topControlHeight} pr-9 pl-3`}
                     />
                   </div>
@@ -559,11 +662,9 @@ export default function SheltersPage() {
                   <Button
                     className={`!bg-blue-600 !text-white hover:!bg-blue-700 ${fixedButtonClass}`}
                     onClick={() => {
+                      setAddFormError('')
                       setAddOpen(true)
-                      clearAddFieldErrors()
-                      setErrorMessage('')
                     }}
-                    disabled={submitting}
                   >
                     <Plus className="ms-1 h-4 w-4 shrink-0" />
                     إضافة مركز إيواء
@@ -573,7 +674,6 @@ export default function SheltersPage() {
                     variant="outline"
                     className={`border-slate-200 text-slate-700 hover:bg-slate-50 ${fixedButtonClass}`}
                     onClick={onDeleteAll}
-                    disabled={submitting || items.length === 0}
                   >
                     حذف الكل
                   </Button>
@@ -586,7 +686,7 @@ export default function SheltersPage() {
             <div className="overflow-hidden rounded-b-lg">
               <div className="w-full overflow-x-auto">
                 <table
-                  className="w-full min-w-[820px] sm:min-w-[980px] lg:min-w-[1120px] table-fixed border-collapse text-[11px] sm:text-sm lg:text-base"
+                  className="w-full min-w-[860px] sm:min-w-[980px] lg:min-w-[1120px] table-fixed border-collapse text-xs sm:text-sm lg:text-base"
                   dir="rtl"
                 >
                   <thead
@@ -596,267 +696,226 @@ export default function SheltersPage() {
                     }}
                   >
                     <tr className="text-right text-foreground/60">
-                      <th className="w-[18%] border-b border-l px-2 py-3 text-right text-[11px] font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
+                      <th className="w-[18%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
                         اسم مركز الإيواء
                       </th>
-                      <th className="w-[13%] border-b border-l px-2 py-3 text-right text-[11px] font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
+                      <th className="w-[13%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
                         المنطقة
                       </th>
-                      <th className="w-[14%] border-b border-l px-2 py-3 text-right text-[11px] font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
+                      <th className="w-[14%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
                         المشرف
                       </th>
-                      <th className="w-[15%] border-b border-l px-2 py-3 text-right text-[11px] font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
+                      <th className="w-[15%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
                         الهاتف
                       </th>
-                      <th className="w-[9%] border-b border-l px-2 py-3 text-right text-[11px] font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
+                      <th className="w-[10%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
                         السعة
                       </th>
-                      <th className="w-[13%] border-b border-l px-2 py-3 text-right text-[11px] font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
+                      <th className="w-[12%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
                         الحالة
                       </th>
-                      <th className="w-[18%] border-b px-2 py-3 text-right text-[11px] font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
+                      <th className="w-[18%] border-b px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
                         الإجراءات
                       </th>
                     </tr>
                   </thead>
 
                   <tbody>
-                    {loading ? (
+                    {pageItems.map((sh) => {
+                      const isEditing = editingId === sh.id
+                      const currentStatus: FillStatus =
+                        statusPick[sh.id] ??
+                        sh.fillStatus ??
+                        defaultFillStatus(sh.familiesCount, sh.capacity)
+
+                      return (
+                        <tr key={sh.id} className="align-top hover:bg-muted/30">
+                          <td className="border-b border-l px-2 py-3 text-right font-medium break-words sm:px-4 sm:py-4 lg:px-5">
+                            {isEditing ? (
+                              <Input
+                                value={editDraft.nameAr}
+                                onChange={(e) =>
+                                  setEditDraft((p) => ({ ...p, nameAr: e.target.value }))
+                                }
+                                className="h-9 sm:h-10 lg:h-11 rounded-lg text-right text-xs sm:text-sm lg:text-base font-medium"
+                              />
+                            ) : (
+                              <span className="block break-words text-xs sm:text-sm lg:text-base font-medium leading-6 sm:leading-7">
+                                {sh.nameAr}
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="border-b border-l px-2 py-3 text-right break-words sm:px-4 sm:py-4 lg:px-5">
+                            {isEditing ? (
+                              <Input
+                                value={editDraft.areaAr}
+                                onChange={(e) =>
+                                  setEditDraft((p) => ({ ...p, areaAr: e.target.value }))
+                                }
+                                className="h-9 sm:h-10 lg:h-11 rounded-lg text-right text-xs sm:text-sm lg:text-base font-medium"
+                              />
+                            ) : (
+                              <span className="block break-words text-xs sm:text-sm lg:text-base font-medium leading-6 sm:leading-7">
+                                {sh.areaAr}
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="border-b border-l px-2 py-3 text-right break-words sm:px-4 sm:py-4 lg:px-5">
+                            {isEditing ? (
+                              <Input
+                                value={editDraft.supervisorAr}
+                                onChange={(e) =>
+                                  setEditDraft((p) => ({ ...p, supervisorAr: e.target.value }))
+                                }
+                                className="h-9 sm:h-10 lg:h-11 rounded-lg text-right text-xs sm:text-sm lg:text-base font-medium"
+                              />
+                            ) : (
+                              <span className="block break-words text-xs sm:text-sm lg:text-base font-medium leading-6 sm:leading-7">
+                                {sh.supervisorAr}
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="border-b border-l px-2 py-3 text-right break-words sm:px-4 sm:py-4 lg:px-5">
+                            {isEditing ? (
+                              <Input
+                                value={editDraft.phone}
+                                onChange={(e) =>
+                                  setEditDraft((p) => ({
+                                    ...p,
+                                    phone: toPhoneDigitsOnly(e.target.value),
+                                  }))
+                                }
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={10}
+                                className="h-9 sm:h-10 lg:h-11 rounded-lg text-right text-xs sm:text-sm lg:text-base font-medium"
+                                placeholder="0599123456"
+                              />
+                            ) : (
+                              <span className="block break-words text-xs sm:text-sm lg:text-base font-medium leading-6 sm:leading-7">
+                                {sh.phone}
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="border-b border-l px-2 py-3 text-right sm:px-4 sm:py-4 lg:px-5">
+                            {isEditing ? (
+                              <Input
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                type="text"
+                                value={editDraft.capacity ? String(editDraft.capacity) : ''}
+                                onChange={(e) =>
+                                  setEditDraft((p) => ({
+                                    ...p,
+                                    capacity: toIntOnly(e.target.value),
+                                  }))
+                                }
+                                className="h-9 sm:h-10 lg:h-11 rounded-lg text-right text-xs sm:text-sm lg:text-base font-medium"
+                              />
+                            ) : (
+                              <span className="block break-words text-xs sm:text-sm lg:text-base font-medium leading-6 sm:leading-7">
+                                {sh.capacity}
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="border-b border-l px-2 py-3 text-right sm:px-4 sm:py-4 lg:px-5">
+                            <div className="w-[120px] sm:w-[135px] lg:w-[150px] max-w-full">
+                              {isEditing ? (
+                                <select
+                                  value={editDraft.fillStatus}
+                                  onChange={(e) =>
+                                    setEditDraft((p) => ({
+                                      ...p,
+                                      fillStatus: e.target.value as FillStatus,
+                                    }))
+                                  }
+                                  className="h-9 sm:h-10 lg:h-11 w-full min-w-0 rounded-lg border bg-background px-2 sm:px-3 text-right text-xs sm:text-sm lg:text-base truncate"
+                                >
+                                  <option value="ممتلئ">ممتلئ</option>
+                                  <option value="غير ممتلئ">غير ممتلئ</option>
+                                </select>
+                              ) : (
+                                <select
+                                  value={currentStatus}
+                                  onChange={(e) =>
+                                    updateStatusDirectly(sh, e.target.value as FillStatus)
+                                  }
+                                  className="h-9 sm:h-10 lg:h-11 w-full min-w-0 rounded-lg border bg-background px-2 sm:px-3 text-right text-xs sm:text-sm lg:text-base truncate"
+                                >
+                                  <option value="ممتلئ">ممتلئ</option>
+                                  <option value="غير ممتلئ">غير ممتلئ</option>
+                                </select>
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="border-b px-2 py-3 sm:px-4 sm:py-4 lg:px-5">
+                            <div className="flex flex-nowrap items-center justify-start gap-2 overflow-x-auto">
+                              {!isEditing ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className={`${fixedIconButtonClass} hover:bg-muted`}
+                                    title="تعديل"
+                                    onClick={() => startEditRow(sh)}
+                                  >
+                                    <Pencil className="size-4" />
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className={`${fixedIconButtonClass} hover:bg-muted`}
+                                    title="حذف"
+                                    onClick={() => onDeleteOne(sh.id)}
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    className={tableBtnClass}
+                                    onClick={() => saveEditRow(sh.id)}
+                                    disabled={
+                                      !editDraft.nameAr.trim() ||
+                                      !editDraft.areaAr.trim() ||
+                                      !editDraft.supervisorAr.trim() ||
+                                      !/^(056|059)\d{7}$/.test(editDraft.phone.trim()) ||
+                                      !Number.isInteger(editDraft.capacity) ||
+                                      editDraft.capacity <= 0
+                                    }
+                                  >
+                                    <Save className="ms-1 size-4" />
+                                    حفظ
+                                  </Button>
+
+                                  <Button
+                                    variant="outline"
+                                    className={tableBtnClass}
+                                    onClick={cancelEditRow}
+                                  >
+                                    <X className="ms-1 size-4" />
+                                    إلغاء
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+
+                    {!pageItems.length && (
                       <tr>
                         <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
-                          جاري تحميل البيانات...
+                          لا توجد مراكز إيواء
                         </td>
                       </tr>
-                    ) : (
-                      <>
-                        {pageItems.map((sh) => {
-                          const isEditing = editingId === sh.id
-                          const currentStatus: FillStatus =
-                            statusPick[sh.id] ??
-                            sh.fillStatus ??
-                            defaultFillStatus(sh.familiesCount, sh.capacity)
-
-                          return (
-                            <tr key={sh.id} className="align-top hover:bg-muted/30">
-                              <td className="border-b border-l px-2 py-3 text-right font-medium break-words sm:px-4 sm:py-4 lg:px-5">
-                                {isEditing ? (
-                                  <Input
-                                    value={editDraft.nameAr}
-                                    onChange={(e) => {
-                                      setEditDraft((p) => ({...p, nameAr: e.target.value}))
-                                      setEditCapacityError('')
-                                    }}
-                                    className="h-8 sm:h-10 lg:h-11 rounded-lg text-right text-[11px] sm:text-sm lg:text-base font-medium"
-                                  />
-                                ) : (
-                                  <span className="block break-words text-[11px] sm:text-sm lg:text-base font-medium leading-5 sm:leading-7">
-                                    {sh.nameAr}
-                                  </span>
-                                )}
-                              </td>
-
-                              <td className="border-b border-l px-2 py-3 text-right break-words sm:px-4 sm:py-4 lg:px-5">
-                                {isEditing ? (
-                                  <Input
-                                    value={editDraft.areaAr}
-                                    onChange={(e) => {
-                                      setEditDraft((p) => ({...p, areaAr: e.target.value}))
-                                      setEditCapacityError('')
-                                    }}
-                                    className="h-8 sm:h-10 lg:h-11 rounded-lg text-right text-[11px] sm:text-sm lg:text-base font-medium"
-                                  />
-                                ) : (
-                                  <span className="block break-words text-[11px] sm:text-sm lg:text-base font-medium leading-5 sm:leading-7">
-                                    {sh.areaAr}
-                                  </span>
-                                )}
-                              </td>
-
-                              <td className="border-b border-l px-2 py-3 text-right break-words sm:px-4 sm:py-4 lg:px-5">
-                                {isEditing ? (
-                                  <Input
-                                    value={editDraft.supervisorAr}
-                                    onChange={(e) => {
-                                      setEditDraft((p) => ({...p, supervisorAr: e.target.value}))
-                                      setEditCapacityError('')
-                                    }}
-                                    className="h-8 sm:h-10 lg:h-11 rounded-lg text-right text-[11px] sm:text-sm lg:text-base font-medium"
-                                  />
-                                ) : (
-                                  <span className="block break-words text-[11px] sm:text-sm lg:text-base font-medium leading-5 sm:leading-7">
-                                    {sh.supervisorAr}
-                                  </span>
-                                )}
-                              </td>
-
-                              <td className="border-b border-l px-2 py-3 text-right break-words sm:px-4 sm:py-4 lg:px-5">
-                                {isEditing ? (
-                                  <div className="max-w-full">
-                                    <Input
-                                      value={editDraft.phone}
-                                      onChange={(e) => {
-                                        const onlyDigits = toPhoneDigitsOnly(e.target.value)
-                                        setEditDraft((p) => ({
-                                          ...p,
-                                          phone: onlyDigits,
-                                        }))
-                                        setEditPhoneError(
-                                          onlyDigits ? getPhoneError(onlyDigits) : 'رقم الهاتف مطلوب'
-                                        )
-                                      }}
-                                      onBlur={() => {
-                                        setEditPhoneError(getPhoneError(editDraft.phone))
-                                      }}
-                                      inputMode="numeric"
-                                      pattern="[0-9]*"
-                                      maxLength={10}
-                                      className={`h-8 sm:h-10 lg:h-11 rounded-lg text-right text-[11px] sm:text-sm lg:text-base ${editPhoneError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-                                      placeholder="0599123456"
-                                    />
-                                    {editPhoneError && (
-                                      <div className="mt-1 text-[10px] sm:text-xs text-red-600 leading-4">
-                                        {editPhoneError}
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="block break-words text-[11px] sm:text-sm lg:text-base font-medium leading-5 sm:leading-7">
-                                    {sh.phone}
-                                  </span>
-                                )}
-                              </td>
-
-                              <td className="border-b border-l px-2 py-3 text-right sm:px-4 sm:py-4 lg:px-5">
-                                {isEditing ? (
-                                  <div className="max-w-full">
-                                    <Input
-                                      inputMode="numeric"
-                                      pattern="[0-9]*"
-                                      type="text"
-                                      value={editDraft.capacity ? String(editDraft.capacity) : ''}
-                                      onChange={(e) => {
-                                        setEditDraft((p) => ({
-                                          ...p,
-                                          capacity: toIntOnly(e.target.value),
-                                        }))
-                                        setEditCapacityError('')
-                                      }}
-                                      className={`h-8 sm:h-10 lg:h-11 rounded-lg text-right text-[11px] sm:text-sm lg:text-base ${editCapacityError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-                                    />
-                                    {editCapacityError && (
-                                      <div className="mt-1 text-[10px] sm:text-xs text-red-600 leading-4">
-                                        {editCapacityError}
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="block break-words text-[11px] sm:text-sm lg:text-base font-medium leading-5 sm:leading-7">
-                                    {sh.capacity}
-                                  </span>
-                                )}
-                              </td>
-
-                              <td className="border-b border-l px-2 py-3 text-right sm:px-4 sm:py-4 lg:px-5">
-                                <div className="w-[100px] sm:w-[135px] lg:w-[150px] max-w-full">
-                                  {isEditing ? (
-                                    <select
-                                      value={editDraft.fillStatus}
-                                      onChange={(e) =>
-                                        setEditDraft((p) => ({
-                                          ...p,
-                                          fillStatus: e.target.value as FillStatus,
-                                        }))
-                                      }
-                                      className="h-8 sm:h-10 lg:h-11 w-full min-w-0 rounded-lg border bg-background px-2 sm:px-3 text-right text-[11px] sm:text-sm lg:text-base truncate"
-                                    >
-                                      <option value="ممتلئ">ممتلئ</option>
-                                      <option value="غير ممتلئ">غير ممتلئ</option>
-                                    </select>
-                                  ) : (
-                                    <select
-                                      value={currentStatus}
-                                      onChange={(e) =>
-                                        updateStatusDirectly(sh, e.target.value as FillStatus)
-                                      }
-                                      className="h-8 sm:h-10 lg:h-11 w-full min-w-0 rounded-lg border bg-background px-2 sm:px-3 text-right text-[11px] sm:text-sm lg:text-base truncate"
-                                      disabled={submitting}
-                                    >
-                                      <option value="ممتلئ">ممتلئ</option>
-                                      <option value="غير ممتلئ">غير ممتلئ</option>
-                                    </select>
-                                  )}
-                                </div>
-                              </td>
-
-                              <td className="border-b px-2 py-3 sm:px-4 sm:py-4 lg:px-5">
-                                <div className="flex flex-nowrap items-center justify-start gap-1.5 sm:gap-2 overflow-visible">
-                                  {!isEditing ? (
-                                    <>
-                                      <button
-                                        type="button"
-                                        className={`${fixedIconButtonClass} hover:bg-muted`}
-                                        title="تعديل"
-                                        onClick={() => startEditRow(sh)}
-                                        disabled={submitting}
-                                      >
-                                        <Pencil className="size-3.5 sm:size-4" />
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        className={`${fixedIconButtonClass} hover:bg-muted`}
-                                        title="حذف"
-                                        onClick={() => onDeleteOne(sh.id)}
-                                        disabled={submitting}
-                                      >
-                                        <Trash2 className="size-3.5 sm:size-4" />
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Button
-                                        className={tableBtnClass}
-                                        onClick={() => saveEditRow(sh.id)}
-                                        disabled={
-                                          submitting ||
-                                          !editDraft.nameAr ||
-                                          !editDraft.areaAr ||
-                                          !editDraft.supervisorAr ||
-                                          !editDraft.phone ||
-                                          !!editPhoneError ||
-                                          !Number.isInteger(editDraft.capacity) ||
-                                          editDraft.capacity <= 0
-                                        }
-                                      >
-                                        <Save className="ms-1 size-3.5 sm:size-4" />
-                                        حفظ
-                                      </Button>
-
-                                      <Button
-                                        variant="outline"
-                                        className={tableBtnClass}
-                                        onClick={cancelEditRow}
-                                        disabled={submitting}
-                                      >
-                                        <X className="ms-1 size-3.5 sm:size-4" />
-                                        إلغاء
-                                      </Button>
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          )
-                        })}
-
-                        {!pageItems.length && (
-                          <tr>
-                            <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
-                              لا توجد مراكز إيواء
-                            </td>
-                          </tr>
-                        )}
-                      </>
                     )}
                   </tbody>
                 </table>
@@ -912,7 +971,7 @@ export default function SheltersPage() {
           onOpenChange={(open) => {
             setAddOpen(open)
             if (!open) {
-              clearAddFieldErrors()
+              setAddFormError('')
             }
           }}
         >
@@ -932,7 +991,7 @@ export default function SheltersPage() {
                   value={nameAr}
                   onChange={(e) => {
                     setNameAr(e.target.value)
-                    setCapacityError('')
+                    if (addFormError) setAddFormError('')
                   }}
                   placeholder="مثال: مركز إيواء الشمال A"
                   className="h-10 text-right sm:h-11"
@@ -945,7 +1004,7 @@ export default function SheltersPage() {
                   value={areaAr}
                   onChange={(e) => {
                     setAreaAr(e.target.value)
-                    setCapacityError('')
+                    if (addFormError) setAddFormError('')
                   }}
                   placeholder="مثال: شمال غزة"
                   className="h-10 text-right sm:h-11"
@@ -958,7 +1017,7 @@ export default function SheltersPage() {
                   value={supervisorAr}
                   onChange={(e) => {
                     setSupervisorAr(e.target.value)
-                    setCapacityError('')
+                    if (addFormError) setAddFormError('')
                   }}
                   placeholder="مثال: أحمد علي"
                   className="h-10 text-right sm:h-11"
@@ -970,20 +1029,15 @@ export default function SheltersPage() {
                 <Input
                   value={phone}
                   onChange={(e) => {
-                    const onlyDigits = toPhoneDigitsOnly(e.target.value)
-                    setPhone(onlyDigits)
-                    setPhoneError(onlyDigits ? getPhoneError(onlyDigits) : 'رقم الهاتف مطلوب')
-                  }}
-                  onBlur={() => {
-                    setPhoneError(getPhoneError(phone))
+                    setPhone(toPhoneDigitsOnly(e.target.value))
+                    if (addFormError) setAddFormError('')
                   }}
                   inputMode="numeric"
                   pattern="[0-9]*"
                   maxLength={10}
                   placeholder="مثال: 0599123456"
-                  className={`h-10 text-right sm:h-11 ${phoneError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                  className="h-10 text-right sm:h-11"
                 />
-                {phoneError && <div className="text-xs text-red-600 sm:text-sm">{phoneError}</div>}
               </div>
 
               <div className="grid gap-2">
@@ -995,22 +1049,42 @@ export default function SheltersPage() {
                   value={capacity ? String(capacity) : ''}
                   onChange={(e) => {
                     setCapacity(toIntOnly(e.target.value))
-                    setCapacityError('')
+                    if (addFormError) setAddFormError('')
                   }}
                   placeholder="مثال: 1500"
-                  className={`h-10 text-right sm:h-11 ${capacityError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                  className="h-10 text-right sm:h-11"
                 />
-                {capacityError && (
-                  <div className="text-xs text-red-600 sm:text-sm">{capacityError}</div>
+              </div>
+
+              <div className="grid gap-2">
+                <div className="text-sm">الحالة *</div>
+                <select
+                  value={fillStatus}
+                  onChange={(e) => {
+                    setFillStatus(e.target.value as FillStatus)
+                    if (addFormError) setAddFormError('')
+                  }}
+                  className={`h-10 rounded-md border bg-background px-3 text-right sm:h-11 ${
+                    addFormError ? 'border-red-500' : ''
+                  }`}
+                >
+                  <option value="غير ممتلئ">غير ممتلئ</option>
+                  <option value="ممتلئ">ممتلئ</option>
+                </select>
+
+                {!!addFormError && (
+                  <div className="text-xs text-red-600 sm:text-sm">{addFormError}</div>
                 )}
               </div>
             </div>
 
-            <DialogFooter className="flex-col gap-2 sm:flex-row" dir="rtl">
+            <DialogFooter className="flex-col gap-2 sm:flex-row">
               <Button
                 variant="outline"
-                onClick={() => setAddOpen(false)}
-                disabled={submitting}
+                onClick={() => {
+                  setAddOpen(false)
+                  setAddFormError('')
+                }}
                 className={`w-full sm:w-auto ${fixedButtonClass}`}
               >
                 إغلاق
@@ -1018,19 +1092,10 @@ export default function SheltersPage() {
 
               <Button
                 onClick={onAdd}
-                disabled={
-                  submitting ||
-                  !nameAr ||
-                  !areaAr ||
-                  !supervisorAr ||
-                  !phone ||
-                  !!phoneError ||
-                  !Number.isInteger(capacity) ||
-                  capacity <= 0
-                }
+                disabled={submitting || !isAddFormValid}
                 className={`w-full sm:w-auto ${fixedButtonClass}`}
               >
-                {submitting ? 'جاري الإضافة...' : 'إضافة'}
+                {submitting ? 'جارٍ الإضافة...' : 'إضافة'}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
+import { z } from 'zod'
 
 import { Card, CardContent } from '../../../../../components/ui/card'
 import { Button } from '../../../../../components/ui/button'
@@ -23,9 +24,9 @@ type CampOption = {
 
 type Address = {
   id: string
-  governorate: string | null
-  city: string | null
-  campId: string | null
+  governorate: string
+  city: string
+  campId: string
   createdAt?: string
   updatedAt?: string
   camp?: {
@@ -34,102 +35,260 @@ type Address = {
   } | null
 }
 
-type AddressForm = {
-  governorate: string
-  city: string
-  campId: string
+const ADDRESS_BASE_URL = '/api/project/projects/address'
+const CAMPS_BASE_URL = '/api/project/projects/camps?forBeneficiary=true'
+
+const createAddressSchema = z.object({
+  governorate: z.string().trim().min(1, 'المحافظة مطلوبة'),
+  city: z.string().trim().min(1, 'المدينة مطلوبة'),
+  campId: z.string().trim().min(1, 'المخيم مطلوب'),
+})
+
+const updateAddressSchema = z
+  .object({
+    governorate: z.string().trim().min(1, 'المحافظة مطلوبة').optional(),
+    city: z.string().trim().min(1, 'المدينة مطلوبة').optional(),
+    campId: z.string().trim().min(1, 'المخيم مطلوب').optional(),
+  })
+  .strict()
+
+const normalizeText = (value: string) =>
+  value
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+
+function getErrorMessage(err: unknown) {
+  if (err instanceof z.ZodError) {
+    return err.issues[0]?.message ?? 'البيانات المدخلة غير صحيحة'
+  }
+
+  return err instanceof Error ? err.message : 'حدث خطأ غير متوقع'
 }
 
-type FieldKey = keyof AddressForm
-type FieldErrors = Partial<Record<FieldKey, string>>
+async function requestJSON<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options?.headers ?? {}),
+    },
+    cache: 'no-store',
+  })
 
-const emptyForm: AddressForm = {
-  governorate: '',
-  city: '',
-  campId: '',
+  const text = await res.text()
+  let data: any = null
+
+  try {
+    data = text ? JSON.parse(text) : null
+  } catch {
+    data = text || null
+  }
+
+  if (!res.ok) {
+    const msg = data?.message ?? `فشل الطلب: ${res.status}`
+    throw new Error(msg)
+  }
+
+  return data as T
 }
 
-const normalizeText = (value: string) => value.trim().toLocaleLowerCase()
+async function readAddresses(): Promise<Address[]> {
+  return requestJSON<Address[]>(ADDRESS_BASE_URL)
+}
+
+async function readCampOptions(): Promise<CampOption[]> {
+  return requestJSON<CampOption[]>(CAMPS_BASE_URL)
+}
+
+function findDuplicateAddress(
+  items: Address[],
+  input: { governorate: string; city: string; campId: string },
+  excludeId?: string
+) {
+  const normalizedGovernorate = normalizeText(input.governorate)
+  const normalizedCity = normalizeText(input.city)
+  const normalizedCampId = input.campId.trim()
+
+  const duplicate = items.find(
+    (a) =>
+      a.id !== excludeId &&
+      normalizeText(a.governorate ?? '') === normalizedGovernorate &&
+      normalizeText(a.city ?? '') === normalizedCity &&
+      (a.campId ?? '') === normalizedCampId
+  )
+
+  if (duplicate) {
+    return 'العنوان موجود بالفعل (بيانات مكررة).'
+  }
+
+  return ''
+}
+
+async function assertAddressBusinessValidation(
+  input: { governorate: string; city: string; campId: string },
+  items: Address[],
+  excludeId?: string
+) {
+  const normalizedGovernorate = normalizeText(input.governorate)
+  const normalizedCity = normalizeText(input.city)
+  const normalizedCampId = input.campId.trim()
+
+  if (!normalizedGovernorate) {
+    throw new Error('المحافظة مطلوبة')
+  }
+
+  if (!normalizedCity) {
+    throw new Error('المدينة مطلوبة')
+  }
+
+  if (!normalizedCampId) {
+    throw new Error('المخيم مطلوب')
+  }
+
+  const duplicateMessage = findDuplicateAddress(items, input, excludeId)
+
+  if (duplicateMessage) {
+    throw new Error(duplicateMessage)
+  }
+}
+
+async function createAddress(
+  input: unknown,
+  items: Address[]
+): Promise<Address> {
+  const body = createAddressSchema.parse(input)
+
+  await assertAddressBusinessValidation(
+    {
+      governorate: body.governorate,
+      city: body.city,
+      campId: body.campId,
+    },
+    items
+  )
+
+  return requestJSON<Address>(ADDRESS_BASE_URL, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+async function updateAddress(
+  id: string,
+  input: unknown,
+  items: Address[]
+): Promise<Address> {
+  if (!id) throw new Error('معرّف العنوان مفقود')
+
+  const body = updateAddressSchema.parse(input)
+  const existing = items.find((x) => x.id === id)
+
+  if (!existing) {
+    throw new Error('العنوان غير موجود')
+  }
+
+  const merged = {
+    governorate: body.governorate ?? existing.governorate ?? '',
+    city: body.city ?? existing.city ?? '',
+    campId: body.campId ?? existing.campId ?? '',
+  }
+
+  await assertAddressBusinessValidation(merged, items, id)
+
+  return requestJSON<Address>(`${ADDRESS_BASE_URL}?id=${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+}
+
+async function deleteAddress(id: string): Promise<void> {
+  if (!id) throw new Error('معرّف العنوان مفقود')
+
+  await requestJSON(`${ADDRESS_BASE_URL}?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
+}
+
+async function deleteAllAddresses(): Promise<void> {
+  await requestJSON(`${ADDRESS_BASE_URL}?all=true`, {
+    method: 'DELETE',
+  })
+}
+
+const addressesApi = {
+  list: readAddresses,
+  create: createAddress,
+  update: updateAddress,
+  remove: deleteAddress,
+  removeAll: deleteAllAddresses,
+}
 
 export default function AddressPage() {
   const [q, setQ] = useState('')
   const [items, setItems] = useState<Address[]>([])
+  const [campOptions, setCampOptions] = useState<CampOption[]>([])
+
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
   const [campFilter, setCampFilter] = useState<'all' | string>('all')
 
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
   const [addOpen, setAddOpen] = useState(false)
-  const [addForm, setAddForm] = useState<AddressForm>(emptyForm)
-  const [addFieldErrors, setAddFieldErrors] = useState<FieldErrors>({})
+  const [governorate, setGovernorate] = useState('')
+  const [city, setCity] = useState('')
+  const [campId, setCampId] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [addFormError, setAddFormError] = useState('')
 
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editDraft, setEditDraft] = useState<AddressForm>(emptyForm)
-  const [editFieldErrors, setEditFieldErrors] = useState<FieldErrors>({})
+  const [editDraft, setEditDraft] = useState<{
+    governorate: string
+    city: string
+    campId: string
+  }>({
+    governorate: '',
+    city: '',
+    campId: '',
+  })
 
-  const [campOptions, setCampOptions] = useState<CampOption[]>([])
-
-  const [loading, setLoading] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
-
-  const fetchAddresses = async () => {
-    try {
-      setLoading(true)
-      setErrorMessage('')
-
-      const res = await fetch('/api/project/projects/address', {
-        method: 'GET',
-        cache: 'no-store',
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'فشل في جلب العناوين')
-      }
-
-      setItems(Array.isArray(data) ? data : [])
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء جلب البيانات')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchCamps = async () => {
-    try {
-      const res = await fetch('/api/project/projects/camps?forBeneficiary=true', {
-        method: 'GET',
-        cache: 'no-store',
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'فشل في جلب المخيمات')
-      }
-
-      setCampOptions(Array.isArray(data) ? data : [])
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء جلب المخيمات')
-    }
-  }
+  const topControlHeight = 'h-10 sm:h-11'
+  const fixedButtonClass =
+    'h-10 sm:h-11 min-w-[110px] sm:min-w-[130px] px-4 sm:px-5 rounded-lg text-xs sm:text-sm shrink-0 flex-none whitespace-nowrap'
+  const fixedIconButtonClass =
+    'inline-flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 flex-none items-center justify-center rounded-lg border'
+  const tableBtnClass =
+    'h-9 sm:h-10 rounded-lg px-3 sm:px-4 text-xs sm:text-sm font-semibold shrink-0 flex-none whitespace-nowrap'
+  const selectBaseClass =
+    'w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-right text-xs sm:text-sm outline-none focus:ring-2 focus:ring-slate-200'
+  const inputBaseClass =
+    'w-full min-w-0 rounded-lg border-slate-200 bg-white text-right text-xs sm:text-sm outline-none focus:!ring-2 focus:!ring-slate-200'
 
   useEffect(() => {
-    fetchAddresses()
-    fetchCamps()
+    const run = async () => {
+      setLoading(true)
+      setError('')
+
+      try {
+        const [addressesData, campsData] = await Promise.all([
+          addressesApi.list(),
+          readCampOptions(),
+        ])
+
+        setItems(Array.isArray(addressesData) ? addressesData : [])
+        setCampOptions(Array.isArray(campsData) ? campsData : [])
+      } catch (err) {
+        setError(getErrorMessage(err))
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    run()
   }, [])
-
-  const campNames = useMemo(() => {
-    const set = new Set(
-      items
-        .map((x) => x.camp?.name)
-        .filter((value): value is string => Boolean(value))
-    )
-
-    return Array.from(set)
-  }, [items])
 
   const filtered = useMemo(() => {
     const s = normalizeText(q)
@@ -141,8 +300,7 @@ export default function AddressPage() {
         normalizeText(a.city ?? '').includes(s) ||
         normalizeText(a.camp?.name ?? '').includes(s)
 
-      const matchCamp =
-        campFilter === 'all' ? true : (a.camp?.name ?? '') === campFilter
+      const matchCamp = campFilter === 'all' ? true : a.campId === campFilter
 
       return matchSearch && matchCamp
     })
@@ -160,195 +318,48 @@ export default function AddressPage() {
     return filtered.slice(start, start + pageSize)
   }, [filtered, safePage, pageSize])
 
-  const findDuplicateAddress = (
-    governorate: string,
-    city: string,
-    campId: string,
-    excludeId?: string
-  ) => {
-    const normalizedGovernorate = normalizeText(governorate)
-    const normalizedCity = normalizeText(city)
-    const normalizedCampId = campId.trim()
-
-    return items.some((item) => {
-      if (excludeId && item.id === excludeId) return false
-
-      return (
-        normalizeText(item.governorate ?? '') === normalizedGovernorate &&
-        normalizeText(item.city ?? '') === normalizedCity &&
-        (item.campId ?? '') === normalizedCampId
-      )
-    })
+  const resetAddForm = () => {
+    setGovernorate('')
+    setCity('')
+    setCampId('')
+    setAddFormError('')
   }
 
-  const validateField = (field: FieldKey, value: string): string => {
-    const trimmed = value.trim()
+  const isAddFormValid =
+    !!governorate.trim() &&
+    !!city.trim() &&
+    !!campId.trim()
 
-    switch (field) {
-      case 'governorate':
-        if (trimmed.length > 100) return 'المحافظة يجب ألا تزيد عن 100 حرف'
-        return ''
+  const onAdd = async () => {
+    const nextGovernorate = governorate.trim()
+    const nextCity = city.trim()
+    const nextCampId = campId.trim()
 
-      case 'city':
-        if (trimmed.length > 100) return 'المدينة يجب ألا تزيد عن 100 حرف'
-        return ''
-
-      case 'campId':
-        return ''
-
-      default:
-        return ''
-    }
-  }
-
-  const validateAddForm = (): boolean => {
-    const nextErrors: FieldErrors = {
-      governorate: validateField('governorate', addForm.governorate),
-      city: validateField('city', addForm.city),
-      campId: validateField('campId', addForm.campId),
+    if (!nextGovernorate || !nextCity || !nextCampId) {
+      setAddFormError('يرجى تعبئة جميع الحقول المطلوبة بشكل صحيح')
+      return
     }
 
-    const hasBasicErrors = Object.values(nextErrors).some(Boolean)
-
-    if (!hasBasicErrors) {
-      const isDuplicate = findDuplicateAddress(
-        addForm.governorate.trim(),
-        addForm.city.trim(),
-        addForm.campId.trim(),
-        undefined
-      )
-
-      if (isDuplicate) {
-        nextErrors.governorate = 'العنوان مكرر مسبقاً'
-        nextErrors.city = 'العنوان مكرر مسبقاً'
-      }
-    }
-
-    setAddFieldErrors(nextErrors)
-    return Object.values(nextErrors).every((x) => !x)
-  }
-
-  const validateEditForm = (id: string): boolean => {
-    const nextErrors: FieldErrors = {
-      governorate: validateField('governorate', editDraft.governorate),
-      city: validateField('city', editDraft.city),
-      campId: validateField('campId', editDraft.campId),
-    }
-
-    const hasBasicErrors = Object.values(nextErrors).some(Boolean)
-
-    if (!hasBasicErrors) {
-      const isDuplicate = findDuplicateAddress(
-        editDraft.governorate.trim(),
-        editDraft.city.trim(),
-        editDraft.campId.trim(),
-        id
-      )
-
-      if (isDuplicate) {
-        nextErrors.governorate = 'العنوان مكرر مسبقاً'
-        nextErrors.city = 'العنوان مكرر مسبقاً'
-      }
-    }
-
-    setEditFieldErrors(nextErrors)
-    return Object.values(nextErrors).every((x) => !x)
-  }
-
-  const isFormValid = (form: AddressForm, errors: FieldErrors) => {
-    const hasErrors = Object.values(errors).some(Boolean)
-    return !hasErrors
-  }
-
-  const handleAddFieldChange = (field: FieldKey, value: string) => {
-    setAddForm((prev) => {
-      const nextForm = {
-        ...prev,
-        [field]: value,
-      }
-
-      const nextErrors: FieldErrors = {
-        governorate: validateField('governorate', nextForm.governorate),
-        city: validateField('city', nextForm.city),
-        campId: validateField('campId', nextForm.campId),
-      }
-
-      if (
-        !Object.values(nextErrors).some(Boolean) &&
-        findDuplicateAddress(nextForm.governorate, nextForm.city, nextForm.campId)
-      ) {
-        nextErrors.governorate = 'العنوان مكرر مسبقاً'
-        nextErrors.city = 'العنوان مكرر مسبقاً'
-      }
-
-      setAddFieldErrors(nextErrors)
-      return nextForm
-    })
-  }
-
-  const handleEditFieldChange = (field: FieldKey, value: string) => {
-    setEditDraft((prev) => {
-      const nextForm = {
-        ...prev,
-        [field]: value,
-      }
-
-      const nextErrors: FieldErrors = {
-        governorate: validateField('governorate', nextForm.governorate),
-        city: validateField('city', nextForm.city),
-        campId: validateField('campId', nextForm.campId),
-      }
-
-      if (
-        !Object.values(nextErrors).some(Boolean) &&
-        findDuplicateAddress(nextForm.governorate, nextForm.city, nextForm.campId, editingId || undefined)
-      ) {
-        nextErrors.governorate = 'العنوان مكرر مسبقاً'
-        nextErrors.city = 'العنوان مكرر مسبقاً'
-      }
-
-      setEditFieldErrors(nextErrors)
-      return nextForm
-    })
-  }
-
-  const onAdd = async (e?: FormEvent<HTMLFormElement>) => {
-    e?.preventDefault()
-
-    if (!validateAddForm()) return
+    setSubmitting(true)
+    setError('')
+    setAddFormError('')
 
     try {
-      setSubmitting(true)
-      setErrorMessage('')
-      setAddFieldErrors({})
-
-      const payload = {
-        governorate: addForm.governorate.trim() || null,
-        city: addForm.city.trim() || null,
-        campId: addForm.campId.trim() || null,
-      }
-
-      const res = await fetch('/api/project/projects/address', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const created = await addressesApi.create(
+        {
+          governorate: nextGovernorate,
+          city: nextCity,
+          campId: nextCampId,
         },
-        body: JSON.stringify(payload),
-      })
+        items
+      )
 
-      const data = await res.json()
+      setItems((prev) => [created, ...prev])
 
-      if (!res.ok) {
-        throw new Error(data?.message || 'فشلت إضافة العنوان')
-      }
-
-      setItems((prev) => [data, ...prev])
-      setAddForm(emptyForm)
-      setAddFieldErrors({})
+      resetAddForm()
       setAddOpen(false)
-      setPage(1)
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء الإضافة')
+    } catch (err) {
+      setAddFormError(getErrorMessage(err))
     } finally {
       setSubmitting(false)
     }
@@ -356,50 +367,13 @@ export default function AddressPage() {
 
   const onDeleteOne = async (id: string) => {
     try {
-      setSubmitting(true)
-      setErrorMessage('')
-
-      const res = await fetch(`/api/project/projects/address?id=${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'فشل حذف العنوان')
-      }
+      setError('')
+      await addressesApi.remove(id)
 
       if (editingId === id) setEditingId(null)
       setItems((prev) => prev.filter((x) => x.id !== id))
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء الحذف')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const onDeleteAll = async () => {
-    try {
-      setSubmitting(true)
-      setErrorMessage('')
-
-      const res = await fetch('/api/project/projects/address?all=true', {
-        method: 'DELETE',
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'فشل حذف جميع العناوين')
-      }
-
-      setItems([])
-      setEditingId(null)
-      setPage(1)
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء حذف الكل')
-    } finally {
-      setSubmitting(false)
+    } catch (err) {
+      setError(getErrorMessage(err))
     }
   }
 
@@ -410,49 +384,48 @@ export default function AddressPage() {
       city: a.city ?? '',
       campId: a.campId ?? '',
     })
-    setEditFieldErrors({})
   }
 
-  const cancelEditRow = () => {
-    setEditingId(null)
-    setEditFieldErrors({})
-  }
+  const cancelEditRow = () => setEditingId(null)
 
   const saveEditRow = async (id: string) => {
-    if (!validateEditForm(id)) return
+    const nextGovernorate = editDraft.governorate.trim()
+    const nextCity = editDraft.city.trim()
+    const nextCampId = editDraft.campId.trim()
+
+    if (!nextGovernorate || !nextCity || !nextCampId) {
+      setError('يرجى تعبئة البيانات بشكل صحيح قبل الحفظ')
+      return
+    }
 
     try {
-      setSubmitting(true)
-      setErrorMessage('')
-      setEditFieldErrors({})
+      setError('')
 
-      const payload = {
-        governorate: editDraft.governorate.trim() || null,
-        city: editDraft.city.trim() || null,
-        campId: editDraft.campId.trim() || null,
-      }
-
-      const res = await fetch(`/api/project/projects/address?id=${encodeURIComponent(id)}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
+      const updated = await addressesApi.update(
+        id,
+        {
+          governorate: nextGovernorate,
+          city: nextCity,
+          campId: nextCampId,
         },
-        body: JSON.stringify(payload),
-      })
+        items
+      )
 
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'فشل تعديل العنوان')
-      }
-
-      setItems((prev) => prev.map((a) => (a.id === id ? data : a)))
+      setItems((prev) => prev.map((a) => (a.id === id ? updated : a)))
       setEditingId(null)
-      setEditFieldErrors({})
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء التعديل')
-    } finally {
-      setSubmitting(false)
+    } catch (err) {
+      setError(getErrorMessage(err))
+    }
+  }
+
+  const onDeleteAll = async () => {
+    try {
+      setError('')
+      await addressesApi.removeAll()
+      setItems([])
+      setEditingId(null)
+    } catch (err) {
+      setError(getErrorMessage(err))
     }
   }
 
@@ -460,71 +433,75 @@ export default function AddressPage() {
   const rangeEnd = Math.min(safePage * pageSize, filtered.length)
 
   return (
-    <div className="w-full px-3 py-6 sm:px-6" dir="rtl">
-      <div className="mb-6 text-right">
-        <div className="text-2xl font-semibold text-foreground">العناوين</div>
+    <div className="w-full px-2 py-3 sm:px-4 sm:py-5 lg:px-6" dir="rtl">
+      <div className="mb-4 sm:mb-6 text-right">
+        <div className="text-base font-semibold text-foreground sm:text-xl lg:text-2xl">
+          العناوين
+        </div>
 
-        <div className="mt-1 text-sm text-muted-foreground">
-          الرئيسية <span className="mx-1">{'>'}</span>{' '}
+        <div className="mt-1 text-[11px] text-muted-foreground sm:text-sm">
+          الرئيسية <span className="mx-1">{'>'}</span>
           <span className="text-foreground">إدارة العناوين</span>
         </div>
+
+        {loading && (
+          <div className="mt-2 text-[11px] text-muted-foreground sm:text-sm">
+            جارٍ التحميل...
+          </div>
+        )}
+
+        {!!error && <div className="mt-2 text-[11px] text-red-600 sm:text-sm">{error}</div>}
       </div>
 
-      {!!errorMessage && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {errorMessage}
-        </div>
-      )}
-
-      <div className="w-full max-w-[1400px]">
-        <Card>
+      <div className="w-full max-w-full">
+        <Card className="overflow-hidden">
           <CardContent className="p-0" dir="rtl">
-            <div className="p-4">
+            <div className="p-2 sm:p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <div className="relative w-full sm:w-[260px]">
+                <div className="flex min-w-0 flex-nowrap items-center gap-2 sm:gap-3 overflow-x-auto pb-1">
+                  <div className="relative min-w-[170px] flex-1 sm:min-w-[220px] sm:max-w-[280px]">
                     <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Input
                       value={q}
                       onChange={(e: ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
                       placeholder="ابحث عن عنوان"
-                      className="!h-10 !rounded-lg border-slate-200 bg-white pr-9 pl-3 text-sm outline-none focus:!ring-2 focus:!ring-slate-200"
+                      className={`${inputBaseClass} ${topControlHeight} pr-9 pl-3`}
                     />
                   </div>
 
-                  <select
-                    value={campFilter}
-                    onChange={(e) => setCampFilter(e.target.value)}
-                    className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-200 sm:w-[200px]"
-                  >
-                    <option value="all">كل المخيمات</option>
-                    {campNames.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="min-w-[140px] max-w-[180px] sm:min-w-[180px] sm:max-w-[220px] shrink-0">
+                    <select
+                      value={campFilter}
+                      onChange={(e) => setCampFilter(e.target.value)}
+                      className={`${selectBaseClass} ${topControlHeight} truncate`}
+                    >
+                      <option value="all">كل المخيمات</option>
+                      {campOptions.map((camp) => (
+                        <option key={camp.id} value={camp.id}>
+                          {camp.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-2">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   <Button
-                    className="inline-flex items-center gap-2 !h-10 !rounded-lg !bg-blue-600 !px-4 !text-sm !font-semibold !text-white hover:!bg-blue-700"
+                    className={`!bg-blue-600 !text-white hover:!bg-blue-700 ${fixedButtonClass}`}
                     onClick={() => {
-                      setAddForm(emptyForm)
-                      setAddFieldErrors({})
+                      setAddFormError('')
                       setAddOpen(true)
                     }}
-                    disabled={submitting}
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="ms-1 h-4 w-4 shrink-0" />
                     إضافة عنوان
                   </Button>
 
                   <Button
                     variant="outline"
-                    className="!h-10 !rounded-lg border-slate-200 !px-4 !text-sm !font-semibold text-slate-700 hover:bg-slate-50"
+                    className={`border-slate-200 text-slate-700 hover:bg-slate-50 ${fixedButtonClass}`}
                     onClick={onDeleteAll}
-                    disabled={submitting || items.length === 0}
+                    disabled={!items.length}
                   >
                     حذف الكل
                   </Button>
@@ -536,7 +513,10 @@ export default function AddressPage() {
 
             <div className="overflow-hidden rounded-b-lg">
               <div className="w-full overflow-x-auto">
-                <table className="min-w-[800px] w-full border-collapse text-sm">
+                <table
+                  className="w-full min-w-[760px] sm:min-w-[860px] lg:min-w-[980px] table-fixed border-collapse text-xs sm:text-sm lg:text-base"
+                  dir="rtl"
+                >
                   <thead
                     style={{
                       backgroundColor: '#F9FAFB',
@@ -544,161 +524,165 @@ export default function AddressPage() {
                     }}
                   >
                     <tr className="text-right text-foreground/60">
-                      <th className="border-b border-r px-4 py-3 font-normal">المحافظة</th>
-                      <th className="border-b border-r px-4 py-3 font-normal">المدينة</th>
-                      <th className="border-b border-r px-4 py-3 font-normal">المخيم</th>
-                      <th className="border-b px-4 py-3 font-normal">الإجراءات</th>
+                      <th className="w-[24%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
+                        المحافظة
+                      </th>
+                      <th className="w-[24%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
+                        المدينة
+                      </th>
+                      <th className="w-[24%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
+                        المخيم
+                      </th>
+                      <th className="w-[28%] border-b px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
+                        الإجراءات
+                      </th>
                     </tr>
                   </thead>
 
                   <tbody>
-                    {loading ? (
+                    {pageItems.map((a) => {
+                      const isEditing = editingId === a.id
+
+                      return (
+                        <tr key={a.id} className="align-top hover:bg-muted/30">
+                          <td className="border-b border-l px-2 py-3 text-right font-medium break-words sm:px-4 sm:py-4 lg:px-5">
+                            {isEditing ? (
+                              <Input
+                                value={editDraft.governorate}
+                                onChange={(e) =>
+                                  setEditDraft((p) => ({
+                                    ...p,
+                                    governorate: e.target.value,
+                                  }))
+                                }
+                                className="h-9 sm:h-10 lg:h-11 rounded-lg text-right text-xs sm:text-sm lg:text-base font-medium"
+                              />
+                            ) : (
+                              <span className="block break-words text-xs sm:text-sm lg:text-base font-medium leading-6 sm:leading-7">
+                                {a.governorate}
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="border-b border-l px-2 py-3 text-right break-words sm:px-4 sm:py-4 lg:px-5">
+                            {isEditing ? (
+                              <Input
+                                value={editDraft.city}
+                                onChange={(e) =>
+                                  setEditDraft((p) => ({
+                                    ...p,
+                                    city: e.target.value,
+                                  }))
+                                }
+                                className="h-9 sm:h-10 lg:h-11 rounded-lg text-right text-xs sm:text-sm lg:text-base font-medium"
+                              />
+                            ) : (
+                              <span className="block break-words text-xs sm:text-sm lg:text-base font-medium leading-6 sm:leading-7">
+                                {a.city}
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="border-b border-l px-2 py-3 text-right sm:px-4 sm:py-4 lg:px-5">
+                            <div className="w-[160px] sm:w-[190px] lg:w-[220px] max-w-full">
+                              {isEditing ? (
+                                <select
+                                  value={editDraft.campId}
+                                  onChange={(e) =>
+                                    setEditDraft((p) => ({
+                                      ...p,
+                                      campId: e.target.value,
+                                    }))
+                                  }
+                                  className="h-9 sm:h-10 lg:h-11 w-full min-w-0 rounded-lg border bg-background px-2 sm:px-3 text-right text-xs sm:text-sm lg:text-base truncate"
+                                >
+                                  <option value="">اختر المخيم</option>
+                                  {campOptions.map((camp) => (
+                                    <option key={camp.id} value={camp.id}>
+                                      {camp.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span className="block break-words text-xs sm:text-sm lg:text-base font-medium leading-6 sm:leading-7">
+                                  {a.camp?.name ?? '-'}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="border-b px-2 py-3 sm:px-4 sm:py-4 lg:px-5">
+                            <div className="flex flex-nowrap items-center justify-start gap-2 overflow-x-auto">
+                              {!isEditing ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className={`${fixedIconButtonClass} hover:bg-muted`}
+                                    title="تعديل"
+                                    onClick={() => startEditRow(a)}
+                                  >
+                                    <Pencil className="size-4" />
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className={`${fixedIconButtonClass} hover:bg-muted`}
+                                    title="حذف"
+                                    onClick={() => onDeleteOne(a.id)}
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    className={tableBtnClass}
+                                    onClick={() => saveEditRow(a.id)}
+                                    disabled={
+                                      !editDraft.governorate.trim() ||
+                                      !editDraft.city.trim() ||
+                                      !editDraft.campId.trim()
+                                    }
+                                  >
+                                    <Save className="ms-1 size-4" />
+                                    حفظ
+                                  </Button>
+
+                                  <Button
+                                    variant="outline"
+                                    className={tableBtnClass}
+                                    onClick={cancelEditRow}
+                                  >
+                                    <X className="ms-1 size-4" />
+                                    إلغاء
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+
+                    {!pageItems.length && (
                       <tr>
                         <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
-                          جاري تحميل البيانات...
+                          لا توجد عناوين
                         </td>
                       </tr>
-                    ) : (
-                      <>
-                        {pageItems.map((a) => {
-                          const isEditing = editingId === a.id
-
-                          return (
-                            <tr key={a.id} className="hover:bg-muted/30 align-top">
-                              <td className="border-b border-r px-4 py-3 font-medium">
-                                {isEditing ? (
-                                  <div className="space-y-1">
-                                    <Input
-                                      value={editDraft.governorate}
-                                      onChange={(e) => handleEditFieldChange('governorate', e.target.value)}
-                                      className="h-9"
-                                      placeholder="مثال: غزة"
-                                    />
-                                    {!!editFieldErrors.governorate && (
-                                      <div className="text-xs text-red-600">{editFieldErrors.governorate}</div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  a.governorate || '-'
-                                )}
-                              </td>
-
-                              <td className="border-b border-r px-4 py-3">
-                                {isEditing ? (
-                                  <div className="space-y-1">
-                                    <Input
-                                      value={editDraft.city}
-                                      onChange={(e) => handleEditFieldChange('city', e.target.value)}
-                                      className="h-9"
-                                      placeholder="مثال: غزة"
-                                    />
-                                    {!!editFieldErrors.city && (
-                                      <div className="text-xs text-red-600">{editFieldErrors.city}</div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  a.city || '-'
-                                )}
-                              </td>
-
-                              <td className="border-b border-r px-4 py-3">
-                                {isEditing ? (
-                                  <div className="space-y-1">
-                                    <select
-                                      value={editDraft.campId}
-                                      onChange={(e) => handleEditFieldChange('campId', e.target.value)}
-                                      className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                                    >
-                                      <option value="">بدون مخيم</option>
-                                      {campOptions.map((camp) => (
-                                        <option key={camp.id} value={camp.id}>
-                                          {camp.name}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    {!!editFieldErrors.campId && (
-                                      <div className="text-xs text-red-600">{editFieldErrors.campId}</div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  a.camp?.name || '-'
-                                )}
-                              </td>
-
-                              <td className="border-b px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                  {!isEditing ? (
-                                    <>
-                                      <button
-                                        type="button"
-                                        className="inline-flex h-10 w-10 items-center justify-center rounded-md border hover:bg-muted"
-                                        title="تعديل"
-                                        onClick={() => startEditRow(a)}
-                                        disabled={submitting}
-                                      >
-                                        <Pencil className="size-4" />
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        className="inline-flex h-10 w-10 items-center justify-center rounded-md border hover:bg-muted"
-                                        title="حذف"
-                                        onClick={() => onDeleteOne(a.id)}
-                                        disabled={submitting}
-                                      >
-                                        <Trash2 className="size-4" />
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Button
-                                        size="sm"
-                                        className="h-10"
-                                        onClick={() => saveEditRow(a.id)}
-                                        disabled={submitting || !isFormValid(editDraft, editFieldErrors)}
-                                      >
-                                        <Save className="size-4 ms-2" />
-                                        حفظ
-                                      </Button>
-
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-10"
-                                        onClick={cancelEditRow}
-                                        disabled={submitting}
-                                      >
-                                        <X className="size-4 ms-2" />
-                                        إلغاء
-                                      </Button>
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          )
-                        })}
-
-                        {!pageItems.length && (
-                          <tr>
-                            <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
-                              لا توجد عناوين
-                            </td>
-                          </tr>
-                        )}
-                      </>
                     )}
                   </tbody>
                 </table>
               </div>
 
-              <div className="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex flex-col gap-3 border-t p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground sm:text-sm">
                   <span>عدد الصفوف</span>
+
                   <select
                     value={pageSize}
                     onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="h-9 rounded-md border bg-background px-2 text-sm"
+                    className="h-8 sm:h-9 rounded-md border bg-background px-2 text-xs sm:text-sm"
                   >
                     <option value={5}>5</option>
                     <option value={10}>10</option>
@@ -706,28 +690,30 @@ export default function AddressPage() {
                   </select>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="text-sm text-muted-foreground">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="text-[11px] text-muted-foreground sm:text-sm">
                     {rangeStart} - {rangeEnd} من {filtered.length}
                   </div>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={safePage <= 1}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  >
-                    السابق
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      disabled={safePage <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      className={tableBtnClass}
+                    >
+                      السابق
+                    </Button>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={safePage >= totalPages}
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  >
-                    التالي
-                  </Button>
+                    <Button
+                      variant="outline"
+                      disabled={safePage >= totalPages}
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      className={tableBtnClass}
+                    >
+                      التالي
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -739,70 +725,92 @@ export default function AddressPage() {
           onOpenChange={(open) => {
             setAddOpen(open)
             if (!open) {
-              setAddForm(emptyForm)
-              setAddFieldErrors({})
+              setAddFormError('')
             }
           }}
         >
-          <DialogContent className="sm:max-w-[560px]" dir="rtl">
+          <DialogContent
+            className="w-[95vw] max-w-[95vw] rounded-xl sm:max-w-[560px]"
+            dir="rtl"
+          >
             <DialogHeader className="text-right">
               <DialogTitle>إضافة عنوان</DialogTitle>
               <DialogDescription>إدخال بيانات العنوان</DialogDescription>
             </DialogHeader>
 
-            <form onSubmit={onAdd} className="grid gap-3 text-right">
+            <div className="grid gap-3 text-right">
               <div className="grid gap-2">
-                <div className="text-sm">المحافظة</div>
+                <div className="text-sm">المحافظة *</div>
                 <Input
-                  value={addForm.governorate}
-                  onChange={(e) => handleAddFieldChange('governorate', e.target.value)}
+                  value={governorate}
+                  onChange={(e) => {
+                    setGovernorate(e.target.value)
+                    if (addFormError) setAddFormError('')
+                  }}
                   placeholder="مثال: غزة"
+                  className="h-10 text-right sm:h-11"
                 />
-                {!!addFieldErrors.governorate && (
-                  <div className="text-xs text-red-600">{addFieldErrors.governorate}</div>
-                )}
               </div>
 
               <div className="grid gap-2">
-                <div className="text-sm">المدينة</div>
+                <div className="text-sm">المدينة *</div>
                 <Input
-                  value={addForm.city}
-                  onChange={(e) => handleAddFieldChange('city', e.target.value)}
+                  value={city}
+                  onChange={(e) => {
+                    setCity(e.target.value)
+                    if (addFormError) setAddFormError('')
+                  }}
                   placeholder="مثال: غزة"
+                  className="h-10 text-right sm:h-11"
                 />
-                {!!addFieldErrors.city && (
-                  <div className="text-xs text-red-600">{addFieldErrors.city}</div>
-                )}
               </div>
 
               <div className="grid gap-2">
-                <div className="text-sm">المخيم</div>
+                <div className="text-sm">المخيم *</div>
                 <select
-                  value={addForm.campId}
-                  onChange={(e) => handleAddFieldChange('campId', e.target.value)}
-                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  value={campId}
+                  onChange={(e) => {
+                    setCampId(e.target.value)
+                    if (addFormError) setAddFormError('')
+                  }}
+                  className={`h-10 rounded-md border bg-background px-3 text-right sm:h-11 ${
+                    addFormError ? 'border-red-500' : ''
+                  }`}
                 >
-                  <option value="">بدون مخيم</option>
+                  <option value="">اختر المخيم</option>
                   {campOptions.map((camp) => (
                     <option key={camp.id} value={camp.id}>
                       {camp.name}
                     </option>
                   ))}
                 </select>
-                {!!addFieldErrors.campId && (
-                  <div className="text-xs text-red-600">{addFieldErrors.campId}</div>
+
+                {!!addFormError && (
+                  <div className="text-xs text-red-600 sm:text-sm">{addFormError}</div>
                 )}
               </div>
+            </div>
 
-              <DialogFooter className="gap-2">
-                <Button type="button" variant="outline" onClick={() => setAddOpen(false)} disabled={submitting}>
-                  إغلاق
-                </Button>
-                <Button type="submit" disabled={submitting || !isFormValid(addForm, addFieldErrors)}>
-                  {submitting ? 'جاري الإضافة...' : 'إضافة'}
-                </Button>
-              </DialogFooter>
-            </form>
+            <DialogFooter className="flex-col gap-2 sm:flex-row">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAddOpen(false)
+                  setAddFormError('')
+                }}
+                className={`w-full sm:w-auto ${fixedButtonClass}`}
+              >
+                إغلاق
+              </Button>
+
+              <Button
+                onClick={onAdd}
+                disabled={submitting || !isAddFormValid}
+                className={`w-full sm:w-auto ${fixedButtonClass}`}
+              >
+                {submitting ? 'جارٍ الإضافة...' : 'إضافة'}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

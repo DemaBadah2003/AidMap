@@ -1,54 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { Prisma } from '@prisma/client'
+import { Prisma, DistributionStatus as PrismaDistributionStatus } from '@prisma/client'
 import prisma from '@/lib/prisma'
 
-type FrontStatus = 'مجدول' | 'تم' | 'ملغي'
-
-function toDbStatus(status: FrontStatus) {
-  switch (status) {
-    case 'تم':
-      return 'COMPLETED'
-    case 'ملغي':
-      return 'CANCELLED'
-    case 'مجدول':
-    default:
-      return 'PENDING'
-  }
-}
-
-function fromDbStatus(status: string): FrontStatus {
-  switch (status) {
-    case 'COMPLETED':
-      return 'تم'
-    case 'CANCELLED':
-      return 'ملغي'
-    case 'PENDING':
-    default:
-      return 'مجدول'
-  }
-}
-
 const createSchema = z.object({
+  beneficiaryId: z.string().trim().optional().nullable(),
   institutionId: z.string().trim().min(1, 'معرّف المؤسسة مطلوب'),
-  clinicId: z.string().trim().min(1, 'معرّف العيادة مطلوب'),
-  productId: z.string().trim().min(1, 'معرّف المنتج مطلوب'),
-  quantity: z.coerce.number().int().positive('يجب أن تكون الكمية أكبر من 0'),
-  status: z.enum(['مجدول', 'تم', 'ملغي']).default('مجدول'),
+  productId: z.string().trim().optional().nullable(),
+  quantity: z.coerce.number().int().min(0, 'يجب أن تكون الكمية 0 أو أكثر').default(0),
+  status: z.nativeEnum(PrismaDistributionStatus).default(PrismaDistributionStatus.PENDING),
+  aidId: z.string().trim().optional().nullable(),
+  clinicId: z.string().trim().optional().nullable(),
+  placeId: z.string().trim().optional().nullable(),
 })
 
 const updateSchema = z.object({
+  beneficiaryId: z.string().trim().optional().nullable(),
   institutionId: z.string().trim().min(1, 'معرّف المؤسسة مطلوب').optional(),
-  clinicId: z.string().trim().min(1, 'معرّف العيادة مطلوب').optional(),
-  productId: z.string().trim().min(1, 'معرّف المنتج مطلوب').optional(),
-  quantity: z.coerce.number().int().positive('يجب أن تكون الكمية أكبر من 0').optional(),
-  status: z.enum(['مجدول', 'تم', 'ملغي']).optional(),
+  productId: z.string().trim().optional().nullable(),
+  quantity: z.coerce.number().int().min(0, 'يجب أن تكون الكمية 0 أو أكثر').optional(),
+  status: z.nativeEnum(PrismaDistributionStatus).optional(),
+  aidId: z.string().trim().optional().nullable(),
+  clinicId: z.string().trim().optional().nullable(),
+  placeId: z.string().trim().optional().nullable(),
 })
 
+function normalizeOptional(value?: string | null) {
+  if (value == null) return null
+  const trimmed = value.trim()
+  return trimmed === '' ? null : trimmed
+}
+
 async function ensureRelationsExist(input: {
+  beneficiaryId?: string | null
   institutionId?: string
-  clinicId?: string
-  productId?: string
+  productId?: string | null
+  aidId?: string | null
+  clinicId?: string | null
+  placeId?: string | null
 }) {
   if (input.institutionId) {
     const institution = await prisma.institution.findUnique({
@@ -58,6 +47,39 @@ async function ensureRelationsExist(input: {
 
     if (!institution) {
       throw new Error('معرّف المؤسسة غير موجود')
+    }
+  }
+
+  if (input.beneficiaryId) {
+    const beneficiary = await prisma.beneficiary.findUnique({
+      where: { id: input.beneficiaryId },
+      select: { id: true },
+    })
+
+    if (!beneficiary) {
+      throw new Error('معرّف المستفيد غير موجود')
+    }
+  }
+
+  if (input.productId) {
+    const product = await prisma.product.findUnique({
+      where: { id: input.productId },
+      select: { id: true },
+    })
+
+    if (!product) {
+      throw new Error('معرّف المنتج غير موجود')
+    }
+  }
+
+  if (input.aidId) {
+    const aid = await prisma.aid.findUnique({
+      where: { id: input.aidId },
+      select: { id: true },
+    })
+
+    if (!aid) {
+      throw new Error('معرّف المساعدة غير موجود')
     }
   }
 
@@ -72,48 +94,49 @@ async function ensureRelationsExist(input: {
     }
   }
 
-  if (input.productId) {
-    const product = await prisma.product.findUnique({
-      where: { id: input.productId },
+  if (input.placeId) {
+    const place = await prisma.place.findUnique({
+      where: { id: input.placeId },
       select: { id: true },
     })
 
-    if (!product) {
-      throw new Error('معرّف المنتج غير موجود')
+    if (!place) {
+      throw new Error('معرّف المكان غير موجود')
     }
   }
 }
 
 function formatDistribution(row: {
   id: string
+  beneficiaryId: string | null
   institutionId: string
-  clinicId: string | null
   productId: string | null
   quantity: number
-  status: string
+  status: PrismaDistributionStatus
+  aidId: string | null
+  clinicId: string | null
+  placeId: string | null
 }) {
   return {
     id: row.id,
+    beneficiaryId: row.beneficiaryId,
     institutionId: row.institutionId,
-    clinicId: row.clinicId ?? '',
-    productId: row.productId ?? '',
+    productId: row.productId,
     quantity: row.quantity,
-    status: fromDbStatus(row.status),
+    status: row.status,
+    aidId: row.aidId,
+    clinicId: row.clinicId,
+    placeId: row.placeId,
   }
 }
 
 export async function GET() {
   try {
-    const rows = await prisma.distribution.findMany({
+    const distributions = await prisma.distribution.findMany({
       orderBy: { id: 'desc' },
-      include: {
-        institution: true,
-        clinic: true,
-        product: true,
-      },
     })
 
-    return NextResponse.json(rows.map(formatDistribution))
+    return NextResponse.json(distributions.map(formatDistribution))
   } catch (e) {
     return NextResponse.json(
       { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
@@ -126,25 +149,21 @@ export async function POST(req: NextRequest) {
   try {
     const body = createSchema.parse(await req.json())
 
-    await ensureRelationsExist({
-      institutionId: body.institutionId,
-      clinicId: body.clinicId,
-      productId: body.productId,
-    })
+    const payload = {
+      beneficiaryId: normalizeOptional(body.beneficiaryId),
+      institutionId: body.institutionId.trim(),
+      productId: normalizeOptional(body.productId),
+      quantity: body.quantity,
+      status: body.status,
+      aidId: normalizeOptional(body.aidId),
+      clinicId: normalizeOptional(body.clinicId),
+      placeId: normalizeOptional(body.placeId),
+    }
+
+    await ensureRelationsExist(payload)
 
     const created = await prisma.distribution.create({
-      data: {
-        institutionId: body.institutionId,
-        clinicId: body.clinicId,
-        productId: body.productId,
-        quantity: body.quantity,
-        status: toDbStatus(body.status) as any,
-      },
-      include: {
-        institution: true,
-        clinic: true,
-        product: true,
-      },
+      data: payload,
     })
 
     return NextResponse.json(formatDistribution(created), { status: 201 })
@@ -156,13 +175,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (e instanceof Prisma.PrismaClientKnownRequestError) {
-      if (e.code === 'P2003') {
-        return NextResponse.json(
-          { message: 'أحد المعرّفات المرتبطة غير موجود في قاعدة البيانات' },
-          { status: 400 }
-        )
-      }
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
+      return NextResponse.json(
+        { message: 'أحد المعرّفات المرتبطة غير موجود في قاعدة البيانات' },
+        { status: 400 }
+      )
     }
 
     return NextResponse.json(
@@ -184,32 +201,52 @@ export async function PUT(req: NextRequest) {
 
     const existing = await prisma.distribution.findUnique({
       where: { id },
-      select: { id: true },
+      select: {
+        id: true,
+        beneficiaryId: true,
+        institutionId: true,
+        productId: true,
+        quantity: true,
+        status: true,
+        aidId: true,
+        clinicId: true,
+        placeId: true,
+      },
     })
 
     if (!existing) {
       return NextResponse.json({ message: 'التوزيع غير موجود' }, { status: 404 })
     }
 
-    await ensureRelationsExist({
-      institutionId: body.institutionId,
-      clinicId: body.clinicId,
-      productId: body.productId,
-    })
+    const merged = {
+      beneficiaryId:
+        body.beneficiaryId !== undefined
+          ? normalizeOptional(body.beneficiaryId)
+          : existing.beneficiaryId,
+      institutionId: body.institutionId ?? existing.institutionId,
+      productId:
+        body.productId !== undefined ? normalizeOptional(body.productId) : existing.productId,
+      quantity: body.quantity ?? existing.quantity,
+      status: body.status ?? existing.status,
+      aidId: body.aidId !== undefined ? normalizeOptional(body.aidId) : existing.aidId,
+      clinicId: body.clinicId !== undefined ? normalizeOptional(body.clinicId) : existing.clinicId,
+      placeId: body.placeId !== undefined ? normalizeOptional(body.placeId) : existing.placeId,
+    }
+
+    await ensureRelationsExist(merged)
 
     const updated = await prisma.distribution.update({
       where: { id },
       data: {
+        beneficiaryId:
+          body.beneficiaryId !== undefined ? normalizeOptional(body.beneficiaryId) : undefined,
         institutionId: body.institutionId,
-        clinicId: body.clinicId,
-        productId: body.productId,
+        productId: body.productId !== undefined ? normalizeOptional(body.productId) : undefined,
         quantity: body.quantity,
-        status: body.status ? (toDbStatus(body.status) as any) : undefined,
-      },
-      include: {
-        institution: true,
-        clinic: true,
-        product: true,
+        status: body.status,
+        aidId: body.aidId !== undefined ? normalizeOptional(body.aidId) : undefined,
+        clinicId: body.clinicId !== undefined ? normalizeOptional(body.clinicId) : undefined,
+        placeId: body.placeId !== undefined ? normalizeOptional(body.placeId) : undefined,
       },
     })
 
@@ -222,13 +259,11 @@ export async function PUT(req: NextRequest) {
       )
     }
 
-    if (e instanceof Prisma.PrismaClientKnownRequestError) {
-      if (e.code === 'P2003') {
-        return NextResponse.json(
-          { message: 'أحد المعرّفات المرتبطة غير موجود في قاعدة البيانات' },
-          { status: 400 }
-        )
-      }
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
+      return NextResponse.json(
+        { message: 'أحد المعرّفات المرتبطة غير موجود في قاعدة البيانات' },
+        { status: 400 }
+      )
     }
 
     return NextResponse.json(

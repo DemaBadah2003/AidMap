@@ -1,37 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { ActiveStatus } from '@prisma/client'
-import prisma from '../../../../../lib/prisma'
+import prisma from '@/lib/prisma'
 
-const normalizeText = (value: string) =>
-  value
-    .trim()
-    .replace(/\s+/g, ' ')
-    .toLowerCase()
+function normalizeText(value: string) {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase()
+}
 
-const arabicStatusSchema = z.enum(['نشط', 'غير نشط'])
-
-const createProductSchema = z.object({
-  nameAr: z.string().trim().min(1, 'اسم المنتج مطلوب'),
-  quantity: z.number().int().min(0, 'الكمية يجب أن تكون 0 أو أكثر'),
-  status: arabicStatusSchema,
-})
-
-const updateProductSchema = z
-  .object({
-    nameAr: z.string().trim().min(1, 'اسم المنتج مطلوب').optional(),
-    quantity: z.number().int().min(0, 'الكمية يجب أن تكون 0 أو أكثر').optional(),
-    status: arabicStatusSchema.optional(),
-  })
-  .strict()
-
-function toPrismaStatus(status: 'نشط' | 'غير نشط'): ActiveStatus {
+function toDbStatus(status: 'نشط' | 'غير نشط'): ActiveStatus {
   return status === 'نشط' ? ActiveStatus.ACTIVE : ActiveStatus.INACTIVE
 }
 
-function fromPrismaStatus(status: ActiveStatus): 'نشط' | 'غير نشط' {
+function fromDbStatus(status: ActiveStatus): 'نشط' | 'غير نشط' {
   return status === ActiveStatus.ACTIVE ? 'نشط' : 'غير نشط'
 }
+
+const createSchema = z.object({
+  nameAr: z.string().trim().min(1, 'اسم المنتج مطلوب'),
+  quantity: z.coerce.number().int().min(0, 'الكمية يجب أن تكون 0 أو أكثر'),
+  status: z.enum(['نشط', 'غير نشط']),
+})
+
+const updateSchema = z.object({
+  nameAr: z.string().trim().min(1, 'اسم المنتج مطلوب').optional(),
+  quantity: z.coerce
+    .number()
+    .int()
+    .min(0, 'الكمية يجب أن تكون 0 أو أكثر')
+    .optional(),
+  status: z.enum(['نشط', 'غير نشط']).optional(),
+})
 
 function formatProduct(product: {
   id: string
@@ -43,12 +41,12 @@ function formatProduct(product: {
     id: product.id,
     nameAr: product.name,
     quantity: product.quantity,
-    status: fromPrismaStatus(product.status),
+    status: fromDbStatus(product.status),
   }
 }
 
 async function hasDuplicateProduct(nameAr: string, excludeId?: string) {
-  const rows = await prisma.product.findMany({
+  const products = await prisma.product.findMany({
     select: {
       id: true,
       name: true,
@@ -57,19 +55,17 @@ async function hasDuplicateProduct(nameAr: string, excludeId?: string) {
 
   const normalizedInput = normalizeText(nameAr)
 
-  return rows.some(
+  return products.some(
     (product) =>
       product.id !== excludeId &&
       normalizeText(product.name) === normalizedInput
   )
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const items = await prisma.product.findMany({
-      orderBy: {
-        id: 'desc',
-      },
+    const products = await prisma.product.findMany({
+      orderBy: { id: 'desc' },
       select: {
         id: true,
         name: true,
@@ -78,12 +74,10 @@ export async function GET() {
       },
     })
 
-    return NextResponse.json(items.map(formatProduct), { status: 200 })
-  } catch (error) {
-    console.error('GET /products error:', error)
-
+    return NextResponse.json(products.map(formatProduct))
+  } catch (e) {
     return NextResponse.json(
-      { message: 'تعذر جلب المنتجات' },
+      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
       { status: 500 }
     )
   }
@@ -91,13 +85,13 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const json = await req.json()
-    const body = createProductSchema.parse(json)
+    const body = createSchema.parse(await req.json())
 
     const normalizedName = body.nameAr.trim()
 
-    const duplicate = await hasDuplicateProduct(normalizedName)
-    if (duplicate) {
+    const exists = await hasDuplicateProduct(normalizedName)
+
+    if (exists) {
       return NextResponse.json(
         { message: 'المنتج موجود بالفعل (اسم المنتج مكرر).' },
         { status: 409 }
@@ -108,7 +102,7 @@ export async function POST(req: NextRequest) {
       data: {
         name: normalizedName,
         quantity: body.quantity,
-        status: toPrismaStatus(body.status),
+        status: toDbStatus(body.status),
       },
       select: {
         id: true,
@@ -119,36 +113,30 @@ export async function POST(req: NextRequest) {
     })
 
     return NextResponse.json(formatProduct(created), { status: 201 })
-  } catch (error) {
-    console.error('POST /products error:', error)
-
-    if (error instanceof z.ZodError) {
+  } catch (e) {
+    if (e instanceof z.ZodError) {
       return NextResponse.json(
-        { message: error.issues[0]?.message ?? 'البيانات المدخلة غير صحيحة' },
+        { message: 'فشل التحقق من صحة البيانات', issues: e.issues },
         { status: 400 }
       )
     }
 
     return NextResponse.json(
-      { message: 'تعذر إنشاء المنتج' },
+      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
       { status: 500 }
     )
   }
 }
 
 export async function PUT(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get('id')
+
+  if (!id) {
+    return NextResponse.json({ message: 'معرّف المنتج مفقود' }, { status: 400 })
+  }
+
   try {
-    const id = req.nextUrl.searchParams.get('id')
-
-    if (!id) {
-      return NextResponse.json(
-        { message: 'معرّف المنتج مطلوب' },
-        { status: 400 }
-      )
-    }
-
-    const json = await req.json()
-    const body = updateProductSchema.parse(json)
+    const body = updateSchema.parse(await req.json())
 
     const existing = await prisma.product.findUnique({
       where: { id },
@@ -168,13 +156,10 @@ export async function PUT(req: NextRequest) {
     }
 
     const mergedName = body.nameAr?.trim() ?? existing.name
-    const mergedQuantity = body.quantity ?? existing.quantity
-    const mergedStatus = body.status
-      ? toPrismaStatus(body.status)
-      : existing.status
 
-    const duplicate = await hasDuplicateProduct(mergedName, id)
-    if (duplicate) {
+    const exists = await hasDuplicateProduct(mergedName, id)
+
+    if (exists) {
       return NextResponse.json(
         { message: 'المنتج موجود بالفعل (اسم المنتج مكرر).' },
         { status: 409 }
@@ -184,9 +169,9 @@ export async function PUT(req: NextRequest) {
     const updated = await prisma.product.update({
       where: { id },
       data: {
-        name: mergedName,
-        quantity: mergedQuantity,
-        status: mergedStatus,
+        name: body.nameAr?.trim() ?? existing.name,
+        quantity: body.quantity ?? existing.quantity,
+        status: body.status ? toDbStatus(body.status) : existing.status,
       },
       select: {
         id: true,
@@ -196,43 +181,34 @@ export async function PUT(req: NextRequest) {
       },
     })
 
-    return NextResponse.json(formatProduct(updated), { status: 200 })
-  } catch (error) {
-    console.error('PUT /products error:', error)
-
-    if (error instanceof z.ZodError) {
+    return NextResponse.json(formatProduct(updated))
+  } catch (e) {
+    if (e instanceof z.ZodError) {
       return NextResponse.json(
-        { message: error.issues[0]?.message ?? 'البيانات المدخلة غير صحيحة' },
+        { message: 'فشل التحقق من صحة البيانات', issues: e.issues },
         { status: 400 }
       )
     }
 
     return NextResponse.json(
-      { message: 'تعذر تعديل المنتج' },
+      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
       { status: 500 }
     )
   }
 }
 
 export async function DELETE(req: NextRequest) {
-  try {
-    const id = req.nextUrl.searchParams.get('id')
-    const all = req.nextUrl.searchParams.get('all')
+  const id = req.nextUrl.searchParams.get('id')
+  const all = req.nextUrl.searchParams.get('all')
 
+  try {
     if (all === 'true') {
       await prisma.product.deleteMany()
-
-      return NextResponse.json(
-        { success: true, message: 'تم حذف جميع المنتجات' },
-        { status: 200 }
-      )
+      return NextResponse.json({ ok: true })
     }
 
     if (!id) {
-      return NextResponse.json(
-        { message: 'معرّف المنتج مطلوب' },
-        { status: 400 }
-      )
+      return NextResponse.json({ message: 'معرّف المنتج مفقود' }, { status: 400 })
     }
 
     const existing = await prisma.product.findUnique({
@@ -251,15 +227,10 @@ export async function DELETE(req: NextRequest) {
       where: { id },
     })
 
+    return NextResponse.json({ ok: true })
+  } catch (e) {
     return NextResponse.json(
-      { success: true, message: 'تم حذف المنتج' },
-      { status: 200 }
-    )
-  } catch (error) {
-    console.error('DELETE /products error:', error)
-
-    return NextResponse.json(
-      { message: 'تعذر حذف المنتج' },
+      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
       { status: 500 }
     )
   }

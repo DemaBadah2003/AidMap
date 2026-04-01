@@ -17,43 +17,66 @@ import {
 
 import { Pencil, Trash2, Save, X, Plus, Search } from 'lucide-react'
 
-type DistributionStatus = 'مجدول' | 'تم' | 'ملغي'
+type DistributionStatus = 'PENDING' | 'COMPLETED' | 'CANCELLED'
 
 type Distribution = {
   distributionId: string
+  beneficiaryId: string
   institutionId: string
-  clinicId: string
   productId: string
   quantity: number
   status: DistributionStatus
+  aidId: string
+  clinicId: string
+  placeId: string
 }
 
 type DistributionApiItem = {
   id: string
+  beneficiaryId?: string | null
   institutionId: string
-  clinicId?: string | null
   productId?: string | null
   quantity: number
   status: DistributionStatus
+  aidId?: string | null
+  clinicId?: string | null
+  placeId?: string | null
 }
 
 const BASE_URL = '/api/project/projects/distributions'
 
+const statusLabels: Record<DistributionStatus, string> = {
+  PENDING: 'مجدول',
+  COMPLETED: 'مكتمل',
+  CANCELLED: 'ملغي',
+}
+
 const createDistributionSchema = z.object({
+  beneficiaryId: z.string().trim().optional().or(z.literal('')),
   institutionId: z.string().trim().min(1, 'معرّف المؤسسة مطلوب'),
-  clinicId: z.string().trim().min(1, 'معرّف العيادة مطلوب'),
-  productId: z.string().trim().min(1, 'معرّف المنتج مطلوب'),
-  quantity: z.coerce.number().int().positive('يجب أن تكون الكمية أكبر من 0'),
-  status: z.enum(['مجدول', 'تم', 'ملغي']),
+  productId: z.string().trim().optional().or(z.literal('')),
+  quantity: z.coerce.number().int().min(0, 'الكمية يجب أن تكون 0 أو أكثر'),
+  status: z.enum(['PENDING', 'COMPLETED', 'CANCELLED']),
+  aidId: z.string().trim().optional().or(z.literal('')),
+  clinicId: z.string().trim().optional().or(z.literal('')),
+  placeId: z.string().trim().optional().or(z.literal('')),
 })
 
 const updateDistributionSchema = z.object({
+  beneficiaryId: z.string().trim().optional().or(z.literal('')),
   institutionId: z.string().trim().min(1, 'معرّف المؤسسة مطلوب').optional(),
-  clinicId: z.string().trim().min(1, 'معرّف العيادة مطلوب').optional(),
-  productId: z.string().trim().min(1, 'معرّف المنتج مطلوب').optional(),
-  quantity: z.coerce.number().int().positive('يجب أن تكون الكمية أكبر من 0').optional(),
-  status: z.enum(['مجدول', 'تم', 'ملغي']).optional(),
+  productId: z.string().trim().optional().or(z.literal('')),
+  quantity: z.coerce.number().int().min(0, 'الكمية يجب أن تكون 0 أو أكثر').optional(),
+  status: z.enum(['PENDING', 'COMPLETED', 'CANCELLED']).optional(),
+  aidId: z.string().trim().optional().or(z.literal('')),
+  clinicId: z.string().trim().optional().or(z.literal('')),
+  placeId: z.string().trim().optional().or(z.literal('')),
 })
+
+const toIntOnly = (value: string) => {
+  const digits = value.replace(/\D/g, '')
+  return digits ? Number(digits) : 0
+}
 
 function getErrorMessage(err: unknown) {
   if (err instanceof z.ZodError) {
@@ -61,6 +84,11 @@ function getErrorMessage(err: unknown) {
   }
 
   return err instanceof Error ? err.message : 'حدث خطأ غير متوقع'
+}
+
+function normalizeOptional(value: string) {
+  const trimmed = value.trim()
+  return trimmed ? trimmed : null
 }
 
 async function requestJSON<T>(url: string, options?: RequestInit): Promise<T> {
@@ -94,12 +122,47 @@ async function readDistributions(): Promise<DistributionApiItem[]> {
   return requestJSON<DistributionApiItem[]>(BASE_URL)
 }
 
+async function assertDistributionBusinessValidation(input: {
+  institutionId: string
+  quantity: number
+  status: DistributionStatus
+}) {
+  if (!input.institutionId.trim()) {
+    throw new Error('معرّف المؤسسة مطلوب')
+  }
+
+  if (!Number.isInteger(input.quantity) || input.quantity < 0) {
+    throw new Error('الكمية يجب أن تكون 0 أو أكثر')
+  }
+
+  if (!input.status) {
+    throw new Error('الحالة مطلوبة')
+  }
+}
+
 async function createDistribution(input: unknown): Promise<DistributionApiItem> {
   const body = createDistributionSchema.parse(input)
 
+  await assertDistributionBusinessValidation({
+    institutionId: body.institutionId,
+    quantity: body.quantity,
+    status: body.status,
+  })
+
+  const payload = {
+    beneficiaryId: normalizeOptional(body.beneficiaryId ?? ''),
+    institutionId: body.institutionId.trim(),
+    productId: normalizeOptional(body.productId ?? ''),
+    quantity: body.quantity,
+    status: body.status,
+    aidId: normalizeOptional(body.aidId ?? ''),
+    clinicId: normalizeOptional(body.clinicId ?? ''),
+    placeId: normalizeOptional(body.placeId ?? ''),
+  }
+
   return requestJSON<DistributionApiItem>(BASE_URL, {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   })
 }
 
@@ -108,9 +171,41 @@ async function updateDistribution(id: string, input: unknown): Promise<Distribut
 
   const body = updateDistributionSchema.parse(input)
 
+  const current = await readDistributions()
+  const existing = current.find((x) => x.id === id)
+
+  if (!existing) {
+    throw new Error('التوزيع غير موجود')
+  }
+
+  const merged = {
+    institutionId: body.institutionId ?? existing.institutionId,
+    quantity: body.quantity ?? existing.quantity,
+    status: body.status ?? existing.status,
+  }
+
+  await assertDistributionBusinessValidation(merged)
+
+  const payload = {
+    beneficiaryId:
+      body.beneficiaryId !== undefined
+        ? normalizeOptional(body.beneficiaryId)
+        : existing.beneficiaryId ?? null,
+    institutionId: body.institutionId ?? existing.institutionId,
+    productId:
+      body.productId !== undefined ? normalizeOptional(body.productId) : existing.productId ?? null,
+    quantity: body.quantity ?? existing.quantity,
+    status: body.status ?? existing.status,
+    aidId: body.aidId !== undefined ? normalizeOptional(body.aidId) : existing.aidId ?? null,
+    clinicId:
+      body.clinicId !== undefined ? normalizeOptional(body.clinicId) : existing.clinicId ?? null,
+    placeId:
+      body.placeId !== undefined ? normalizeOptional(body.placeId) : existing.placeId ?? null,
+  }
+
   return requestJSON<DistributionApiItem>(`${BASE_URL}?id=${encodeURIComponent(id)}`, {
     method: 'PUT',
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   })
 }
 
@@ -148,27 +243,36 @@ export default function DistributionsPage() {
   const [pageSize, setPageSize] = useState(10)
 
   const [addOpen, setAddOpen] = useState(false)
+  const [beneficiaryId, setBeneficiaryId] = useState('')
   const [institutionId, setInstitutionId] = useState('')
-  const [clinicId, setClinicId] = useState('')
   const [productId, setProductId] = useState('')
   const [quantity, setQuantity] = useState<number>(0)
-  const [status, setStatus] = useState<DistributionStatus>('مجدول')
+  const [status, setStatus] = useState<DistributionStatus>('PENDING')
+  const [aidId, setAidId] = useState('')
+  const [clinicId, setClinicId] = useState('')
+  const [placeId, setPlaceId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [addFormError, setAddFormError] = useState('')
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<{
+    beneficiaryId: string
     institutionId: string
-    clinicId: string
     productId: string
     quantity: number
     status: DistributionStatus
+    aidId: string
+    clinicId: string
+    placeId: string
   }>({
+    beneficiaryId: '',
     institutionId: '',
-    clinicId: '',
     productId: '',
     quantity: 0,
-    status: 'مجدول',
+    status: 'PENDING',
+    aidId: '',
+    clinicId: '',
+    placeId: '',
   })
 
   const topControlHeight = 'h-10 sm:h-11'
@@ -194,11 +298,14 @@ export default function DistributionsPage() {
         setItems(
           data.map((x) => ({
             distributionId: x.id,
+            beneficiaryId: x.beneficiaryId ?? '',
             institutionId: x.institutionId,
-            clinicId: x.clinicId ?? '',
             productId: x.productId ?? '',
             quantity: x.quantity,
             status: x.status,
+            aidId: x.aidId ?? '',
+            clinicId: x.clinicId ?? '',
+            placeId: x.placeId ?? '',
           }))
         )
       } catch (err) {
@@ -218,10 +325,14 @@ export default function DistributionsPage() {
       const matchSearch =
         !s ||
         x.distributionId.toLowerCase().includes(s) ||
+        x.beneficiaryId.toLowerCase().includes(s) ||
         x.institutionId.toLowerCase().includes(s) ||
         x.clinicId.toLowerCase().includes(s) ||
         x.productId.toLowerCase().includes(s) ||
+        x.aidId.toLowerCase().includes(s) ||
+        x.placeId.toLowerCase().includes(s) ||
         String(x.quantity).includes(s) ||
+        statusLabels[x.status].toLowerCase().includes(s) ||
         x.status.toLowerCase().includes(s)
 
       const matchStatus = statusFilter === 'all' ? true : x.status === statusFilter
@@ -243,31 +354,25 @@ export default function DistributionsPage() {
   }, [filtered, safePage, pageSize])
 
   const resetAddForm = () => {
+    setBeneficiaryId('')
     setInstitutionId('')
-    setClinicId('')
     setProductId('')
     setQuantity(0)
-    setStatus('مجدول')
+    setStatus('PENDING')
+    setAidId('')
+    setClinicId('')
+    setPlaceId('')
     setAddFormError('')
   }
 
   const isAddFormValid =
-    !!institutionId.trim() &&
-    !!clinicId.trim() &&
-    !!productId.trim() &&
-    Number.isInteger(quantity) &&
-    quantity > 0 &&
-    !!status
+    !!institutionId.trim() && Number.isInteger(quantity) && quantity >= 0 && !!status
 
   const onAdd = async () => {
-    if (
-      !institutionId.trim() ||
-      !clinicId.trim() ||
-      !productId.trim() ||
-      !Number.isInteger(quantity) ||
-      quantity <= 0
-    ) {
-      setAddFormError('يرجى تعبئة جميع الحقول المطلوبة بشكل صحيح')
+    const institution = institutionId.trim()
+
+    if (!institution || !Number.isInteger(quantity) || quantity < 0 || !status) {
+      setAddFormError('يرجى تعبئة الحقول المطلوبة بشكل صحيح')
       return
     }
 
@@ -277,21 +382,27 @@ export default function DistributionsPage() {
 
     try {
       const created = await distributionsApi.create({
-        institutionId: institutionId.trim(),
-        clinicId: clinicId.trim(),
-        productId: productId.trim(),
+        beneficiaryId,
+        institutionId: institution,
+        productId,
         quantity,
         status,
+        aidId,
+        clinicId,
+        placeId,
       })
 
       setItems((prev) => [
         {
           distributionId: created.id,
+          beneficiaryId: created.beneficiaryId ?? '',
           institutionId: created.institutionId,
-          clinicId: created.clinicId ?? '',
           productId: created.productId ?? '',
           quantity: created.quantity,
           status: created.status,
+          aidId: created.aidId ?? '',
+          clinicId: created.clinicId ?? '',
+          placeId: created.placeId ?? '',
         },
         ...prev,
       ])
@@ -321,24 +432,27 @@ export default function DistributionsPage() {
   const startEditRow = (row: Distribution) => {
     setEditingId(row.distributionId)
     setEditDraft({
+      beneficiaryId: row.beneficiaryId,
       institutionId: row.institutionId,
-      clinicId: row.clinicId,
       productId: row.productId,
       quantity: row.quantity,
       status: row.status,
+      aidId: row.aidId,
+      clinicId: row.clinicId,
+      placeId: row.placeId,
     })
+    setError('')
   }
 
-  const cancelEditRow = () => setEditingId(null)
+  const cancelEditRow = () => {
+    setEditingId(null)
+    setError('')
+  }
 
   const saveEditRow = async (id: string) => {
-    if (
-      !editDraft.institutionId.trim() ||
-      !editDraft.clinicId.trim() ||
-      !editDraft.productId.trim() ||
-      !Number.isInteger(editDraft.quantity) ||
-      editDraft.quantity <= 0
-    ) {
+    const institution = editDraft.institutionId.trim()
+
+    if (!institution || !Number.isInteger(editDraft.quantity) || editDraft.quantity < 0) {
       setError('يرجى تعبئة البيانات بشكل صحيح قبل الحفظ')
       return
     }
@@ -347,11 +461,14 @@ export default function DistributionsPage() {
       setError('')
 
       const updated = await distributionsApi.update(id, {
-        institutionId: editDraft.institutionId.trim(),
-        clinicId: editDraft.clinicId.trim(),
-        productId: editDraft.productId.trim(),
+        beneficiaryId: editDraft.beneficiaryId,
+        institutionId: institution,
+        productId: editDraft.productId,
         quantity: editDraft.quantity,
         status: editDraft.status,
+        aidId: editDraft.aidId,
+        clinicId: editDraft.clinicId,
+        placeId: editDraft.placeId,
       })
 
       setItems((prev) =>
@@ -359,11 +476,14 @@ export default function DistributionsPage() {
           x.distributionId === id
             ? {
                 distributionId: updated.id,
+                beneficiaryId: updated.beneficiaryId ?? '',
                 institutionId: updated.institutionId,
-                clinicId: updated.clinicId ?? '',
                 productId: updated.productId ?? '',
                 quantity: updated.quantity,
                 status: updated.status,
+                aidId: updated.aidId ?? '',
+                clinicId: updated.clinicId ?? '',
+                placeId: updated.placeId ?? '',
               }
             : x
         )
@@ -424,16 +544,16 @@ export default function DistributionsPage() {
                     />
                   </div>
 
-                  <div className="min-w-[120px] max-w-[140px] sm:min-w-[150px] sm:max-w-[160px] shrink-0">
+                  <div className="min-w-[120px] max-w-[160px] shrink-0">
                     <select
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value as 'all' | DistributionStatus)}
                       className={`${selectBaseClass} ${topControlHeight} truncate`}
                     >
                       <option value="all">كل الحالات</option>
-                      <option value="مجدول">مجدول</option>
-                      <option value="تم">تم</option>
-                      <option value="ملغي">ملغي</option>
+                      <option value="PENDING">مجدول</option>
+                      <option value="COMPLETED">مكتمل</option>
+                      <option value="CANCELLED">ملغي</option>
                     </select>
                   </div>
                 </div>
@@ -466,7 +586,7 @@ export default function DistributionsPage() {
             <div className="overflow-hidden rounded-b-lg">
               <div className="w-full overflow-x-auto">
                 <table
-                  className="w-full min-w-[760px] sm:min-w-[860px] lg:min-w-[980px] table-fixed border-collapse text-xs sm:text-sm lg:text-base"
+                  className="w-full min-w-[1300px] table-fixed border-collapse text-xs sm:text-sm lg:text-base"
                   dir="rtl"
                 >
                   <thead
@@ -476,27 +596,16 @@ export default function DistributionsPage() {
                     }}
                   >
                     <tr className="text-right text-foreground/60">
-                      <th className="w-[24%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
-                        معرّف التوزيع
-                      </th>
-                      <th className="w-[20%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
-                        معرّف المؤسسة
-                      </th>
-                      <th className="w-[18%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
-                        معرّف العيادة
-                      </th>
-                      <th className="w-[18%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
-                        معرّف المنتج
-                      </th>
-                      <th className="w-[10%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
-                        الكمية
-                      </th>
-                      <th className="w-[10%] border-b border-l px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
-                        الحالة
-                      </th>
-                      <th className="w-[20%] border-b px-2 py-3 text-right text-xs font-medium sm:px-4 sm:py-4 sm:text-sm lg:px-5 lg:text-base">
-                        الإجراءات
-                      </th>
+                      <th className="border-b border-l px-3 py-3">معرّف التوزيع</th>
+                      <th className="border-b border-l px-3 py-3">المستفيد</th>
+                      <th className="border-b border-l px-3 py-3">المؤسسة</th>
+                      <th className="border-b border-l px-3 py-3">العيادة</th>
+                      <th className="border-b border-l px-3 py-3">المنتج</th>
+                      <th className="border-b border-l px-3 py-3">المساعدة</th>
+                      <th className="border-b border-l px-3 py-3">المكان</th>
+                      <th className="border-b border-l px-3 py-3">الكمية</th>
+                      <th className="border-b border-l px-3 py-3">الحالة</th>
+                      <th className="border-b px-3 py-3">الإجراءات</th>
                     </tr>
                   </thead>
 
@@ -506,83 +615,115 @@ export default function DistributionsPage() {
 
                       return (
                         <tr key={row.distributionId} className="align-top hover:bg-muted/30">
-                          <td className="border-b border-l px-2 py-3 text-right font-medium break-words sm:px-4 sm:py-4 lg:px-5">
-                            <span className="block break-words text-xs sm:text-sm lg:text-base font-medium leading-6 sm:leading-7">
-                              {row.distributionId}
-                            </span>
+                          <td className="border-b border-l px-3 py-3 break-words">
+                            {row.distributionId}
                           </td>
 
-                          <td className="border-b border-l px-2 py-3 text-right break-words sm:px-4 sm:py-4 lg:px-5">
+                          <td className="border-b border-l px-3 py-3">
+                            {isEditing ? (
+                              <Input
+                                value={editDraft.beneficiaryId}
+                                onChange={(e) =>
+                                  setEditDraft((p) => ({ ...p, beneficiaryId: e.target.value }))
+                                }
+                                className="h-9 rounded-lg text-right"
+                              />
+                            ) : (
+                              row.beneficiaryId || '-'
+                            )}
+                          </td>
+
+                          <td className="border-b border-l px-3 py-3">
                             {isEditing ? (
                               <Input
                                 value={editDraft.institutionId}
                                 onChange={(e) =>
                                   setEditDraft((p) => ({ ...p, institutionId: e.target.value }))
                                 }
-                                className="h-9 sm:h-10 lg:h-11 rounded-lg text-right text-xs sm:text-sm lg:text-base font-medium"
+                                className="h-9 rounded-lg text-right"
                               />
                             ) : (
-                              <span className="block break-words text-xs sm:text-sm lg:text-base font-medium leading-6 sm:leading-7">
-                                {row.institutionId}
-                              </span>
+                              row.institutionId
                             )}
                           </td>
 
-                          <td className="border-b border-l px-2 py-3 text-right break-words sm:px-4 sm:py-4 lg:px-5">
+                          <td className="border-b border-l px-3 py-3">
                             {isEditing ? (
                               <Input
                                 value={editDraft.clinicId}
                                 onChange={(e) =>
                                   setEditDraft((p) => ({ ...p, clinicId: e.target.value }))
                                 }
-                                className="h-9 sm:h-10 lg:h-11 rounded-lg text-right text-xs sm:text-sm lg:text-base font-medium"
+                                className="h-9 rounded-lg text-right"
                               />
                             ) : (
-                              <span className="block break-words text-xs sm:text-sm lg:text-base font-medium leading-6 sm:leading-7">
-                                {row.clinicId}
-                              </span>
+                              row.clinicId || '-'
                             )}
                           </td>
 
-                          <td className="border-b border-l px-2 py-3 text-right break-words sm:px-4 sm:py-4 lg:px-5">
+                          <td className="border-b border-l px-3 py-3">
                             {isEditing ? (
                               <Input
                                 value={editDraft.productId}
                                 onChange={(e) =>
                                   setEditDraft((p) => ({ ...p, productId: e.target.value }))
                                 }
-                                className="h-9 sm:h-10 lg:h-11 rounded-lg text-right text-xs sm:text-sm lg:text-base font-medium"
+                                className="h-9 rounded-lg text-right"
                               />
                             ) : (
-                              <span className="block break-words text-xs sm:text-sm lg:text-base font-medium leading-6 sm:leading-7">
-                                {row.productId}
-                              </span>
+                              row.productId || '-'
                             )}
                           </td>
 
-                          <td className="border-b border-l px-2 py-3 text-right sm:px-4 sm:py-4 lg:px-5">
+                          <td className="border-b border-l px-3 py-3">
+                            {isEditing ? (
+                              <Input
+                                value={editDraft.aidId}
+                                onChange={(e) =>
+                                  setEditDraft((p) => ({ ...p, aidId: e.target.value }))
+                                }
+                                className="h-9 rounded-lg text-right"
+                              />
+                            ) : (
+                              row.aidId || '-'
+                            )}
+                          </td>
+
+                          <td className="border-b border-l px-3 py-3">
+                            {isEditing ? (
+                              <Input
+                                value={editDraft.placeId}
+                                onChange={(e) =>
+                                  setEditDraft((p) => ({ ...p, placeId: e.target.value }))
+                                }
+                                className="h-9 rounded-lg text-right"
+                              />
+                            ) : (
+                              row.placeId || '-'
+                            )}
+                          </td>
+
+                          <td className="border-b border-l px-3 py-3">
                             {isEditing ? (
                               <Input
                                 inputMode="numeric"
                                 pattern="[0-9]*"
                                 type="text"
-                                value={editDraft.quantity ? String(editDraft.quantity) : ''}
+                                value={String(editDraft.quantity)}
                                 onChange={(e) =>
                                   setEditDraft((p) => ({
                                     ...p,
-                                    quantity: Number(e.target.value.replace(/\D/g, '')) || 0,
+                                    quantity: toIntOnly(e.target.value),
                                   }))
                                 }
-                                className="h-9 sm:h-10 lg:h-11 rounded-lg text-right text-xs sm:text-sm lg:text-base font-medium"
+                                className="h-9 rounded-lg text-right"
                               />
                             ) : (
-                              <span className="block break-words text-xs sm:text-sm lg:text-base font-medium leading-6 sm:leading-7">
-                                {row.quantity}
-                              </span>
+                              row.quantity
                             )}
                           </td>
 
-                          <td className="border-b border-l px-2 py-3 text-right sm:px-4 sm:py-4 lg:px-5">
+                          <td className="border-b border-l px-3 py-3">
                             {isEditing ? (
                               <select
                                 value={editDraft.status}
@@ -592,20 +733,20 @@ export default function DistributionsPage() {
                                     status: e.target.value as DistributionStatus,
                                   }))
                                 }
-                                className="h-9 sm:h-10 lg:h-11 w-full min-w-0 rounded-lg border bg-background px-2 sm:px-3 text-right text-xs sm:text-sm lg:text-base truncate"
+                                className="h-9 w-full rounded-lg border bg-background px-3 text-right"
                               >
-                                <option value="مجدول">مجدول</option>
-                                <option value="تم">تم</option>
-                                <option value="ملغي">ملغي</option>
+                                <option value="PENDING">مجدول</option>
+                                <option value="COMPLETED">مكتمل</option>
+                                <option value="CANCELLED">ملغي</option>
                               </select>
                             ) : (
                               <span className="inline-flex items-center rounded-md border px-2 py-1 text-xs">
-                                {row.status}
+                                {statusLabels[row.status]}
                               </span>
                             )}
                           </td>
 
-                          <td className="border-b px-2 py-3 sm:px-4 sm:py-4 lg:px-5">
+                          <td className="border-b px-3 py-3">
                             <div className="flex flex-nowrap items-center justify-start gap-2 overflow-x-auto">
                               {!isEditing ? (
                                 <>
@@ -634,10 +775,8 @@ export default function DistributionsPage() {
                                     onClick={() => saveEditRow(row.distributionId)}
                                     disabled={
                                       !editDraft.institutionId.trim() ||
-                                      !editDraft.clinicId.trim() ||
-                                      !editDraft.productId.trim() ||
                                       !Number.isInteger(editDraft.quantity) ||
-                                      editDraft.quantity <= 0
+                                      editDraft.quantity < 0
                                     }
                                   >
                                     <Save className="ms-1 size-4" />
@@ -662,7 +801,7 @@ export default function DistributionsPage() {
 
                     {!pageItems.length && (
                       <tr>
-                        <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                        <td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">
                           لا توجد توزيعات
                         </td>
                       </tr>
@@ -734,40 +873,61 @@ export default function DistributionsPage() {
 
             <div className="grid gap-3 text-right">
               <div className="grid gap-2">
+                <div className="text-sm">معرّف المستفيد</div>
+                <Input
+                  value={beneficiaryId}
+                  onChange={(e) => setBeneficiaryId(e.target.value)}
+                  placeholder="اختياري"
+                  className="h-10 text-right sm:h-11"
+                />
+              </div>
+
+              <div className="grid gap-2">
                 <div className="text-sm">معرّف المؤسسة *</div>
                 <Input
                   value={institutionId}
-                  onChange={(e) => {
-                    setInstitutionId(e.target.value)
-                    if (addFormError) setAddFormError('')
-                  }}
+                  onChange={(e) => setInstitutionId(e.target.value)}
                   placeholder="أدخل UUID المؤسسة"
                   className="h-10 text-right sm:h-11"
                 />
               </div>
 
               <div className="grid gap-2">
-                <div className="text-sm">معرّف العيادة *</div>
+                <div className="text-sm">معرّف العيادة</div>
                 <Input
                   value={clinicId}
-                  onChange={(e) => {
-                    setClinicId(e.target.value)
-                    if (addFormError) setAddFormError('')
-                  }}
-                  placeholder="أدخل UUID العيادة"
+                  onChange={(e) => setClinicId(e.target.value)}
+                  placeholder="اختياري"
                   className="h-10 text-right sm:h-11"
                 />
               </div>
 
               <div className="grid gap-2">
-                <div className="text-sm">معرّف المنتج *</div>
+                <div className="text-sm">معرّف المنتج</div>
                 <Input
                   value={productId}
-                  onChange={(e) => {
-                    setProductId(e.target.value)
-                    if (addFormError) setAddFormError('')
-                  }}
-                  placeholder="أدخل UUID المنتج"
+                  onChange={(e) => setProductId(e.target.value)}
+                  placeholder="اختياري"
+                  className="h-10 text-right sm:h-11"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <div className="text-sm">معرّف المساعدة</div>
+                <Input
+                  value={aidId}
+                  onChange={(e) => setAidId(e.target.value)}
+                  placeholder="اختياري"
+                  className="h-10 text-right sm:h-11"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <div className="text-sm">معرّف المكان</div>
+                <Input
+                  value={placeId}
+                  onChange={(e) => setPlaceId(e.target.value)}
+                  placeholder="اختياري"
                   className="h-10 text-right sm:h-11"
                 />
               </div>
@@ -778,11 +938,8 @@ export default function DistributionsPage() {
                   inputMode="numeric"
                   pattern="[0-9]*"
                   type="text"
-                  value={quantity ? String(quantity) : ''}
-                  onChange={(e) => {
-                    setQuantity(Number(e.target.value.replace(/\D/g, '')) || 0)
-                    if (addFormError) setAddFormError('')
-                  }}
+                  value={quantity ? String(quantity) : '0'}
+                  onChange={(e) => setQuantity(toIntOnly(e.target.value))}
                   placeholder="مثال: 150"
                   className="h-10 text-right sm:h-11"
                 />
@@ -792,17 +949,12 @@ export default function DistributionsPage() {
                 <div className="text-sm">الحالة *</div>
                 <select
                   value={status}
-                  onChange={(e) => {
-                    setStatus(e.target.value as DistributionStatus)
-                    if (addFormError) setAddFormError('')
-                  }}
-                  className={`h-10 rounded-md border bg-background px-3 text-right sm:h-11 ${
-                    addFormError ? 'border-red-500' : ''
-                  }`}
+                  onChange={(e) => setStatus(e.target.value as DistributionStatus)}
+                  className="h-10 rounded-md border bg-background px-3 text-right sm:h-11"
                 >
-                  <option value="مجدول">مجدول</option>
-                  <option value="تم">تم</option>
-                  <option value="ملغي">ملغي</option>
+                  <option value="PENDING">مجدول</option>
+                  <option value="COMPLETED">مكتمل</option>
+                  <option value="CANCELLED">ملغي</option>
                 </select>
 
                 {!!addFormError && (

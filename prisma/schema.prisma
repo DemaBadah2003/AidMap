@@ -88,6 +88,31 @@ model Account {
   @@unique([provider, providerAccountId], name: "provider_providerAccountId")
 }
 
+model Shelter {
+  id            String         @id @default(uuid())
+  name          String
+  area          String
+  phone         String
+  familiesCount Int            @default(0)
+  capacity      Int            @default(0)
+  fillStatus    CampFillStatus @default(NOT_FULL)
+  supervisorId  String
+  placeId       String?        @unique
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  isTrashed     Boolean        @default(false)
+  isProtected   Boolean        @default(false)
+
+  supervisor Supervisor @relation(fields: [supervisorId], references: [id])
+  place      Place?     @relation("ShelterPlace", fields: [placeId], references: [id])
+
+  @@index([supervisorId])
+  @@index([fillStatus])
+  @@index([name])
+  @@index([area])
+  @@index([isTrashed])
+}
+
 model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique
@@ -166,6 +191,8 @@ model Supervisor {
   isTrashed   Boolean       @default(false)
   isProtected Boolean       @default(false)
   camps       Camps[]
+  shelters    Shelter[]
+
   emergencies Emergency[]
 
   @@index([status])
@@ -360,25 +387,27 @@ model Distribution {
 }
 
 model Place {
-  id            String         @id @default(uuid())
+  id            String      @id @default(uuid())
   name          String
   type          PlaceType
   description   String?
-  latitude      Decimal        @db.Decimal(10, 7)
-  longitude     Decimal        @db.Decimal(10, 7)
-  status        PlaceStatus    @default(AVAILABLE)
-  isActive      Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  isTrashed     Boolean        @default(false)
-  isProtected   Boolean        @default(false)
+  latitude      Decimal     @db.Decimal(10, 7)
+  longitude     Decimal     @db.Decimal(10, 7)
+  status        PlaceStatus @default(AVAILABLE)
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  isTrashed     Boolean     @default(false)
+  isProtected   Boolean     @default(false)
   operator      String?
   capacity      Int?
   occupancy     Int?
   availableBeds Int?
   statusText    String?
-  camp          Camps?         @relation("CampPlace")
-  clinic        Clinic?        @relation("ClinicPlace")
+  camp          Camps?      @relation("CampPlace")
+  clinic        Clinic?     @relation("ClinicPlace")
+  shelter       Shelter?    @relation("ShelterPlace")
+
   distributions Distribution[]
   institution   Institution?   @relation("InstitutionPlace")
 
