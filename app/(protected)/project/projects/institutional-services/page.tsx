@@ -20,76 +20,205 @@ import { Pencil, Trash2, Save, X, Plus, Search } from 'lucide-react'
 type ActiveStatus = 'مفعل' | 'غير مفعل'
 
 type InstitutionService = {
-  id: string // PK (string للعرض/التحرير بسهولة)
-  institutionId: number
-  serviceId: number // FK
+  id: string
+  institutionId: string
+  serviceId: string
   status: ActiveStatus
 }
 
-const seed: InstitutionService[] = [
-  { id: 'is_01', institutionId: 10, serviceId: 101, status: 'مفعل' },
-  { id: 'is_02', institutionId: 10, serviceId: 102, status: 'غير مفعل' },
-  { id: 'is_03', institutionId: 12, serviceId: 104, status: 'مفعل' },
-]
+type InstitutionServiceApiItem = {
+  id: string
+  institutionId: string
+  serviceId: string
+}
 
-// ✅ أرقام صحيحة فقط
-const toIntOnly = (value: string) => {
-  const digits = value.replace(/\D/g, '')
-  return digits ? Number(digits) : 0
+const BASE_URL = '/api/project/projects/institutional-services'
+
+function getErrorMessage(err: unknown) {
+  return err instanceof Error ? err.message : 'حدث خطأ غير متوقع'
+}
+
+async function requestJSON<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options?.headers ?? {}),
+    },
+    cache: 'no-store',
+  })
+
+  const text = await res.text()
+  let data: any = null
+
+  try {
+    data = text ? JSON.parse(text) : null
+  } catch {
+    data = text || null
+  }
+
+  if (!res.ok) {
+    const msg = data?.message ?? `فشل الطلب: ${res.status}`
+    throw new Error(msg)
+  }
+
+  return data as T
+}
+
+async function readInstitutionServices(): Promise<InstitutionServiceApiItem[]> {
+  return requestJSON<InstitutionServiceApiItem[]>(BASE_URL)
+}
+
+async function createInstitutionService(input: {
+  institutionId: string
+  serviceId: string
+}): Promise<InstitutionServiceApiItem> {
+  if (!input.institutionId.trim()) throw new Error('معرف المؤسسة مطلوب')
+  if (!input.serviceId.trim()) throw new Error('معرف الخدمة مطلوب')
+
+  return requestJSON<InstitutionServiceApiItem>(BASE_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      institutionId: input.institutionId.trim(),
+      serviceId: input.serviceId.trim(),
+    }),
+  })
+}
+
+async function updateInstitutionService(
+  id: string,
+  input: {
+    institutionId?: string
+    serviceId?: string
+  }
+): Promise<InstitutionServiceApiItem> {
+  if (!id) throw new Error('معرّف السجل مفقود')
+
+  const body: Record<string, string> = {}
+
+  if (typeof input.institutionId === 'string') {
+    if (!input.institutionId.trim()) throw new Error('معرف المؤسسة مطلوب')
+    body.institutionId = input.institutionId.trim()
+  }
+
+  if (typeof input.serviceId === 'string') {
+    if (!input.serviceId.trim()) throw new Error('معرف الخدمة مطلوب')
+    body.serviceId = input.serviceId.trim()
+  }
+
+  return requestJSON<InstitutionServiceApiItem>(`${BASE_URL}?id=${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+}
+
+async function deleteInstitutionService(id: string): Promise<void> {
+  if (!id) throw new Error('معرّف السجل مفقود')
+
+  await requestJSON(`${BASE_URL}?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
+}
+
+async function deleteAllInstitutionServices(): Promise<void> {
+  await requestJSON(`${BASE_URL}?all=true`, {
+    method: 'DELETE',
+  })
+}
+
+const institutionServicesApi = {
+  list: readInstitutionServices,
+  create: createInstitutionService,
+  update: updateInstitutionService,
+  remove: deleteInstitutionService,
+  removeAll: deleteAllInstitutionServices,
 }
 
 export default function InstitutionServicesPage() {
   const [q, setQ] = useState('')
-  const [items, setItems] = useState<InstitutionService[]>(seed)
+  const [items, setItems] = useState<InstitutionService[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  // فلترة الحالة من فوق
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  const [statusPick, setStatusPick] = useState<Record<string, ActiveStatus>>({})
 
-  // Pagination
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
-  // Add dialog
   const [addOpen, setAddOpen] = useState(false)
-  const [institutionId, setInstitutionId] = useState<number>(0)
-  const [serviceId, setServiceId] = useState<number>(0)
+  const [institutionId, setInstitutionId] = useState('')
+  const [serviceId, setServiceId] = useState('')
   const [status, setStatus] = useState<ActiveStatus>('مفعل')
+  const [submitting, setSubmitting] = useState(false)
+  const [addFormError, setAddFormError] = useState('')
 
-  // Inline Edit
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<{
-    institutionId: number
-    serviceId: number
+    institutionId: string
+    serviceId: string
     status: ActiveStatus
   }>({
-    institutionId: 0,
-    serviceId: 0,
+    institutionId: '',
+    serviceId: '',
     status: 'مفعل',
   })
 
-  // ✅ فلترة search + فلترة status
+  useEffect(() => {
+    const run = async () => {
+      setLoading(true)
+      setError('')
+
+      try {
+        const data = await institutionServicesApi.list()
+
+        setItems(
+          data.map((x) => ({
+            id: x.id,
+            institutionId: x.institutionId,
+            serviceId: x.serviceId,
+            status: 'مفعل',
+          }))
+        )
+
+        const pick: Record<string, ActiveStatus> = {}
+        data.forEach((x) => {
+          pick[x.id] = 'مفعل'
+        })
+        setStatusPick(pick)
+      } catch (err) {
+        setError(getErrorMessage(err))
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    run()
+  }, [])
+
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
 
     return items.filter((x) => {
+      const rowStatus = statusPick[x.id] ?? x.status
+
       const matchSearch =
         !s ||
         x.id.toLowerCase().includes(s) ||
-        String(x.institutionId).includes(s) ||
-        String(x.serviceId).includes(s)
+        x.institutionId.toLowerCase().includes(s) ||
+        x.serviceId.toLowerCase().includes(s)
 
       const matchStatus =
         statusFilter === 'all'
           ? true
           : statusFilter === 'active'
-            ? x.status === 'مفعل'
-            : x.status === 'غير مفعل'
+          ? rowStatus === 'مفعل'
+          : rowStatus === 'غير مفعل'
 
       return matchSearch && matchStatus
     })
-  }, [q, items, statusFilter])
+  }, [q, items, statusFilter, statusPick])
 
-  // ✅ reset page عند أي تغيير
   useEffect(() => {
     setPage(1)
   }, [q, statusFilter, pageSize])
@@ -102,27 +231,74 @@ export default function InstitutionServicesPage() {
     return filtered.slice(start, start + pageSize)
   }, [filtered, safePage, pageSize])
 
-  const onAdd = () => {
-    if (!Number.isInteger(institutionId) || institutionId <= 0) return
-    if (!Number.isInteger(serviceId) || serviceId <= 0) return
-
-    const newItem: InstitutionService = {
-      id: `is_${Math.random().toString(16).slice(2, 8)}`,
-      institutionId,
-      serviceId,
-      status,
-    }
-
-    setItems((prev) => [newItem, ...prev])
-    setInstitutionId(0)
-    setServiceId(0)
+  const resetAddForm = () => {
+    setInstitutionId('')
+    setServiceId('')
     setStatus('مفعل')
-    setAddOpen(false)
+    setAddFormError('')
   }
 
-  const onDeleteOne = (id: string) => {
-    if (editingId === id) setEditingId(null)
-    setItems((prev) => prev.filter((x) => x.id !== id))
+  const isAddFormValid = !!institutionId.trim() && !!serviceId.trim()
+
+  const onAdd = async () => {
+    const inst = institutionId.trim()
+    const serv = serviceId.trim()
+
+    if (!inst || !serv) {
+      setAddFormError('يرجى تعبئة جميع الحقول المطلوبة بشكل صحيح')
+      return
+    }
+
+    setSubmitting(true)
+    setError('')
+    setAddFormError('')
+
+    try {
+      const created = await institutionServicesApi.create({
+        institutionId: inst,
+        serviceId: serv,
+      })
+
+      setItems((prev) => [
+        {
+          id: created.id,
+          institutionId: created.institutionId,
+          serviceId: created.serviceId,
+          status,
+        },
+        ...prev,
+      ])
+
+      setStatusPick((prev) => ({
+        ...prev,
+        [created.id]: status,
+      }))
+
+      resetAddForm()
+      setAddOpen(false)
+    } catch (err) {
+      setAddFormError(getErrorMessage(err))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const onDeleteOne = async (id: string) => {
+    try {
+      setError('')
+      await institutionServicesApi.remove(id)
+
+      if (editingId === id) setEditingId(null)
+
+      setItems((prev) => prev.filter((x) => x.id !== id))
+      setStatusPick((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+    } catch (err) {
+      setError(getErrorMessage(err))
+    }
   }
 
   const startEditRow = (row: InstitutionService) => {
@@ -130,99 +306,129 @@ export default function InstitutionServicesPage() {
     setEditDraft({
       institutionId: row.institutionId,
       serviceId: row.serviceId,
-      status: row.status,
+      status: statusPick[row.id] ?? row.status,
     })
   }
 
   const cancelEditRow = () => setEditingId(null)
 
-  const saveEditRow = (id: string) => {
-    if (!Number.isInteger(editDraft.institutionId) || editDraft.institutionId <= 0) return
-    if (!Number.isInteger(editDraft.serviceId) || editDraft.serviceId <= 0) return
+  const saveEditRow = async (id: string) => {
+    const inst = editDraft.institutionId.trim()
+    const serv = editDraft.serviceId.trim()
 
-    setItems((prev) =>
-      prev.map((x) =>
-        x.id === id
-          ? {
-              ...x,
-              institutionId: editDraft.institutionId,
-              serviceId: editDraft.serviceId,
-              status: editDraft.status,
-            }
-          : x
+    if (!inst || !serv) {
+      setError('يرجى تعبئة البيانات بشكل صحيح قبل الحفظ')
+      return
+    }
+
+    try {
+      setError('')
+
+      const updated = await institutionServicesApi.update(id, {
+        institutionId: inst,
+        serviceId: serv,
+      })
+
+      setItems((prev) =>
+        prev.map((x) =>
+          x.id === id
+            ? {
+                ...x,
+                institutionId: updated.institutionId,
+                serviceId: updated.serviceId,
+                status: editDraft.status,
+              }
+            : x
+        )
       )
-    )
-    setEditingId(null)
+
+      setStatusPick((prev) => ({
+        ...prev,
+        [id]: editDraft.status,
+      }))
+
+      setEditingId(null)
+    } catch (err) {
+      setError(getErrorMessage(err))
+    }
   }
 
-  // Pagination label
+  const onDeleteAll = async () => {
+    try {
+      setError('')
+      await institutionServicesApi.removeAll()
+      setItems([])
+      setStatusPick({})
+      setEditingId(null)
+    } catch (err) {
+      setError(getErrorMessage(err))
+    }
+  }
+
   const rangeStart = filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1
   const rangeEnd = Math.min(safePage * pageSize, filtered.length)
 
   return (
     <div className="w-full px-3 sm:px-6 py-6" dir="rtl">
-      {/* Header */}
-      <div className="mb-6" dir="ltr">
-        <div className="text-left">
-          <div className="text-2xl font-semibold text-foreground">Institution Services</div>
+      <div className="mb-6">
+        <div className="text-right">
+          <div className="text-2xl font-semibold text-foreground">خدمات المؤسسات</div>
 
           <div className="mt-1 text-sm text-muted-foreground">
-            Home <span className="mx-1">{'>'}</span>{' '}
-            <span className="text-foreground">Institution Services Management</span>
+            الرئيسية <span className="mx-1">{'>'}</span>{' '}
+            <span className="text-foreground">إدارة خدمات المؤسسات</span>
           </div>
+
+          {loading && <div className="mt-2 text-sm text-muted-foreground">جارٍ التحميل...</div>}
+          {!!error && <div className="mt-2 text-sm text-red-600">{error}</div>}
         </div>
       </div>
 
       <div className="w-full max-w-[1200px]">
         <Card>
-          <CardContent className="p-0" dir="ltr">
-            {/* Toolbar */}
+          <CardContent className="p-0" dir="rtl">
             <div className="p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                {/* Left */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  {/* Search */}
                   <div className="relative w-full sm:w-[260px]">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Input
                       value={q}
                       onChange={(e: ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
-                      placeholder="Search institution services"
-                      className="!h-10 !rounded-lg border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:!ring-2 focus:!ring-slate-200"
+                      placeholder="ابحث في خدمات المؤسسات"
+                      className="!h-10 !rounded-lg border-slate-200 bg-white pr-9 pl-3 text-sm outline-none focus:!ring-2 focus:!ring-slate-200"
                     />
                   </div>
 
-                  {/* Status filter */}
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
                     className="h-10 w-full sm:w-[180px] rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
                   >
-                    <option value="all">All status</option>
+                    <option value="all">كل الحالات</option>
                     <option value="active">مفعل</option>
                     <option value="inactive">غير مفعل</option>
                   </select>
                 </div>
 
-                {/* Right */}
                 <div className="flex items-center gap-2 justify-end">
                   <Button
                     className="!h-10 !rounded-lg !bg-blue-600 !px-4 !text-sm !font-semibold !text-white hover:!bg-blue-700 inline-flex items-center gap-2"
-                    onClick={() => setAddOpen(true)}
+                    onClick={() => {
+                      setAddFormError('')
+                      setAddOpen(true)
+                    }}
                   >
                     <Plus className="h-4 w-4" />
-                    Add
+                    إضافة
                   </Button>
 
                   <Button
                     variant="outline"
                     className="!h-10 !rounded-lg !px-4 !text-sm !font-semibold border-slate-200 text-slate-700 hover:bg-slate-50"
-                    onClick={() => {
-                      setItems([])
-                      setEditingId(null)
-                    }}
+                    onClick={onDeleteAll}
                   >
-                    Delete all
+                    حذف الكل
                   </Button>
                 </div>
               </div>
@@ -230,7 +436,6 @@ export default function InstitutionServicesPage() {
 
             <div className="border-t" />
 
-            {/* Table */}
             <div className="rounded-b-lg overflow-hidden">
               <div className="w-full overflow-x-auto">
                 <table className="w-full text-sm border-collapse min-w-[900px]">
@@ -240,18 +445,19 @@ export default function InstitutionServicesPage() {
                       boxShadow: '0 1px 0 rgba(0,0,0,0.06)',
                     }}
                   >
-                    <tr className="text-left text-foreground/60">
-                      <th className="px-4 py-3 border-b border-r font-normal">ID (PK)</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Institution ID</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Service ID (FK)</th>
-                      <th className="px-4 py-3 border-b border-r font-normal">Status</th>
-                      <th className="px-4 py-3 border-b font-normal">Actions</th>
+                    <tr className="text-right text-foreground/60">
+                      <th className="px-4 py-3 border-b border-r font-normal">المعرف (أساسي)</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">معرف المؤسسة</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">معرف الخدمة (مرجع)</th>
+                      <th className="px-4 py-3 border-b border-r font-normal">الحالة</th>
+                      <th className="px-4 py-3 border-b font-normal">الإجراءات</th>
                     </tr>
                   </thead>
 
                   <tbody>
                     {pageItems.map((row) => {
                       const isEditing = editingId === row.id
+                      const currentStatus = statusPick[row.id] ?? row.status
 
                       return (
                         <tr key={row.id} className="hover:bg-muted/30">
@@ -260,12 +466,10 @@ export default function InstitutionServicesPage() {
                           <td className="px-4 py-3 border-b border-r">
                             {isEditing ? (
                               <Input
-                                inputMode="numeric"
-                                pattern="[0-9]*"
                                 type="text"
-                                value={editDraft.institutionId ? String(editDraft.institutionId) : ''}
+                                value={editDraft.institutionId}
                                 onChange={(e) =>
-                                  setEditDraft((p) => ({ ...p, institutionId: toIntOnly(e.target.value) }))
+                                  setEditDraft((p) => ({ ...p, institutionId: e.target.value }))
                                 }
                                 className="h-10"
                               />
@@ -277,11 +481,11 @@ export default function InstitutionServicesPage() {
                           <td className="px-4 py-3 border-b border-r">
                             {isEditing ? (
                               <Input
-                                inputMode="numeric"
-                                pattern="[0-9]*"
                                 type="text"
-                                value={editDraft.serviceId ? String(editDraft.serviceId) : ''}
-                                onChange={(e) => setEditDraft((p) => ({ ...p, serviceId: toIntOnly(e.target.value) }))}
+                                value={editDraft.serviceId}
+                                onChange={(e) =>
+                                  setEditDraft((p) => ({ ...p, serviceId: e.target.value }))
+                                }
                                 className="h-10"
                               />
                             ) : (
@@ -289,11 +493,13 @@ export default function InstitutionServicesPage() {
                             )}
                           </td>
 
-                          <td className="px-4 py-3 border-b border-r" dir="rtl">
+                          <td className="px-4 py-3 border-b border-r">
                             {isEditing ? (
                               <select
                                 value={editDraft.status}
-                                onChange={(e) => setEditDraft((p) => ({ ...p, status: e.target.value as ActiveStatus }))}
+                                onChange={(e) =>
+                                  setEditDraft((p) => ({ ...p, status: e.target.value as ActiveStatus }))
+                                }
                                 className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
                               >
                                 <option value="مفعل">مفعل</option>
@@ -301,7 +507,7 @@ export default function InstitutionServicesPage() {
                               </select>
                             ) : (
                               <span className="inline-flex items-center rounded-md border px-2 py-1 text-xs">
-                                {row.status}
+                                {currentStatus}
                               </span>
                             )}
                           </td>
@@ -313,7 +519,7 @@ export default function InstitutionServicesPage() {
                                   <button
                                     type="button"
                                     className="inline-flex items-center justify-center rounded-md border h-10 w-10 hover:bg-muted"
-                                    title="Edit"
+                                    title="تعديل"
                                     onClick={() => startEditRow(row)}
                                   >
                                     <Pencil className="size-4" />
@@ -322,7 +528,7 @@ export default function InstitutionServicesPage() {
                                   <button
                                     type="button"
                                     className="inline-flex items-center justify-center rounded-md border h-10 w-10 hover:bg-muted"
-                                    title="Delete"
+                                    title="حذف"
                                     onClick={() => onDeleteOne(row.id)}
                                   >
                                     <Trash2 className="size-4" />
@@ -334,20 +540,15 @@ export default function InstitutionServicesPage() {
                                     size="sm"
                                     className="h-10"
                                     onClick={() => saveEditRow(row.id)}
-                                    disabled={
-                                      !Number.isInteger(editDraft.institutionId) ||
-                                      editDraft.institutionId <= 0 ||
-                                      !Number.isInteger(editDraft.serviceId) ||
-                                      editDraft.serviceId <= 0
-                                    }
+                                    disabled={!editDraft.institutionId.trim() || !editDraft.serviceId.trim()}
                                   >
-                                    <Save className="size-4 me-2" />
-                                    Save
+                                    <Save className="size-4 ms-2" />
+                                    حفظ
                                   </Button>
 
                                   <Button size="sm" variant="outline" className="h-10" onClick={cancelEditRow}>
-                                    <X className="size-4 me-2" />
-                                    Cancel
+                                    <X className="size-4 ms-2" />
+                                    إلغاء
                                   </Button>
                                 </>
                               )}
@@ -360,7 +561,7 @@ export default function InstitutionServicesPage() {
                     {!pageItems.length && (
                       <tr>
                         <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
-                          No records found
+                          لا توجد بيانات
                         </td>
                       </tr>
                     )}
@@ -368,10 +569,9 @@ export default function InstitutionServicesPage() {
                 </table>
               </div>
 
-              {/* Pagination */}
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 border-t">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>Rows per page</span>
+                  <span>عدد الصفوف لكل صفحة</span>
                   <select
                     value={pageSize}
                     onChange={(e) => setPageSize(Number(e.target.value))}
@@ -385,7 +585,7 @@ export default function InstitutionServicesPage() {
 
                 <div className="flex items-center gap-2">
                   <div className="text-sm text-muted-foreground">
-                    {rangeStart} - {rangeEnd} of {filtered.length}
+                    {rangeStart} - {rangeEnd} من {filtered.length}
                   </div>
 
                   <Button
@@ -394,7 +594,7 @@ export default function InstitutionServicesPage() {
                     disabled={safePage <= 1}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                   >
-                    Previous
+                    السابق
                   </Button>
 
                   <Button
@@ -403,7 +603,7 @@ export default function InstitutionServicesPage() {
                     disabled={safePage >= totalPages}
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   >
-                    Next
+                    التالي
                   </Button>
                 </div>
               </div>
@@ -411,36 +611,43 @@ export default function InstitutionServicesPage() {
           </CardContent>
         </Card>
 
-        {/* Add Dialog */}
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogContent className="sm:max-w-[560px]">
-            <DialogHeader dir="rtl" className="text-right">
+        <Dialog
+          open={addOpen}
+          onOpenChange={(open) => {
+            setAddOpen(open)
+            if (!open) setAddFormError('')
+          }}
+        >
+          <DialogContent className="sm:max-w-[560px]" dir="rtl">
+            <DialogHeader className="text-right">
               <DialogTitle>إضافة خدمة للمؤسسة</DialogTitle>
               <DialogDescription>إدخال بيانات خدمات المؤسسة</DialogDescription>
             </DialogHeader>
 
-            <div dir="rtl" className="grid gap-3">
+            <div className="grid gap-3 text-right">
               <div className="grid gap-2">
-                <div className="text-sm">Institution ID</div>
+                <div className="text-sm">معرف المؤسسة</div>
                 <Input
-                  inputMode="numeric"
-                  pattern="[0-9]*"
                   type="text"
-                  value={institutionId ? String(institutionId) : ''}
-                  onChange={(e) => setInstitutionId(toIntOnly(e.target.value))}
-                  placeholder="مثال: 10"
+                  value={institutionId}
+                  onChange={(e) => {
+                    setInstitutionId(e.target.value)
+                    if (addFormError) setAddFormError('')
+                  }}
+                  placeholder="مثال: 10 أو uuid"
                 />
               </div>
 
               <div className="grid gap-2">
-                <div className="text-sm">Service ID (FK)</div>
+                <div className="text-sm">معرف الخدمة (مرجع)</div>
                 <Input
-                  inputMode="numeric"
-                  pattern="[0-9]*"
                   type="text"
-                  value={serviceId ? String(serviceId) : ''}
-                  onChange={(e) => setServiceId(toIntOnly(e.target.value))}
-                  placeholder="مثال: 101"
+                  value={serviceId}
+                  onChange={(e) => {
+                    setServiceId(e.target.value)
+                    if (addFormError) setAddFormError('')
+                  }}
+                  placeholder="مثال: 101 أو uuid"
                 />
               </div>
 
@@ -448,29 +655,33 @@ export default function InstitutionServicesPage() {
                 <div className="text-sm">حالة الخدمة</div>
                 <select
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as ActiveStatus)}
+                  onChange={(e) => {
+                    setStatus(e.target.value as ActiveStatus)
+                    if (addFormError) setAddFormError('')
+                  }}
                   className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
                 >
                   <option value="مفعل">مفعل</option>
                   <option value="غير مفعل">غير مفعل</option>
                 </select>
+
+                {!!addFormError && <div className="text-sm text-red-600">{addFormError}</div>}
               </div>
             </div>
 
-            <DialogFooter dir="rtl" className="gap-2">
-              <Button variant="outline" onClick={() => setAddOpen(false)}>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAddOpen(false)
+                  setAddFormError('')
+                }}
+              >
                 إغلاق
               </Button>
-              <Button
-                onClick={onAdd}
-                disabled={
-                  !Number.isInteger(institutionId) ||
-                  institutionId <= 0 ||
-                  !Number.isInteger(serviceId) ||
-                  serviceId <= 0
-                }
-              >
-                إضافة
+
+              <Button onClick={onAdd} disabled={submitting || !isAddFormValid}>
+                {submitting ? 'جارٍ الإضافة...' : 'إضافة'}
               </Button>
             </DialogFooter>
           </DialogContent>

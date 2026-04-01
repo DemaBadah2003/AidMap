@@ -1,236 +1,213 @@
-import {NextRequest, NextResponse} from 'next/server'
-import {PrismaClient, GeneralStatus} from '@prisma/client'
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import prisma from '@/lib/prisma'
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
+function toDbStatus(status: 'نشط' | 'موقوف') {
+  return status === 'نشط' ? 'ACTIVE' : 'INACTIVE'
 }
 
-const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ['error', 'warn'],
-  })
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
-
-type ArabicStatus = 'نشط' | 'موقوف'
-
-type SupervisorBody = {
-  nameAr?: string
-  phone?: string
-  status?: ArabicStatus
-}
-
-const normalizePhone = (value: string) => value.replace(/[^\d+]/g, '').trim()
-
-const toArabicStatus = (status: GeneralStatus): ArabicStatus => {
-  return status === GeneralStatus.ACTIVE ? 'نشط' : 'موقوف'
-}
-
-const toPrismaStatus = (status?: ArabicStatus): GeneralStatus => {
-  return status === 'نشط' ? GeneralStatus.ACTIVE : GeneralStatus.INACTIVE
-}
-
-const mapSupervisor = (item: {
+function toUiSupervisor(supervisor: {
   id: string
   name: string
   phone: string | null
-  status: GeneralStatus
-}) => ({
-  id: item.id,
-  nameAr: item.name,
-  phone: item.phone ?? '',
-  status: toArabicStatus(item.status),
+  status: string
+}) {
+  return {
+    id: supervisor.id,
+    nameAr: supervisor.name,
+    phone: supervisor.phone ?? '',
+    status: supervisor.status === 'ACTIVE' ? 'نشط' : 'موقوف',
+  }
+}
+
+const createSchema = z.object({
+  nameAr: z.string().trim().min(1, 'اسم المشرف مطلوب'),
+  phone: z.string().trim().min(1, 'رقم الجوال مطلوب'),
+  status: z.enum(['نشط', 'موقوف']).default('نشط'),
+})
+
+const updateSchema = z.object({
+  nameAr: z.string().trim().min(1, 'اسم المشرف مطلوب').optional(),
+  phone: z.string().trim().min(1, 'رقم الجوال مطلوب').optional(),
+  status: z.enum(['نشط', 'موقوف']).optional(),
 })
 
 export async function GET(req: NextRequest) {
   try {
-    const {searchParams} = new URL(req.url)
+    const status = req.nextUrl.searchParams.get('status')
 
-    const id = searchParams.get('id')
-    const q = searchParams.get('q')?.trim() || ''
-    const status = searchParams.get('status') || 'all'
-
-    if (id) {
-      const item = await prisma.supervisor.findFirst({
-        where: {
-          id,
-          isTrashed: false,
-        },
-      })
-
-      if (!item) {
-        return NextResponse.json({message: 'المشرف غير موجود'}, {status: 404})
-      }
-
-      return NextResponse.json(mapSupervisor(item), {status: 200})
+    const where: any = {
+      isTrashed: false,
     }
 
-    const items = await prisma.supervisor.findMany({
-      where: {
-        isTrashed: false,
-        ...(q
-          ? {
-              OR: [
-                {id: {contains: q}},
-                {name: {contains: q, mode: 'insensitive'}},
-                {phone: {contains: q}},
-              ],
-            }
-          : {}),
-        ...(status === 'active'
-          ? {status: GeneralStatus.ACTIVE}
-          : status === 'blocked'
-            ? {status: GeneralStatus.INACTIVE}
-            : {}),
-      },
-      orderBy: {
-        createdAt: 'desc',
+    if (status === 'active') {
+      where.status = 'ACTIVE'
+    } else if (status === 'blocked') {
+      where.status = 'INACTIVE'
+    }
+
+    const supervisors = await prisma.supervisor.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        status: true,
       },
     })
 
-    return NextResponse.json(items.map(mapSupervisor), {status: 200})
-  } catch (error) {
-    console.error('GET /api/project/projects/supervisor error:', error)
-    return NextResponse.json({message: 'حدث خطأ أثناء جلب البيانات'}, {status: 500})
+    return NextResponse.json(supervisors.map(toUiSupervisor))
+  } catch (e) {
+    return NextResponse.json(
+      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
+      { status: 500 }
+    )
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as SupervisorBody
+    const body = createSchema.parse(await req.json())
 
-    const name = body.nameAr?.trim()
-    const phone = body.phone ? normalizePhone(body.phone) : null
-    const status = toPrismaStatus(body.status)
+    const exists = await prisma.supervisor.findFirst({
+      where: {
+        name: body.nameAr,
+        isTrashed: false,
+      },
+      select: { id: true },
+    })
 
-    if (!name) {
-      return NextResponse.json({message: 'اسم المشرف مطلوب'}, {status: 400})
-    }
-
-    if (!phone) {
-      return NextResponse.json({message: 'رقم الجوال مطلوب'}, {status: 400})
+    if (exists) {
+      return NextResponse.json(
+        { message: 'المشرف موجود بالفعل (اسم مكرر).' },
+        { status: 409 }
+      )
     }
 
     const created = await prisma.supervisor.create({
       data: {
-        name,
-        phone,
-        status,
+        name: body.nameAr,
+        phone: body.phone,
+        status: toDbStatus(body.status) as any,
+      },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        status: true,
       },
     })
 
-    return NextResponse.json(mapSupervisor(created), {status: 201})
-  } catch (error) {
-    console.error('POST /api/project/projects/supervisor error:', error)
-    return NextResponse.json({message: 'حدث خطأ أثناء إضافة المشرف'}, {status: 500})
+    return NextResponse.json(toUiSupervisor(created), { status: 201 })
+  } catch (e) {
+    if (e instanceof z.ZodError) {
+      return NextResponse.json(
+        { message: 'فشل التحقق من صحة البيانات', issues: e.issues },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(
+      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
+      { status: 500 }
+    )
   }
 }
 
 export async function PUT(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get('id')
+
+  if (!id) {
+    return NextResponse.json({ message: 'معرّف المشرف مفقود' }, { status: 400 })
+  }
+
   try {
-    const {searchParams} = new URL(req.url)
-    const id = searchParams.get('id')
+    const body = updateSchema.parse(await req.json())
 
-    if (!id) {
-      return NextResponse.json({message: 'id مطلوب'}, {status: 400})
-    }
+    if (body.nameAr) {
+      const exists = await prisma.supervisor.findFirst({
+        where: {
+          name: body.nameAr,
+          isTrashed: false,
+          NOT: { id },
+        },
+        select: { id: true },
+      })
 
-    const body = (await req.json()) as SupervisorBody
-
-    const found = await prisma.supervisor.findFirst({
-      where: {
-        id,
-        isTrashed: false,
-      },
-    })
-
-    if (!found) {
-      return NextResponse.json({message: 'المشرف غير موجود'}, {status: 404})
-    }
-
-    if (found.isProtected) {
-      return NextResponse.json({message: 'لا يمكن تعديل هذا المشرف لأنه محمي'}, {status: 403})
-    }
-
-    const trimmedName = body.nameAr?.trim()
-    const normalizedPhone = body.phone !== undefined ? normalizePhone(body.phone) : undefined
-
-    if (body.nameAr !== undefined && !trimmedName) {
-      return NextResponse.json({message: 'اسم المشرف مطلوب'}, {status: 400})
-    }
-
-    if (body.phone !== undefined && !normalizedPhone) {
-      return NextResponse.json({message: 'رقم الجوال مطلوب'}, {status: 400})
+      if (exists) {
+        return NextResponse.json(
+          { message: 'المشرف موجود بالفعل (اسم مكرر).' },
+          { status: 409 }
+        )
+      }
     }
 
     const updated = await prisma.supervisor.update({
-      where: {id},
+      where: { id },
       data: {
-        ...(trimmedName !== undefined ? {name: trimmedName} : {}),
-        ...(normalizedPhone !== undefined ? {phone: normalizedPhone} : {}),
-        ...(body.status !== undefined ? {status: toPrismaStatus(body.status)} : {}),
+        name: body.nameAr,
+        phone: body.phone,
+        status: body.status ? (toDbStatus(body.status) as any) : undefined,
+      },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        status: true,
       },
     })
 
-    return NextResponse.json(mapSupervisor(updated), {status: 200})
-  } catch (error) {
-    console.error('PUT /api/project/projects/supervisor error:', error)
-    return NextResponse.json({message: 'حدث خطأ أثناء تعديل المشرف'}, {status: 500})
+    return NextResponse.json(toUiSupervisor(updated))
+  } catch (e) {
+    if (e instanceof z.ZodError) {
+      return NextResponse.json(
+        { message: 'فشل التحقق من صحة البيانات', issues: e.issues },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(
+      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
+      { status: 500 }
+    )
   }
 }
 
 export async function DELETE(req: NextRequest) {
-  try {
-    const {searchParams} = new URL(req.url)
-    const id = searchParams.get('id')
-    const all = searchParams.get('all')
+  const id = req.nextUrl.searchParams.get('id')
+  const all = req.nextUrl.searchParams.get('all')
 
+  try {
     if (all === 'true') {
       await prisma.supervisor.updateMany({
         where: {
           isTrashed: false,
-          isProtected: false,
         },
         data: {
           isTrashed: true,
         },
       })
 
-      return NextResponse.json({message: 'تم حذف جميع المشرفين'}, {status: 200})
+      return NextResponse.json({ ok: true })
     }
 
     if (!id) {
-      return NextResponse.json({message: 'يجب إرسال id أو all=true'}, {status: 400})
-    }
-
-    const found = await prisma.supervisor.findFirst({
-      where: {
-        id,
-        isTrashed: false,
-      },
-    })
-
-    if (!found) {
-      return NextResponse.json({message: 'المشرف غير موجود'}, {status: 404})
-    }
-
-    if (found.isProtected) {
-      return NextResponse.json({message: 'لا يمكن حذف هذا المشرف لأنه محمي'}, {status: 403})
+      return NextResponse.json({ message: 'معرّف المشرف مفقود' }, { status: 400 })
     }
 
     await prisma.supervisor.update({
-      where: {id},
+      where: { id },
       data: {
         isTrashed: true,
       },
     })
 
-    return NextResponse.json({message: 'تم حذف المشرف بنجاح'}, {status: 200})
-  } catch (error) {
-    console.error('DELETE /api/project/projects/supervisor error:', error)
-    return NextResponse.json({message: 'حدث خطأ أثناء الحذف'}, {status: 500})
+    return NextResponse.json({ ok: true })
+  } catch (e) {
+    return NextResponse.json(
+      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
+      { status: 500 }
+    )
   }
 }

@@ -1,10 +1,10 @@
 'use client'
 
-import {useEffect, useMemo, useState, type ChangeEvent} from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 
-import {Card, CardContent} from '../../../../../components/ui/card'
-import {Button} from '../../../../../components/ui/button'
-import {Input} from '../../../../../components/ui/input'
+import { Card, CardContent } from '../../../../../components/ui/card'
+import { Button } from '../../../../../components/ui/button'
+import { Input } from '../../../../../components/ui/input'
 
 import {
   Dialog,
@@ -15,7 +15,7 @@ import {
   DialogFooter,
 } from '../../../../../components/ui/dialog'
 
-import {Pencil, Trash2, Save, X, Plus, Search} from 'lucide-react'
+import { Pencil, Trash2, Save, X, Plus, Search } from 'lucide-react'
 
 type Supervisor = {
   id: string
@@ -24,14 +24,146 @@ type Supervisor = {
   status: 'نشط' | 'موقوف'
 }
 
+type SupervisorApiItem = {
+  id: string
+  nameAr?: string
+  name?: string
+  phone?: string | null
+  status?: 'ACTIVE' | 'INACTIVE' | 'نشط' | 'موقوف'
+}
+
+const API_URL = '/api/project/projects/supervisor'
+
 const normalizePhone = (value: string) => value.replace(/[^\d+]/g, '')
+
+const toUiStatus = (status?: SupervisorApiItem['status']): Supervisor['status'] => {
+  if (status === 'INACTIVE' || status === 'موقوف') return 'موقوف'
+  return 'نشط'
+}
+
+const toApiStatus = (status: Supervisor['status']) => {
+  return status === 'موقوف' ? 'INACTIVE' : 'ACTIVE'
+}
+
+function getErrorMessage(err: unknown) {
+  return err instanceof Error ? err.message : 'حدث خطأ غير متوقع'
+}
+
+async function requestJSON<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options?.headers ?? {}),
+    },
+    cache: 'no-store',
+  })
+
+  const text = await res.text()
+  let data: any = null
+
+  try {
+    data = text ? JSON.parse(text) : null
+  } catch {
+    data = text || null
+  }
+
+  if (!res.ok) {
+    const msg = data?.message ?? `فشل الطلب: ${res.status}`
+    throw new Error(msg)
+  }
+
+  return data as T
+}
+
+async function readSupervisors(
+  statusFilter: 'all' | 'active' | 'blocked'
+): Promise<SupervisorApiItem[]> {
+  const params = new URLSearchParams()
+
+  if (statusFilter !== 'all') {
+    params.set('status', statusFilter)
+  }
+
+  const queryString = params.toString()
+  const url = `${API_URL}${queryString ? `?${queryString}` : ''}`
+
+  return requestJSON<SupervisorApiItem[]>(url)
+}
+
+async function createSupervisor(input: {
+  nameAr: string
+  phone: string
+  status: Supervisor['status']
+}): Promise<SupervisorApiItem> {
+  const nameAr = input.nameAr.trim()
+  const phone = normalizePhone(input.phone.trim())
+
+  if (!nameAr) throw new Error('اسم المشرف مطلوب')
+  if (!phone) throw new Error('رقم الجوال مطلوب')
+
+  return requestJSON<SupervisorApiItem>(API_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      nameAr,
+      phone,
+      status: input.status,
+    }),
+  })
+}
+
+async function updateSupervisor(
+  id: string,
+  input: {
+    nameAr: string
+    phone: string
+    status: Supervisor['status']
+  }
+): Promise<SupervisorApiItem> {
+  if (!id) throw new Error('معرّف المشرف مفقود')
+
+  const nameAr = input.nameAr.trim()
+  const phone = normalizePhone(input.phone.trim())
+
+  if (!nameAr) throw new Error('اسم المشرف مطلوب')
+  if (!phone) throw new Error('رقم الجوال مطلوب')
+
+  return requestJSON<SupervisorApiItem>(`${API_URL}?id=${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      nameAr,
+      phone,
+      status: input.status,
+    }),
+  })
+}
+
+async function deleteSupervisor(id: string): Promise<void> {
+  if (!id) throw new Error('معرّف المشرف مفقود')
+
+  await requestJSON(`${API_URL}?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
+}
+
+async function deleteAllSupervisors(): Promise<void> {
+  await requestJSON(`${API_URL}?all=true`, {
+    method: 'DELETE',
+  })
+}
+
+const supervisorsApi = {
+  list: readSupervisors,
+  create: createSupervisor,
+  update: updateSupervisor,
+  remove: deleteSupervisor,
+  removeAll: deleteAllSupervisors,
+}
 
 export default function SupervisorsPage() {
   const [q, setQ] = useState('')
   const [items, setItems] = useState<Supervisor[]>([])
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'blocked'>('all')
@@ -43,6 +175,8 @@ export default function SupervisorsPage() {
   const [nameAr, setNameAr] = useState('')
   const [phone, setPhone] = useState('')
   const [status, setStatus] = useState<Supervisor['status']>('نشط')
+  const [submitting, setSubmitting] = useState(false)
+  const [addFormError, setAddFormError] = useState('')
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<{
@@ -55,42 +189,23 @@ export default function SupervisorsPage() {
     status: 'نشط',
   })
 
-  const API_URL = '/api/project/projects/supervisor'
+  const mapApiItems = (data: SupervisorApiItem[]): Supervisor[] =>
+    data.map((x) => ({
+      id: x.id,
+      nameAr: x.nameAr ?? x.name ?? '',
+      phone: x.phone ?? '',
+      status: toUiStatus(x.status),
+    }))
 
   const fetchSupervisors = async () => {
+    setLoading(true)
+    setErrorMessage('')
+
     try {
-      setLoading(true)
-      setErrorMessage('')
-
-      const params = new URLSearchParams()
-      if (q.trim()) params.set('q', q.trim())
-      if (statusFilter !== 'all') params.set('status', statusFilter)
-
-      const queryString = params.toString()
-      const url = `${API_URL}${queryString ? `?${queryString}` : ''}`
-
-      const res = await fetch(url, {
-        method: 'GET',
-        cache: 'no-store',
-      })
-
-      const contentType = res.headers.get('content-type') || ''
-      if (!contentType.includes('application/json')) {
-        const text = await res.text()
-        console.error('Non-JSON response:', text)
-        throw new Error('الاستجابة من السيرفر ليست JSON. تأكد من مسار الـ API')
-      }
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'فشل في جلب المشرفين')
-      }
-
-      setItems(Array.isArray(data) ? data : [])
-    } catch (error) {
-      console.error(error)
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء جلب البيانات')
+      const data = await supervisorsApi.list(statusFilter)
+      setItems(mapApiItems(data))
+    } catch (err) {
+      setErrorMessage(getErrorMessage(err))
       setItems([])
     } finally {
       setLoading(false)
@@ -99,7 +214,6 @@ export default function SupervisorsPage() {
 
   useEffect(() => {
     fetchSupervisors()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter])
 
   const filtered = useMemo(() => {
@@ -132,52 +246,45 @@ export default function SupervisorsPage() {
     setNameAr('')
     setPhone('')
     setStatus('نشط')
+    setAddFormError('')
   }
+
+  const isAddFormValid = !!nameAr.trim() && !!normalizePhone(phone.trim())
 
   const onAdd = async () => {
     const ar = nameAr.trim()
     const ph = normalizePhone(phone.trim())
 
     if (!ar || !ph) {
-      setErrorMessage('يرجى إدخال اسم المشرف ورقم الجوال')
+      setAddFormError('يرجى إدخال اسم المشرف ورقم الجوال')
       return
     }
 
-    try {
-      setSubmitting(true)
-      setErrorMessage('')
+    setSubmitting(true)
+    setErrorMessage('')
+    setAddFormError('')
 
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nameAr: ar,
-          phone: ph,
-          status,
-        }),
+    try {
+      const created = await supervisorsApi.create({
+        nameAr: ar,
+        phone: ph,
+        status,
       })
 
-      const contentType = res.headers.get('content-type') || ''
-      if (!contentType.includes('application/json')) {
-        const text = await res.text()
-        console.error('Non-JSON response:', text)
-        throw new Error('الاستجابة من السيرفر ليست JSON. تأكد من مسار الـ API')
-      }
+      setItems((prev) => [
+        {
+          id: created.id,
+          nameAr: created.nameAr ?? created.name ?? ar,
+          phone: created.phone ?? ph,
+          status: toUiStatus(created.status),
+        },
+        ...prev,
+      ])
 
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'فشل في إضافة المشرف')
-      }
-
-      setItems((prev) => [data, ...prev])
       resetAddForm()
       setAddOpen(false)
-    } catch (error) {
-      console.error(error)
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء الإضافة')
+    } catch (err) {
+      setAddFormError(getErrorMessage(err))
     } finally {
       setSubmitting(false)
     }
@@ -185,33 +292,14 @@ export default function SupervisorsPage() {
 
   const onDeleteOne = async (id: string) => {
     try {
-      setActionLoadingId(id)
       setErrorMessage('')
-
-      const res = await fetch(`${API_URL}?id=${id}`, {
-        method: 'DELETE',
-      })
-
-      const contentType = res.headers.get('content-type') || ''
-      if (!contentType.includes('application/json')) {
-        const text = await res.text()
-        console.error('Non-JSON response:', text)
-        throw new Error('الاستجابة من السيرفر ليست JSON. تأكد من مسار الـ API')
-      }
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'فشل في حذف المشرف')
-      }
+      await supervisorsApi.remove(id)
 
       if (editingId === id) setEditingId(null)
+
       setItems((prev) => prev.filter((x) => x.id !== id))
-    } catch (error) {
-      console.error(error)
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء الحذف')
-    } finally {
-      setActionLoadingId(null)
+    } catch (err) {
+      setErrorMessage(getErrorMessage(err))
     }
   }
 
@@ -220,28 +308,11 @@ export default function SupervisorsPage() {
       setSubmitting(true)
       setErrorMessage('')
 
-      const res = await fetch(`${API_URL}?all=true`, {
-        method: 'DELETE',
-      })
-
-      const contentType = res.headers.get('content-type') || ''
-      if (!contentType.includes('application/json')) {
-        const text = await res.text()
-        console.error('Non-JSON response:', text)
-        throw new Error('الاستجابة من السيرفر ليست JSON. تأكد من مسار الـ API')
-      }
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'فشل في حذف جميع المشرفين')
-      }
-
+      await supervisorsApi.removeAll()
       setItems([])
       setEditingId(null)
-    } catch (error) {
-      console.error(error)
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء حذف الكل')
+    } catch (err) {
+      setErrorMessage(getErrorMessage(err))
     } finally {
       setSubmitting(false)
     }
@@ -275,41 +346,30 @@ export default function SupervisorsPage() {
     }
 
     try {
-      setActionLoadingId(id)
       setErrorMessage('')
 
-      const res = await fetch(`${API_URL}?id=${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nameAr: ar,
-          phone: ph,
-          status: editDraft.status,
-        }),
+      const updated = await supervisorsApi.update(id, {
+        nameAr: ar,
+        phone: ph,
+        status: editDraft.status,
       })
 
-      const contentType = res.headers.get('content-type') || ''
-      if (!contentType.includes('application/json')) {
-        const text = await res.text()
-        console.error('Non-JSON response:', text)
-        throw new Error('الاستجابة من السيرفر ليست JSON. تأكد من مسار الـ API')
-      }
+      setItems((prev) =>
+        prev.map((sp) =>
+          sp.id === id
+            ? {
+                id: updated.id,
+                nameAr: updated.nameAr ?? updated.name ?? ar,
+                phone: updated.phone ?? ph,
+                status: toUiStatus(updated.status),
+              }
+            : sp
+        )
+      )
 
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'فشل في تعديل بيانات المشرف')
-      }
-
-      setItems((prev) => prev.map((sp) => (sp.id === id ? data : sp)))
       setEditingId(null)
-    } catch (error) {
-      console.error(error)
-      setErrorMessage(error instanceof Error ? error.message : 'حدث خطأ أثناء التعديل')
-    } finally {
-      setActionLoadingId(null)
+    } catch (err) {
+      setErrorMessage(getErrorMessage(err))
     }
   }
 
@@ -369,6 +429,7 @@ export default function SupervisorsPage() {
                     className="inline-flex items-center gap-2 !h-10 !rounded-lg !bg-blue-600 !px-4 !text-sm !font-semibold !text-white hover:!bg-blue-700"
                     onClick={() => {
                       setErrorMessage('')
+                      setAddFormError('')
                       setAddOpen(true)
                     }}
                   >
@@ -423,7 +484,6 @@ export default function SupervisorsPage() {
                     ) : pageItems.length ? (
                       pageItems.map((sp) => {
                         const isEditing = editingId === sp.id
-                        const isBusy = actionLoadingId === sp.id
 
                         return (
                           <tr key={sp.id} className="hover:bg-muted/30">
@@ -432,7 +492,7 @@ export default function SupervisorsPage() {
                                 <Input
                                   value={editDraft.nameAr}
                                   onChange={(e) =>
-                                    setEditDraft((p) => ({...p, nameAr: e.target.value}))
+                                    setEditDraft((p) => ({ ...p, nameAr: e.target.value }))
                                   }
                                   className="h-9"
                                 />
@@ -495,32 +555,25 @@ export default function SupervisorsPage() {
                                   <>
                                     <button
                                       type="button"
-                                      className="inline-flex h-10 w-10 items-center justify-center rounded-md border hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                                      className="inline-flex h-10 w-10 items-center justify-center rounded-md border hover:bg-muted"
                                       title="تعديل"
                                       onClick={() => startEditRow(sp)}
-                                      disabled={isBusy}
                                     >
                                       <Pencil className="size-4" />
                                     </button>
 
                                     <button
                                       type="button"
-                                      className="inline-flex h-10 w-10 items-center justify-center rounded-md border hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                                      className="inline-flex h-10 w-10 items-center justify-center rounded-md border hover:bg-muted"
                                       title="حذف"
                                       onClick={() => onDeleteOne(sp.id)}
-                                      disabled={isBusy}
                                     >
                                       <Trash2 className="size-4" />
                                     </button>
                                   </>
                                 ) : (
                                   <>
-                                    <Button
-                                      size="sm"
-                                      className="h-10"
-                                      onClick={() => saveEditRow(sp.id)}
-                                      disabled={isBusy}
-                                    >
+                                    <Button className="h-10" size="sm" onClick={() => saveEditRow(sp.id)}>
                                       <Save className="ms-2 size-4" />
                                       حفظ
                                     </Button>
@@ -530,7 +583,6 @@ export default function SupervisorsPage() {
                                       variant="outline"
                                       className="h-10"
                                       onClick={cancelEditRow}
-                                      disabled={isBusy}
                                     >
                                       <X className="ms-2 size-4" />
                                       إلغاء
@@ -613,7 +665,10 @@ export default function SupervisorsPage() {
                 <div className="text-sm">اسم المشرف</div>
                 <Input
                   value={nameAr}
-                  onChange={(e) => setNameAr(e.target.value)}
+                  onChange={(e) => {
+                    setNameAr(e.target.value)
+                    if (addFormError) setAddFormError('')
+                  }}
                   placeholder="مثال: أحمد محمد"
                 />
               </div>
@@ -622,7 +677,10 @@ export default function SupervisorsPage() {
                 <div className="text-sm">رقم الجوال</div>
                 <Input
                   value={phone}
-                  onChange={(e) => setPhone(normalizePhone(e.target.value))}
+                  onChange={(e) => {
+                    setPhone(normalizePhone(e.target.value))
+                    if (addFormError) setAddFormError('')
+                  }}
                   placeholder="مثال: 0599123456"
                 />
               </div>
@@ -631,12 +689,17 @@ export default function SupervisorsPage() {
                 <div className="text-sm">الحالة</div>
                 <select
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as Supervisor['status'])}
+                  onChange={(e) => {
+                    setStatus(e.target.value as Supervisor['status'])
+                    if (addFormError) setAddFormError('')
+                  }}
                   className="h-10 rounded-md border bg-background px-3"
                 >
                   <option value="نشط">نشط</option>
                   <option value="موقوف">موقوف</option>
                 </select>
+
+                {!!addFormError && <div className="text-sm text-red-600">{addFormError}</div>}
               </div>
             </div>
 
@@ -651,7 +714,7 @@ export default function SupervisorsPage() {
                 إغلاق
               </Button>
 
-              <Button onClick={onAdd} disabled={!nameAr.trim() || !phone.trim() || submitting}>
+              <Button onClick={onAdd} disabled={!isAddFormValid || submitting}>
                 {submitting ? 'جارٍ الإضافة...' : 'إضافة'}
               </Button>
             </DialogFooter>
@@ -660,4 +723,4 @@ export default function SupervisorsPage() {
       </div>
     </div>
   )
-}
+} 
