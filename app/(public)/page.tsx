@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import MapPreviewContent from '../components/maps/MapPreviewContent';
+import MapPreview from '../components/maps/MapPreviewContent';
 
 type MapPlace = {
   id: string;
@@ -50,7 +51,7 @@ export default function PublicHomePage() {
         ) : error ? (
           <div className="p-6 text-center text-red-600">{error}</div>
         ) : (
-          <MapPreviewContent height={700} adminPlaces={places} />
+          <MapPreview />
         )}
       </div>
     </div>
