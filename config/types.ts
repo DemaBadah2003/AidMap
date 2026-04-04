@@ -2,6 +2,7 @@ import { type LucideIcon } from 'lucide-react';
 
 // ✅ توحيد النظام كله
 export type AppRole = 'admin' | 'user';
+
 export interface MenuItem {
   title?: string;
   icon?: LucideIcon;
@@ -16,8 +17,11 @@ export interface MenuItem {
   expandTitle?: string;
   badge?: string;
   separator?: boolean;
+  
+  // ✅ التعديل الجديد لفتح القوائم تلقائياً
+  expanded?: boolean; 
 
-  // ✅ نفس التعديل هنا
+  // ✅ صلاحيات الوصول
   roles?: AppRole[];
 }
 

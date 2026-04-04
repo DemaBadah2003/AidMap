@@ -38,7 +38,7 @@ export default function ProfilePage() {
         console.error(error);
 
         const fallback = {
-          name: 'Ahmed',
+          name: 'أحمد',
           email: 'ahmed4@gmail.com',
           image: '/media/avatars/300-2.png',
         };
@@ -72,18 +72,18 @@ export default function ProfilePage() {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      alert('Profile updated successfully');
+      alert('تم تحديث الملف الشخصي بنجاح');
     } catch (error) {
       console.error(error);
-      alert('Error updating profile');
+      alert('خطأ في تحديث الملف الشخصي');
     }
   };
 
   if (loading) {
     return (
-      <div className="w-full py-10">
-        <div className="mx-auto max-w-[800px] px-6">
-          <p className="text-sm text-muted-foreground">Loading profile...</p>
+      <div className="w-full py-10" dir="rtl">
+        <div className="mx-auto max-w-[800px] px-6 text-right">
+          <p className="text-sm text-muted-foreground">جاري تحميل الملف الشخصي...</p>
         </div>
       </div>
     );
@@ -91,23 +91,23 @@ export default function ProfilePage() {
 
   if (!user) {
     return (
-      <div className="w-full py-10">
-        <div className="mx-auto max-w-[800px] px-6">
-          <p className="text-sm text-red-500">Unable to load profile.</p>
+      <div className="w-full py-10" dir="rtl">
+        <div className="mx-auto max-w-[800px] px-6 text-right">
+          <p className="text-sm text-red-500">تعذر تحميل الملف الشخصي.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full py-10">
+    <div className="w-full py-10" dir="rtl">
       <div className="mx-auto w-full max-w-[800px] px-6 space-y-6">
         
         {/* Title */}
         <div className="text-center">
-          <h1 className="text-2xl font-bold">My Profile</h1>
+          <h1 className="text-2xl font-bold">ملفي الشخصي</h1>
           <p className="text-sm text-muted-foreground">
-            View your account information.
+            عرض معلومات حسابك.
           </p>
         </div>
 
@@ -121,7 +121,7 @@ export default function ProfilePage() {
               className="mx-auto h-24 w-24 rounded-full border object-cover md:mx-0"
             />
 
-            <div className="flex-1 text-center md:text-left">
+            <div className="flex-1 text-center md:text-right">
               <h2 className="text-xl font-semibold">{user.name}</h2>
 
               <div className="mt-1 flex items-center justify-center gap-2 text-sm text-muted-foreground md:justify-start">
@@ -130,20 +130,20 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* أزرار أصغر */}
+            {/* الأزرار */}
             <div className="flex flex-col gap-2 sm:flex-row">
               <Link
                 href="/profile-page/edit"
                 className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted text-center"
               >
-                Edit Profile
+                تعديل الملف الشخصي
               </Link>
 
               <Link
                 href="/profile-page/security/change-password"
                 className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 text-center"
               >
-                Change Password
+                تغيير كلمة المرور
               </Link>
             </div>
           </div>
@@ -151,32 +151,32 @@ export default function ProfilePage() {
 
         {/* Account Info (Editable) */}
         <div className="rounded-2xl border bg-background p-5 shadow-sm">
-          <div className="mb-4 flex items-center gap-2">
+          <div className="mb-4 flex items-center gap-2 text-right">
             <User className="h-5 w-5" />
-            <h3 className="font-semibold">Account Info</h3>
+            <h3 className="font-semibold">معلومات الحساب</h3>
           </div>
 
-          <div className="space-y-4 text-sm">
+          <div className="space-y-4 text-sm text-right">
 
             {/* Name */}
             <div className="flex flex-col gap-1">
-              <label className="text-muted-foreground">Full Name</label>
+              <label className="text-muted-foreground">الاسم الكامل</label>
               <input
                 name="name"
                 value={form.name}
                 onChange={handleChange}
-                className="rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                className="rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary text-right"
               />
             </div>
 
             {/* Email */}
             <div className="flex flex-col gap-1">
-              <label className="text-muted-foreground">Email</label>
+              <label className="text-muted-foreground">البريد الإلكتروني</label>
               <input
                 name="email"
                 value={form.email}
                 onChange={handleChange}
-                className="rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                className="rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary text-right"
               />
             </div>
 
@@ -184,25 +184,25 @@ export default function ProfilePage() {
             <div className="flex flex-col gap-1">
               <label className="text-muted-foreground flex items-center gap-1">
                 <Lock className="h-4 w-4" />
-                Password
+                كلمة المرور
               </label>
               <input
                 type="password"
                 name="password"
                 value={form.password}
                 onChange={handleChange}
-                placeholder="Enter new password"
-                className="rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                placeholder="أدخل كلمة مرور جديدة"
+                className="rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary text-right"
               />
             </div>
 
-            {/* Save Button (آخر زر + صغير) */}
+            {/* Save Button */}
             <div className="pt-2">
               <button
                 onClick={handleSave}
                 className="w-full sm:w-auto rounded-md bg-primary px-4 py-2 text-xs font-medium text-white hover:opacity-90"
               >
-                Save Changes
+                حفظ التغييرات
               </button>
             </div>
 

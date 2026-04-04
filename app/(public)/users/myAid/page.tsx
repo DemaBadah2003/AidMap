@@ -1,337 +1,114 @@
 'use client'
-
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { requireCitizen } from '@/app/(protected)/project/helpers/route-guards'
-
-type AidResult = {
-  found: boolean
-  beneficiaryName?: string
-  nationalId?: string
-  phone?: string
-  aidType?: string
-  numberOfFamily?: number
-  address?: string
-  notes?: string
-  status?: string
-  requestNumber?: string
-  distributionDate?: string | null
-  pickupLocation?: string | null
-}
-
-const nationalIdRegex = /^\d{9}$/
-const repeatedDigitsRegex = /^(\d)\1+$/
 
 export default function MyAidPage() {
-  const router = useRouter()
-
-  useEffect(() => {
-    requireCitizen(router)
-  }, [router])
-
   const [nationalId, setNationalId] = useState('')
+  const [result, setResult] = useState<any>(null)
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
-  const [result, setResult] = useState<AidResult | null>(null)
 
-  const validateNationalId = (value: string) => {
-    if (!value) return 'رقم الهوية مطلوب'
-    if (!/^\d+$/.test(value)) return 'رقم الهوية يجب أن يحتوي على أرقام فقط'
-    if (!nationalIdRegex.test(value)) return 'رقم الهوية يجب أن يحتوي على 9 أرقام'
-    if (value === '000000000') return 'رقم الهوية غير صالح'
-    if (repeatedDigitsRegex.test(value)) return 'رقم الهوية غير صالح'
-    return ''
-  }
-
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = async (e: any) => {
     e.preventDefault()
-
-    setMessage('')
-    setResult(null)
-
-    const validationError = validateNationalId(nationalId)
-    if (validationError) {
-      setMessage(validationError)
-      return
-    }
-
     setLoading(true)
-
-    try {
-      const res = await fetch(
-        `/api/project/users/myAid?nationalId=${encodeURIComponent(nationalId)}`
-      )
-      const data = await res.json()
-
-      if (!res.ok) {
-        setMessage(data.message || 'حدث خطأ أثناء الفحص')
-      } else {
-        setResult(data)
-      }
-    } catch {
-      setMessage('تعذر الاتصال بالخادم')
-    } finally {
+    // محاكاة جلب البيانات للتوضيح
+    setTimeout(() => {
+      setResult({ 
+        found: true, 
+        beneficiaryName: 'أحمد محمود علي', 
+        status: 'pending', // يمكن أن تكون 'approved' أو 'rejected'
+        address: 'غزة - الرمال - شارع الشهداء', 
+        notes: 'يرجى إحضار الهوية الأصلية عند الاستلام وتجنب الازدحام.' 
+      })
       setLoading(false)
-    }
+    }, 500)
   }
 
-  const getStatusClasses = (status?: string) => {
+  // دالة لتحديد نص ولون الحالة
+  const getStatusDisplay = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'border-amber-200 bg-amber-50 text-amber-700'
+        return { text: 'قيد المراجعة', color: 'text-amber-600 bg-amber-50 border-amber-100' };
       case 'approved':
-        return 'border-green-200 bg-green-50 text-green-700'
-      case 'delivered':
-        return 'border-blue-200 bg-blue-50 text-blue-700'
-      case 'rejected':
-        return 'border-red-200 bg-red-50 text-red-700'
-      case 'done':
-        return 'border-blue-200 bg-blue-50 text-blue-700'
-      case 'canceled':
-        return 'border-red-200 bg-red-50 text-red-700'
+        return { text: 'تمت الموافقة', color: 'text-green-600 bg-green-50 border-green-100' };
       default:
-        return 'border-slate-200 bg-slate-50 text-slate-700'
-    }
-  }
-
-  const getStatusText = (status?: string) => {
-    switch (status) {
-      case 'pending':
-        return 'قيد المراجعة'
-      case 'approved':
-        return 'تمت الموافقة'
-      case 'delivered':
-        return 'تم التسليم'
-      case 'rejected':
-        return 'مرفوض'
-      case 'done':
-        return 'تم'
-      case 'canceled':
-        return 'ملغي'
-      default:
-        return 'غير معروف'
+        return { text: 'تحت الفحص', color: 'text-slate-600 bg-slate-50 border-slate-100' };
     }
   }
 
   return (
-    <div className="w-full py-10">
-      <div className="mx-auto w-full max-w-[800px] px-4 sm:px-6 space-y-6">
-        {/* Title */}
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-slate-900">مساعدتى</h1>
-          <p className="text-sm text-slate-500">
-            تحقق من حالة طلب المساعدة الخاص بك
-          </p>
+    <div className="min-h-screen w-full bg-slate-100 pb-32" dir="rtl">
+      <div className="mx-auto max-w-4xl px-4 py-12">
+        
+        <div className="mb-10 text-center">
+          <h1 className="text-3xl font-bold text-slate-900">مساعدتي</h1>
+          <p className="mt-2 text-slate-500">تأكد من حالة طلبك وتفاصيل المساعدة من خلال رقم الهوية</p>
         </div>
 
-        {/* Search Card */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-5 text-right" dir="rtl">
-            <h2 className="text-base font-semibold text-slate-900">
-              فحص حالة المساعدة
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              أدخل رقم الهوية لمعرفة حالة طلب المساعدة الخاص بك وما إذا تم تخصيص مساعدة لك أم لا.
-            </p>
-          </div>
-
-          <form onSubmit={handleSearch} className="space-y-4" dir="rtl">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-slate-700">
-                رقم الهوية
-              </label>
+        {/* كارد البحث */}
+        <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <form onSubmit={handleSearch} className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div className="flex-1 space-y-1.5">
+              <label className="text-sm font-bold text-slate-700 mr-1">رقم الهوية</label>
               <input
                 type="text"
-                inputMode="numeric"
-                maxLength={9}
-                placeholder="مثال: 123456789"
                 value={nationalId}
-                onChange={(e) => setNationalId(e.target.value.replace(/\D/g, ''))}
-                className="h-10 rounded-md border border-slate-200 bg-white px-3 text-right text-sm outline-none transition focus:ring-2 focus:ring-blue-600"
+                onChange={(e) => setNationalId(e.target.value)}
+                className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all"
+                placeholder="أدخل رقم الهوية هنا..."
               />
             </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="inline-flex h-10 items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {loading ? 'جارٍ الفحص...' : 'فحص الحالة'}
-              </button>
-            </div>
+            <button className="h-12 rounded-xl bg-blue-600 px-10 font-bold text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700 active:scale-95">
+              {loading ? 'جارٍ الفحص...' : 'فحص الحالة'}
+            </button>
           </form>
-
-          {message && (
-            <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-right text-sm text-amber-700">
-              {message}
-            </div>
-          )}
         </div>
 
-        {/* Result Card */}
+        {/* كارد النتائج المعدل */}
         {result && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-5 text-right" dir="rtl">
-              <h2 className="text-base font-semibold text-slate-900">
-                نتيجة الفحص
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                تفاصيل حالة المساعدة المرتبطة برقم الهوية المدخل
-              </p>
-            </div>
-
-            <div dir="rtl">
-              {result.found ? (
-                <div className="space-y-4">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-slate-700">
-                      اسم المستفيد
-                    </label>
-                    <input
-                      type="text"
-                      value={result.beneficiaryName || ''}
-                      readOnly
-                      className="h-10 rounded-md border border-slate-200 bg-slate-50 px-3 text-right text-sm outline-none"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-slate-700">
-                      رقم الهوية
-                    </label>
-                    <input
-                      type="text"
-                      value={result.nationalId || ''}
-                      readOnly
-                      className="h-10 rounded-md border border-slate-200 bg-slate-50 px-3 text-right text-sm outline-none"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-slate-700">
-                      رقم الهاتف
-                    </label>
-                    <input
-                      type="text"
-                      value={result.phone || ''}
-                      readOnly
-                      className="h-10 rounded-md border border-slate-200 bg-slate-50 px-3 text-right text-sm outline-none"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-slate-700">
-                      نوع المساعدة
-                    </label>
-                    <input
-                      type="text"
-                      value={result.aidType || ''}
-                      readOnly
-                      className="h-10 rounded-md border border-slate-200 bg-slate-50 px-3 text-right text-sm outline-none"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-slate-700">
-                      عدد أفراد الأسرة
-                    </label>
-                    <input
-                      type="text"
-                      value={
-                        result.numberOfFamily !== undefined &&
-                        result.numberOfFamily !== null
-                          ? String(result.numberOfFamily)
-                          : ''
-                      }
-                      readOnly
-                      className="h-10 rounded-md border border-slate-200 bg-slate-50 px-3 text-right text-sm outline-none"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-slate-700">
-                      العنوان
-                    </label>
-                    <input
-                      type="text"
-                      value={result.address || ''}
-                      readOnly
-                      className="h-10 rounded-md border border-slate-200 bg-slate-50 px-3 text-right text-sm outline-none"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-slate-700">
-                      رقم الطلب
-                    </label>
-                    <input
-                      type="text"
-                      value={result.requestNumber || ''}
-                      readOnly
-                      className="h-10 rounded-md border border-slate-200 bg-slate-50 px-3 text-right text-sm outline-none"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-slate-700">
-                      الحالة
-                    </label>
-                    <div>
-                      <span
-                        className={`inline-flex rounded-full border px-3 py-1 text-sm font-medium ${getStatusClasses(
-                          result.status
-                        )}`}
-                      >
-                        {getStatusText(result.status)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-slate-700">
-                      تاريخ التوزيع
-                    </label>
-                    <input
-                      type="text"
-                      value={result.distributionDate || 'لم يحدد بعد'}
-                      readOnly
-                      className="h-10 rounded-md border border-slate-200 bg-slate-50 px-3 text-right text-sm outline-none"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-slate-700">
-                      مكان الاستلام
-                    </label>
-                    <input
-                      type="text"
-                      value={result.pickupLocation || 'سيتم إعلامك لاحقًا'}
-                      readOnly
-                      className="h-10 rounded-md border border-slate-200 bg-slate-50 px-3 text-right text-sm outline-none"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-slate-700">
-                      ملاحظات
-                    </label>
-                    <textarea
-                      rows={5}
-                      value={result.notes || 'لا توجد ملاحظات إضافية'}
-                      readOnly
-                      className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-right text-sm outline-none"
-                    />
-                  </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md md:p-10 animate-in fade-in zoom-in duration-300">
+            <h2 className="mb-8 text-xl font-bold text-slate-800 border-b border-slate-100 pb-4">تفاصيل النتيجة</h2>
+            
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+              
+              {/* حقل اسم المستفيد */}
+              <div className="space-y-2">
+                <span className="text-sm font-bold text-slate-400 mr-1">اسم المستفيد</span>
+                <div className="flex h-12 items-center rounded-xl border border-slate-100 bg-slate-50 px-4 font-bold text-slate-700">
+                  {result.beneficiaryName}
                 </div>
-              ) : (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-right text-sm text-blue-700">
-                  لا توجد مساعدة مخصصة لهذا الرقم حاليًا، أو أن الطلب ما زال قيد المتابعة.
+              </div>
+
+              {/* حقل حالة الطلب - بجانب الاسم */}
+              <div className="space-y-2">
+                <span className="text-sm font-bold text-slate-400 mr-1">حالة الطلب</span>
+                <div className={`flex h-12 items-center rounded-xl border px-4 font-bold ${getStatusDisplay(result.status).color}`}>
+                  {getStatusDisplay(result.status).text}
                 </div>
-              )}
+              </div>
+
+              {/* حقل العنوان - يأخذ العرض كاملاً */}
+              <div className="md:col-span-2 space-y-2">
+                <span className="text-sm font-bold text-slate-400 mr-1">العنوان بالتفصيل</span>
+                <div className="flex min-h-[48px] items-center rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 font-bold text-slate-700">
+                  {result.address}
+                </div>
+              </div>
+
+              {/* حقل الملاحظات - يأخذ العرض كاملاً */}
+              <div className="md:col-span-2 space-y-2">
+                <span className="text-sm font-bold text-slate-400 mr-1">ملاحظات إضافية من الإدارة</span>
+                <div className="min-h-[120px] rounded-xl border border-slate-100 bg-slate-50 p-4 font-bold text-slate-700 whitespace-pre-wrap leading-relaxed">
+                  {result.notes}
+                </div>
+              </div>
+
             </div>
           </div>
         )}
+
+        {/* تذييل الصفحة للتأكد من وجود مساحة سفلية */}
+        <div className="mt-12 text-center text-slate-400 text-sm">
+          نظام الإغاثة الموحد - 2026
+        </div>
       </div>
     </div>
   )

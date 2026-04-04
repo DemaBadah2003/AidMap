@@ -41,7 +41,8 @@ export function Header() {
   return (
     <header
       className={cn(
-        'header fixed top-0 z-10 start-0 flex items-stretch shrink-0 border-b border-transparent bg-background end-0 pe-[var(--removed-body-scroll-bar-size,0px)]',
+        // تم إضافة 'lg:pe-[var(--sidebar-default-width)]' لإزاحة الهيدر لليسار وتجنب السايدبار اليميني
+        'header fixed top-0 z-10 start-0 flex items-stretch shrink-0 border-b border-transparent bg-background end-0 pe-[var(--removed-body-scroll-bar-size,0px)] lg:pe-[var(--sidebar-default-width)]',
         headerSticky && 'border-b border-border',
       )}
     >
@@ -64,7 +65,7 @@ export function Header() {
                 </SheetTrigger>
                 <SheetContent
                   className="w-[275px] gap-0 p-0"
-                  side="left"
+                  side="right" // تم التعديل ليفتح من اليمين في الجوال
                   close={false}
                 >
                   <SheetHeader className="space-y-0 p-0" />
@@ -87,7 +88,7 @@ export function Header() {
                 </SheetTrigger>
                 <SheetContent
                   className="w-[275px] gap-0 p-0"
-                  side="left"
+                  side="right" // تم التعديل ليفتح من اليمين في الجوال
                   close={false}
                 >
                   <SheetHeader className="space-y-0 p-0" />
@@ -108,7 +109,8 @@ export function Header() {
           )}
         </div>
 
-        <div className="ms-auto flex items-center gap-3">
+        {/* أضفنا pe-6 لضمان ابتعاد الصورة عن حافة السايدبار اليميني قليلاً */}
+        <div className="ms-auto flex items-center gap-3 pe-6">
           <UserDropdownMenu
             trigger={
               <img

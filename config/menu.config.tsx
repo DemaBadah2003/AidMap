@@ -12,165 +12,71 @@ import { type MenuConfig, type AppRole, type MenuItem } from './types';
 
 export const MENU_SIDEBAR: MenuConfig = [
   {
-    title: 'Dashboards',
+    title: 'لوحات التحكم',
     icon: LayoutGrid,
+    expanded: true, // ✅ يفتح قسم "لوحات التحكم" تلقائياً
     children: [
       {
-        title: 'Project Sidebar',
+        title: 'إدارة المشاريع',
+        expanded: true, // ✅ يفتح قائمة "إدارة المشاريع" لتظهر المخيمات والمستفيدين فوراً
         children: [
-          { title: 'Camps Sidebar', path: '/project/projects/camps' },
-          { title: 'beneficiaries Sidebar', path: '/project/projects/beneficiaries' },
-          { title: ' Clinic Sidebar', path: '/project/projects/clinic' },
-          { title: ' shelters Sidebar', path: '/project/projects/shelters' },
-          { title: ' supervisior Sidebar', path: '/project/projects/supervisior' },
-          { title: 'institutions Sidebar', path: '/project/projects/institutions' },
-          { title: 'contacts Sidebar', path: '/project/projects/contacts' },
-          { title: 'address Sidebar', path: '/project/projects/address' },
-          { title: 'Enterprise-Products  Sidebar', path: '/project/projects/Enterprise-Products' },
-          { title: 'products Sidebar', path: '/project/projects/products' },
-          { title: 'service Sidebar', path: '/project/projects/service' },
-          { title: 'institutional-services Sidebar', path: '/project/projects/institutional-services' },
-          { title: 'Emergency  Sidebar', path: '/project/projects/Emergency' },
-          { title: 'Distributions  Sidebar', path: '/project/projects/Distributions' },
+          { title: 'المخيمات', path: '/project/projects/camps' },
+          { title: 'المستفيدين', path: '/project/projects/beneficiaries' },
+          { title: 'العيادة', path: '/project/projects/clinic' },
+          { title: 'المراكز الإيوائية', path: '/project/projects/shelters' },
+          { title: 'المشرفين', path: '/project/projects/supervisior' },
+          { title: 'المؤسسات', path: '/project/projects/institutions' },
+          { title: 'جهات الاتصال', path: '/project/projects/contacts' },
+          { title: 'العناوين', path: '/project/projects/address' },
+          { title: 'منتجات المؤسسات', path: '/project/projects/Enterprise-Products' },
+          { title: 'المنتجات', path: '/project/projects/products' },
+          { title: 'الخدمات', path: '/project/projects/service' },
+          { title: 'الخدمات المؤسساتية', path: '/project/projects/institutional-services' },
+          { title: 'الطوارئ', path: '/project/projects/Emergency' },
+          { title: 'التوزيعات', path: '/project/projects/Distributions' },
         ],
       },
       {
-        title: 'Admin Dashboard',
+        title: 'لوحة تحكم المسؤول',
         path: '/store-admin/dashboard',
         roles: ['admin'],
+        expanded: true, // ✅ يفتح قائمة "لوحة تحكم المسؤول" لتظهر معاينة الخريطة وإضافة مكان فوراً
         children: [
-       { title: 'Map Preview', path: '/project/MapPreview' },
-          { title: 'Add Place', path: '/project/admins/addPlaces' },
-          { title: 'Admin Beneficiary', path: '/project/admins/adminBeneficiary' },
-          { title: 'Add Aid', path: '/project/admins/addAid' },
-          { title: 'Distribute Aid', path: '/project/admins/distributeAid' },
+          { title: 'معاينة الخريطة', path: '/project/MapPreview' },
+          { title: 'إضافة مكان', path: '/project/admins/addPlaces' },
+          { title: 'إدارة المستفيدين', path: '/project/admins/adminBeneficiary' },
+          { title: 'إضافة مساعدة', path: '/project/admins/addAid' },
+          { title: 'توزيع المساعدات', path: '/project/admins/distributeAid' },
         ],
       },
-   
     ],
   },
 ];
 
-export const MENU_SIDEBAR_CUSTOM: MenuConfig = [
-  {
-    title: 'Store - Client',
-    children: [
-      { title: 'Home', path: '/store-client/home' },
-      {
-        title: 'Search Results',
-        children: [
-          {
-            title: 'Search Results - Grid',
-            path: '/store-client/search-results-grid',
-          },
-          {
-            title: 'Search Results - List',
-            path: '/store-client/search-results-list',
-          },
-        ],
-      },
-      {
-        title: 'Overlays',
-        children: [
-          { title: 'Product Details', path: '/store-client/product-details' },
-          { title: 'Wishlist', path: '/store-client/wishlist' },
-        ],
-      },
-      {
-        title: 'Checkout',
-        children: [
-          {
-            title: 'Order Summary',
-            path: '/store-client/checkout/order-summary',
-          },
-          {
-            title: 'Shipping Info',
-            path: '/store-client/checkout/shipping-info',
-          },
-          {
-            title: 'Payment Method',
-            path: '/store-client/checkout/payment-method',
-          },
-          {
-            title: 'Order Placed',
-            path: '/store-client/checkout/order-placed',
-          },
-        ],
-      },
-      { title: 'My Orders', path: '/store-client/my-orders' },
-      { title: 'Order Receipt', path: '/store-client/order-receipt' },
-    ],
-  },
-];
-
-/**
- * تم تفريغ هذا المينيو بالكامل حتى تختفي العناصر التالية من السايدبار:
- * Public Profile
- * My Account
- * Network
- * Authentication
- * User Management
- * Store - Client
- * وكذلك Home / Dashboards من الشكل المضغوط
- */
+// القوائم الأخرى فارغة كما طلبت في تعديلاتك السابقة
+export const MENU_SIDEBAR_CUSTOM: MenuConfig = [];
 export const MENU_SIDEBAR_COMPACT: MenuConfig = [];
-
-/**
- * تم تفريغ المينيو العلوي بالكامل حتى تختفي:
- * Home
- * Profiles
- * My Account
- * Network
- * Apps
- */
 export const MENU_ROOT: MenuConfig = [];
-
 export const MENU_MEGA: MenuConfig = [];
-
 export const MENU_MEGA_MOBILE: MenuConfig = [];
 
 export const MENU_HELP: MenuConfig = [
   {
-    title: 'Getting Started',
-    icon: Coffee,
-    path: 'https://keenthemes.com/metronic/tailwind/docs/getting-started/installation',
-  },
-  {
-    title: 'Support Forum',
-    icon: AlertCircle,
+    title: 'الدعم والمساعدة',
+    icon: HelpCircle,
+    expanded: true, // ✅ مفتوحة تلقائياً
     children: [
       {
-        title: 'All Questions',
+        title: 'ابدأ هنا',
+        icon: Coffee,
+        path: 'https://keenthemes.com/metronic/tailwind/docs/getting-started/installation',
+      },
+      {
+        title: 'التوثيق التعليمي',
         icon: FileQuestion,
-        path: 'https://devs.keenthemes.com',
-      },
-      {
-        title: 'Popular Questions',
-        icon: Star,
-        path: 'https://devs.keenthemes.com/popular',
-      },
-      {
-        title: 'Ask Question',
-        icon: HelpCircle,
-        path: 'https://devs.keenthemes.com/question/create',
+        path: 'https://keenthemes.com/metronic/tailwind/docs',
       },
     ],
-  },
-  {
-    title: 'Licenses & FAQ',
-    icon: Captions,
-    path: 'https://keenthemes.com/metronic/tailwind/docs/getting-started/license',
-  },
-  {
-    title: 'Documentation',
-    icon: FileQuestion,
-    path: 'https://keenthemes.com/metronic/tailwind/docs',
-  },
-  { separator: true },
-  {
-    title: 'Contact Us',
-    icon: Share2,
-    path: 'https://keenthemes.com/contact',
   },
 ];
 

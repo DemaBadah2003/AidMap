@@ -22,80 +22,81 @@ export default function EditProfilePage() {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Saved:', formData);
+    alert('تم حفظ التغييرات بنجاح');
   };
 
   return (
-    <div className="w-full py-10">
+    <div className="w-full py-10" dir="rtl">
       <div className="mx-auto w-full max-w-[800px] px-6 space-y-6">
-        {/* Title */}
+        {/* العنوان */}
         <div className="text-center">
-          <h1 className="text-2xl font-bold">Edit Profile</h1>
+          <h1 className="text-2xl font-bold">تعديل الملف الشخصي</h1>
           <p className="text-sm text-muted-foreground">
-            Update your personal information.
+            قم بتحديث معلوماتك الشخصية.
           </p>
         </div>
 
-        {/* Form Card */}
+        {/* نموذج البيانات */}
         <form
           onSubmit={handleSave}
           className="rounded-2xl border bg-background p-5 shadow-sm"
         >
-          <h3 className="mb-4 font-semibold">Account Info</h3>
+          <h3 className="mb-4 font-semibold text-right">بيانات الحساب</h3>
 
-          <div className="space-y-4 text-sm">
-            {/* Name */}
+          <div className="space-y-4 text-sm text-right">
+            {/* الاسم الكامل */}
             <div className="flex flex-col gap-1">
-              <label className="text-muted-foreground">Full Name</label>
+              <label className="text-muted-foreground">الاسم الكامل</label>
               <input
                 type="text"
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                placeholder="Enter your full name"
-                className="h-9 rounded-md border px-3 text-sm outline-none focus:ring-2 focus:ring-primary"
+                placeholder="أدخل اسمك الكامل"
+                className="h-9 rounded-md border px-3 text-sm outline-none focus:ring-2 focus:ring-primary text-right"
               />
             </div>
 
-            {/* Email */}
+            {/* البريد الإلكتروني */}
             <div className="flex flex-col gap-1">
-              <label className="text-muted-foreground">Email</label>
+              <label className="text-muted-foreground">البريد الإلكتروني</label>
               <input
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="Enter your email"
-                className="h-9 rounded-md border px-3 text-sm outline-none focus:ring-2 focus:ring-primary"
+                placeholder="أدخل بريدك الإلكتروني"
+                className="h-9 rounded-md border px-3 text-sm outline-none focus:ring-2 focus:ring-primary text-right"
               />
             </div>
 
-            {/* Password */}
+            {/* كلمة المرور */}
             <div className="flex flex-col gap-1">
-              <label className="text-muted-foreground">Password</label>
+              <label className="text-muted-foreground">كلمة المرور</label>
               <input
                 type="password"
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                placeholder="Enter new password"
-                className="h-9 rounded-md border px-3 text-sm outline-none focus:ring-2 focus:ring-primary"
+                placeholder="أدخل كلمة مرور جديدة"
+                className="h-9 rounded-md border px-3 text-sm outline-none focus:ring-2 focus:ring-primary text-right"
               />
             </div>
 
-            {/* Buttons */}
+            {/* الأزرار */}
             <div className="flex justify-end gap-3 pt-2">
               <Link
                 href="/profile-page"
                 className="h-9 rounded-md border px-4 text-xs font-medium hover:bg-muted flex items-center justify-center"
               >
-                Cancel
+                إلغاء
               </Link>
 
               <button
                 type="submit"
                 className="h-9 rounded-md bg-primary px-4 text-xs font-medium text-white hover:opacity-90 flex items-center justify-center"
               >
-                Save Changes
+                حفظ التغييرات
               </button>
             </div>
           </div>

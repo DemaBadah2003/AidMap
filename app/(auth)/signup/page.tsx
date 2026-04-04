@@ -4,11 +4,11 @@ import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AlertCircle, Check, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, LoaderCircleIcon } from 'lucide-react';
 import { signIn } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { apiFetch } from '@/lib/api';
-import { Alert, AlertIcon, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -20,260 +20,178 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { LoaderCircleIcon } from 'lucide-react';
 import { Icons } from '@/components/common/icons';
 import { getSignupSchema, SignupSchemaType } from '../forms/signup-schema';
 
 export default function Page() {
   const router = useRouter();
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [passwordConfirmationVisible, setPasswordConfirmationVisible] =
-    useState(false);
+  const [passwordConfirmationVisible, setPasswordConfirmationVisible] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<boolean | null>(false);
 
   const form = useForm<SignupSchemaType>({
     resolver: zodResolver(getSignupSchema()),
     defaultValues: {
       name: '',
+      email: '',
       password: '',
       passwordConfirmation: '',
       accept: false,
     },
   });
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const result = await form.trigger();
-    if (!result) return;
+  async function onSubmit(values: SignupSchemaType) {
     try {
-      const values = form.getValues();
-      console.log('Form Values:', values);
       setIsProcessing(true);
       setError(null);
       const response = await apiFetch('/api/auth/signup', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
       });
+
       if (!response.ok) {
-        const { message } = await response.json();
-        setError(message);
+        const data = await response.json();
+        setError(data.message || 'حدث خطأ أثناء إنشاء الحساب');
       } else {
         router.push('/');
       }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'An unexpected error occurred. Please try again.',
-      );
+      setError('تعذر الاتصال بالخادم، يرجى المحاولة لاحقاً.');
     } finally {
       setIsProcessing(false);
     }
-  };
+  }
 
   return (
-    <Suspense>
-      <Form {...form}>
-        <form onSubmit={handleSubmit} className="block w-full space-y-5">
-          <div className="space-y-1.5 pb-3">
-            <h1 className="text-2xl font-semibold tracking-tight text-center">
-              Sign Up to Metronic
-            </h1>
+    <Suspense fallback={<div className="flex h-screen items-center justify-center">جاري التحميل...</div>}>
+      {/* الحاوية الرئيسية للتمركز ومنع السكرول */}
+      <div className="fixed inset-0 flex items-center justify-center bg-[#f8fafc] p-4 overflow-hidden" dir="rtl">
+        
+        {/* الكارد الموحد */}
+        <div className="w-full max-w-[450px] bg-white rounded-3xl border border-gray-100 shadow-2xl p-8 md:p-10">
+          
+          {/* النصوص الجديدة لنظام الإغاثة */}
+          <div className="text-center mb-8 space-y-2">
+            <h1 className="text-2xl font-bold text-gray-900">إنشاء حساب جديد</h1>
+            <p className="text-sm text-gray-500">أدخل بياناتك للانضمام إلى نظام الإغاثة</p>
           </div>
 
-          <div className="flex flex-col gap-3.5">
-            <Button
-              variant="outline"
-              type="button"
-              onClick={() => signIn('google', { callbackUrl: '/' })}
-            >
-              <Icons.googleColorful className="size-4!" /> Sign up with Google
-            </Button>
-          </div>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              
+              {/* تسجيل الدخول عبر جوجل */}
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => signIn('google', { callbackUrl: '/' })}
+                className="h-12 w-full border-gray-200 hover:bg-gray-50 flex items-center justify-center gap-3 rounded-xl transition-all"
+              >
+                <Icons.googleColorful className="size-5" />
+                <span className="text-sm font-semibold text-gray-700">التسجيل بواسطة Google</span>
+              </Button>
 
-          <div className="relative py-1.5">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                or
-              </span>
-            </div>
-          </div>
-
-          {error && (
-            <Alert variant="destructive" onClose={() => setError(null)}>
-              <AlertIcon>
-                <AlertCircle />
-              </AlertIcon>
-              <AlertTitle>{error}</AlertTitle>
-            </Alert>
-          )}
-
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Name</FormLabel>
-                <FormControl>
-                  <Input placeholder="Your Name" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input placeholder="Your email" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Password</FormLabel>
-                <div className="relative">
-                  <Input
-                    placeholder="Your password"
-                    type={passwordVisible ? 'text' : 'password'}
-                    {...field}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    mode="icon"
-                    size="sm"
-                    onClick={() => setPasswordVisible(!passwordVisible)}
-                    className="absolute end-0 top-1/2 -translate-y-1/2 h-7 w-7 me-1.5 bg-transparent!"
-                    aria-label={
-                      passwordVisible ? 'Hide password' : 'Show password'
-                    }
-                  >
-                    {passwordVisible ? (
-                      <EyeOff className="text-muted-foreground" />
-                    ) : (
-                      <Eye className="text-muted-foreground" />
-                    )}
-                  </Button>
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-gray-100" /></div>
+                <div className="relative flex justify-center text-[11px] uppercase">
+                  <span className="bg-white px-3 text-gray-400 font-medium">أو عبر البريد</span>
                 </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+              </div>
 
-          <FormField
-            control={form.control}
-            name="passwordConfirmation"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Confirm Password</FormLabel>
-                <div className="relative">
-                  <Input
-                    type={passwordConfirmationVisible ? 'text' : 'password'}
-                    {...field}
-                    placeholder="Confirm your password"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    mode="icon"
-                    size="sm"
-                    onClick={() =>
-                      setPasswordConfirmationVisible(
-                        !passwordConfirmationVisible,
-                      )
-                    }
-                    className="absolute end-0 top-1/2 -translate-y-1/2 h-7 w-7 me-1.5 bg-transparent!"
-                    aria-label={
-                      passwordConfirmationVisible
-                        ? 'Hide password confirmation'
-                        : 'Show password confirmation'
-                    }
-                  >
-                    {passwordConfirmationVisible ? (
-                      <EyeOff className="text-muted-foreground" />
-                    ) : (
-                      <Eye className="text-muted-foreground" />
-                    )}
-                  </Button>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <div className="flex items-center space-x-2">
-            <FormField
-              control={form.control}
-              name="accept"
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <div className="flex items-center gap-2.5">
-                      <Checkbox
-                        id="accept"
-                        checked={field.value}
-                        onCheckedChange={(checked) => field.onChange(!!checked)}
-                      />
-                      <label
-                        htmlFor="accept"
-                        className="text-sm leading-none text-muted-foreground"
-                      >
-                        I agree to the
-                      </label>
-                      <Link
-                        href="/privacy-policy"
-                        target="_blank"
-                        className="-ms-0.5 text-sm font-semibold text-foreground hover:text-primary"
-                      >
-                        Privacy Policy
-                      </Link>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+              {error && (
+                <Alert variant="destructive" className="py-2 animate-in fade-in zoom-in duration-300">
+                  <AlertDescription className="text-xs text-center">{error}</AlertDescription>
+                </Alert>
               )}
-            />
-          </div>
 
-          <div className="flex flex-col gap-2.5">
-            <Button type="submit" disabled={isProcessing}>
-              {isProcessing ? (
-                <LoaderCircleIcon className="size-4 animate-spin" />
-              ) : null}
-              Continue
-            </Button>
-          </div>
+              {/* حقول الإدخال */}
+              <div className="space-y-3">
+                <FormField control={form.control} name="name" render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs font-bold text-gray-600">الاسم الكامل</FormLabel>
+                    <FormControl><Input placeholder="أدخل اسمك الثلاثي" className="h-11 rounded-lg" {...field} /></FormControl>
+                    <FormMessage className="text-[10px]" />
+                  </FormItem>
+                )} />
 
-          <div className="text-sm text-muted-foreground text-center">
-            Already have an account?{' '}
-            <Link
-              href="/signin"
-              className="text-sm text-sm font-semibold text-foreground hover:text-primary"
-            >
-              Sign In
-            </Link>
-          </div>
-        </form>
-      </Form>
+                <FormField control={form.control} name="email" render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs font-bold text-gray-600">البريد الإلكتروني</FormLabel>
+                    <FormControl><Input placeholder="example@relief.org" className="h-11 rounded-lg" {...field} /></FormControl>
+                    <FormMessage className="text-[10px]" />
+                  </FormItem>
+                )} />
+
+                {/* حقل كلمة المرور */}
+                <FormField control={form.control} name="password" render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs font-bold text-gray-600">كلمة المرور</FormLabel>
+                    <div className="relative">
+                      <Input type={passwordVisible ? 'text' : 'password'} placeholder="••••••••" className="h-11 rounded-lg pe-10" {...field} />
+                      <button type="button" onClick={() => setPasswordVisible(!passwordVisible)} className="absolute end-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        {passwordVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
+                    <FormMessage className="text-[10px]" />
+                  </FormItem>
+                )} />
+
+                {/* حقل تأكيد كلمة المرور - الآن أصبح تحت حقل كلمة المرور مباشرة */}
+                <FormField control={form.control} name="passwordConfirmation" render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs font-bold text-gray-600">تأكيد كلمة المرور</FormLabel>
+                    <div className="relative">
+                      <Input type={passwordConfirmationVisible ? 'text' : 'password'} placeholder="أعد كتابة كلمة المرور" className="h-11 rounded-lg pe-10" {...field} />
+                      <button type="button" onClick={() => setPasswordConfirmationVisible(!passwordConfirmationVisible)} className="absolute end-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        {passwordConfirmationVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
+                    <FormMessage className="text-[10px]" />
+                  </FormItem>
+                )} />
+              </div>
+
+              {/* زر الموافقة والشروط */}
+              <FormField
+                control={form.control}
+                name="accept"
+                render={({ field }) => (
+                  <FormItem className="pt-1">
+                    <div className="flex items-center gap-2">
+                      <FormControl>
+                        <Checkbox id="terms" checked={field.value} onCheckedChange={field.onChange} className="rounded-md border-gray-300" />
+                      </FormControl>
+                      <label htmlFor="terms" className="text-xs text-gray-600 cursor-pointer select-none font-medium">
+                        أوافق على <Link href="#" className="text-blue-600 font-bold hover:underline">سياسة الخصوصية</Link> لنظام الإغاثة.
+                      </label>
+                    </div>
+                    <FormMessage className="text-[10px] mr-7" />
+                  </FormItem>
+                )}
+              />
+
+              {/* زر الإرسال */}
+              <Button 
+                type="submit" 
+                disabled={isProcessing} 
+                className="h-12 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-100 transition-all active:scale-95"
+              >
+                {isProcessing ? (
+                  <div className="flex items-center gap-2">
+                    <LoaderCircleIcon className="size-4 animate-spin" />
+                    <span>جاري الإنشاء...</span>
+                  </div>
+                ) : 'إنشاء الحساب'}
+              </Button>
+
+              <p className="text-center text-sm text-gray-500 pt-2">
+                لديك حساب بالفعل؟ <Link href="/signin" className="text-blue-600 font-bold hover:underline">تسجيل الدخول</Link>
+              </p>
+            </form>
+          </Form>
+        </div>
+      </div>
     </Suspense>
   );
 }

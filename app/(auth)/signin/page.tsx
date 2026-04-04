@@ -24,7 +24,7 @@ import { LoaderCircleIcon } from 'lucide-react';
 import { Icons } from '@/components/common/icons';
 import { getSigninSchema, SigninSchemaType } from '../forms/signin-schema';
 
-// ✅ التعديل الصحيح
+// ✅ استيراد مساعد حفظ بيانات المستخدم
 import { saveCurrentUser } from '@/app/api/project/helpers/helpers';
 
 export default function Page() {
@@ -55,37 +55,33 @@ export default function Page() {
       });
 
       if (response?.error) {
-        const errorData = JSON.parse(response.error);
-        setError(errorData.message);
+        try {
+            const errorData = JSON.parse(response.error);
+            setError(errorData.message);
+        } catch {
+            setError('خطأ في البريد الإلكتروني أو كلمة المرور');
+        }
       } else {
-        // ✅ جلب session
         const session = await fetch('/api/auth/session').then((r) => r.json());
 
-        console.log('SESSION AFTER LOGIN:', session);
-
-        // ✅ تحويل roleId → role
         let role: 'admin' | 'user' = 'user';
-
-        // ⚠️ مهم: هذا ID الأدمن من DB عندك
         if (session?.user?.roleId === '8bec7f4f-e5a1-42d3-b001-8bbd5059fffd') {
           role = 'admin';
         }
 
-        // ✅ تخزين المستخدم (الحل الأساسي للمشكلة)
         saveCurrentUser({
           id: session.user.id,
           email: session.user.email,
           role,
         });
 
-        // ✅ توجيه
         router.push('/dashboard');
       }
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'An unexpected error occurred. Please try again.',
+          : 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.',
       );
     } finally {
       setIsProcessing(false);
@@ -97,10 +93,12 @@ export default function Page() {
       <form
         onSubmit={form.handleSubmit(onSubmit)}
         className="block w-full space-y-5"
+        dir="rtl"
       >
-        <div className="space-y-1.5 pb-3">
-          <h1 className="text-2xl font-semibold tracking-tight text-center">
-            Sign in to Metronic
+        {/* العنوان باللون الأسود */}
+        <div className="space-y-1.5 pb-6">
+          <h1 className="text-3xl font-bold tracking-tight text-center text-black">
+            نظام الإغاثة
           </h1>
         </div>
 
@@ -108,11 +106,10 @@ export default function Page() {
           <AlertIcon>
             <RiErrorWarningFill className="text-primary" />
           </AlertIcon>
-          <AlertTitle className="text-accent-foreground">
-            Use <span className="text-mono font-semibold">demo@kt.com</span>{' '}
-            username and{' '}
-            <span className="text-mono font-semibold">demo123</span> for demo
-            access.
+          <AlertTitle className="text-accent-foreground text-right">
+            استخدم البريد <span className="text-mono font-semibold">demo@kt.com</span>{' '}
+            وكلمة المرور{' '}
+            <span className="text-mono font-semibold">demo123</span> للدخول التجريبي.
           </AlertTitle>
         </Alert>
 
@@ -122,8 +119,7 @@ export default function Page() {
             type="button"
             onClick={() => signIn('google', { callbackUrl: '/' })}
           >
-            <Icons.googleColorful className="size-5! opacity-100!" /> Sign in
-            with Google
+            <Icons.googleColorful className="ml-2 size-5! opacity-100!" /> تسجيل الدخول بواسطة Google
           </Button>
         </div>
 
@@ -132,7 +128,7 @@ export default function Page() {
             <span className="w-full border-t" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">or</span>
+            <span className="bg-background px-2 text-muted-foreground">أو من خلال</span>
           </div>
         </div>
 
@@ -141,7 +137,7 @@ export default function Page() {
             <AlertIcon>
               <AlertCircle />
             </AlertIcon>
-            <AlertTitle>{error}</AlertTitle>
+            <AlertTitle className="text-right">{error}</AlertTitle>
           </Alert>
         )}
 
@@ -149,10 +145,10 @@ export default function Page() {
           control={form.control}
           name="email"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email</FormLabel>
+            <FormItem className="text-right">
+              <FormLabel>البريد الإلكتروني</FormLabel>
               <FormControl>
-                <Input placeholder="Your email" {...field} />
+                <Input placeholder="أدخل بريدك الإلكتروني" {...field} className="text-right" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -163,21 +159,22 @@ export default function Page() {
           control={form.control}
           name="password"
           render={({ field }) => (
-            <FormItem>
+            <FormItem className="text-right">
               <div className="flex justify-between items-center gap-2.5">
-                <FormLabel>Password</FormLabel>
+                <FormLabel>كلمة المرور</FormLabel>
                 <Link
                   href="/reset-password"
                   className="text-sm font-semibold text-foreground hover:text-primary"
                 >
-                  Forgot Password?
+                  نسيت كلمة المرور؟
                 </Link>
               </div>
               <div className="relative">
                 <Input
-                  placeholder="Your password"
+                  placeholder="أدخل كلمة المرور"
                   type={passwordVisible ? 'text' : 'password'}
                   {...field}
+                  className="text-right pl-10"
                 />
                 <Button
                   type="button"
@@ -185,7 +182,7 @@ export default function Page() {
                   mode="icon"
                   size="sm"
                   onClick={() => setPasswordVisible(!passwordVisible)}
-                  className="absolute end-0 top-1/2 -translate-y-1/2 h-7 w-7 me-1.5 bg-transparent!"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 h-7 w-7 ms-1.5 bg-transparent!"
                 >
                   {passwordVisible ? (
                     <EyeOff className="text-muted-foreground" />
@@ -199,7 +196,7 @@ export default function Page() {
           )}
         />
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 space-x-reverse justify-start">
           <FormField
             control={form.control}
             name="rememberMe"
@@ -212,9 +209,9 @@ export default function Page() {
                 />
                 <label
                   htmlFor="remember-me"
-                  className="text-sm leading-none text-muted-foreground"
+                  className="text-sm leading-none text-muted-foreground mr-2"
                 >
-                  Remember me
+                  تذكرني على هذا الجهاز
                 </label>
               </>
             )}
@@ -222,21 +219,21 @@ export default function Page() {
         </div>
 
         <div className="flex flex-col gap-2.5">
-          <Button type="submit" disabled={isProcessing}>
+          <Button type="submit" disabled={isProcessing} className="w-full">
             {isProcessing ? (
-              <LoaderCircleIcon className="size-4 animate-spin" />
+              <LoaderCircleIcon className="ml-2 size-4 animate-spin" />
             ) : null}
-            Continue
+            تسجيل الدخول
           </Button>
         </div>
 
         <p className="text-sm text-muted-foreground text-center">
-          Don&apos;t have an account?{' '}
+          ليس لديك حساب؟{' '}
           <Link
             href="/signup"
             className="text-sm font-semibold text-foreground hover:text-primary"
           >
-            Sign Up
+            إنشاء حساب جديد
           </Link>
         </p>
       </form>

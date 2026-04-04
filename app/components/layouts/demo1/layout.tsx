@@ -6,6 +6,8 @@ import { useSettings } from '@/providers/settings-provider';
 import { Footer } from './components/footer';
 import { Header } from './components/header';
 import { Sidebar } from './components/sidebar';
+// استيراد الحاوية للتحكم في العرض
+import { Container } from '@/components/common/container';
 
 export function Demo1Layout({ children }: { children: ReactNode }) {
   const isMobile = useIsMobile();
@@ -57,7 +59,13 @@ export function Demo1Layout({ children }: { children: ReactNode }) {
         <Header />
 
         <main className="grow pt-5" role="content">
-          {children}
+          {/* التعديل الجوهري هنا: 
+            استخدام Container مع width="fluid" لإلغاء الـ max-width
+            واستخدام !p-0 لإزالة الفراغات الجانبية التي تسببها الحاوية الافتراضية
+          */}
+          <Container width="fluid" className="!p-0">
+            {children}
+          </Container>
         </main>
 
         <Footer />

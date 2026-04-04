@@ -17,11 +17,13 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 
 const inter = Inter({ subsets: ['latin'] });
 
+// تعديل العنوان والبيانات الوصفية للغة العربية
 export const metadata: Metadata = {
   title: {
-    template: '%s | Metronic',
-    default: 'Metronic',
+    template: '%s | نظام الإغاثة',
+    default: 'نظام الإغاثة - Relief System',
   },
+  description: 'نظام إدارة المساعدات والخدمات للمستفيدين',
 };
 
 export default function RootLayout({
@@ -32,7 +34,7 @@ export default function RootLayout({
   return (
     <html
       lang="ar"
-      dir="rtl"
+      dir="rtl" // التأكد من تفعيل الاتجاه العربي
       suppressHydrationWarning
       className="h-full w-full"
     >
@@ -50,6 +52,7 @@ export default function RootLayout({
                   <TooltipsProvider>
                     <ModulesProvider>
                       <div className="h-screen w-screen overflow-hidden">
+                        {/* استخدام Suspense لضمان تجربة مستخدم سلسة أثناء التحميل */}
                         <Suspense fallback={null}>{children}</Suspense>
                       </div>
                       <Toaster />

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import MapPreview from '@/app/components/maps/MapPreviewContent'
+import { MapLibrePreview } from '@/app/components/maps/MapPreviewContent'
 
 type MapPlace = {
   id: string
@@ -16,55 +16,38 @@ type MapPlace = {
   statusText: string
 }
 
-function toSafeNumber(value: any, fallback = 0): number {
+function toSafeNumber(value: unknown, fallback = 0): number {
   if (value === null || value === undefined || value === '') return fallback
-
-  const normalized =
-    typeof value === 'string' ? value.replace(/,/g, '.').trim() : value
-
-  const n = Number(normalized)
+  const n = Number(value)
   return Number.isFinite(n) ? n : fallback
 }
 
 function normalizePlace(item: any): MapPlace | null {
-  const rawType = String(
-    item?.type ?? item?.kind ?? item?.category ?? item?.placeType ?? ''
-  ).toLowerCase()
-
-  let mappedType: MapPlace['type'] = 'shelter'
-
-  if (['shelter', 'shelters', 'school', 'unrwa_school'].includes(rawType)) {
-    mappedType = 'shelter'
-  } else if (
-    ['hospital', 'medical', 'clinic', 'doctors', 'pharmacy'].includes(rawType)
-  ) {
-    mappedType = 'hospital'
-  } else if (['water', 'drinking_water', 'aid'].includes(rawType)) {
-    mappedType = 'water'
-  } else if (
-    ['food', 'community_centre', 'social_centre', 'marketplace'].includes(rawType)
-  ) {
-    mappedType = 'food'
-  }
-
-  const lat = toSafeNumber(item?.lat ?? item?.latitude, NaN)
-  const lng = toSafeNumber(item?.lng ?? item?.longitude ?? item?.long, NaN)
+  const lat = toSafeNumber(item?.lat, NaN)
+  const lng = toSafeNumber(item?.lng, NaN)
 
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     return null
   }
 
   return {
-    id: String(item?.id ?? item?._id ?? crypto.randomUUID()),
-    name: String(item?.name ?? item?.title ?? item?.placeName ?? 'بدون اسم'),
-    type: mappedType,
+    id: String(item?.id ?? crypto.randomUUID()),
+    name: String(item?.name ?? 'بدون اسم'),
+    type:
+      item?.type === 'hospital'
+        ? 'hospital'
+        : item?.type === 'water'
+          ? 'water'
+          : item?.type === 'food'
+            ? 'food'
+            : 'shelter',
     lat,
     lng,
-    operator: String(item?.operator ?? item?.managedBy ?? ''),
+    operator: String(item?.operator ?? ''),
     capacity: toSafeNumber(item?.capacity, 0),
     occupancy: toSafeNumber(item?.occupancy, 0),
     availableBeds: toSafeNumber(item?.availableBeds, 0),
-    statusText: String(item?.statusText ?? item?.status ?? ''),
+    statusText: String(item?.statusText ?? ''),
   }
 }
 
@@ -85,34 +68,15 @@ export default function ProjectMapPreviewPage() {
 
         const data = await res.json()
 
-        console.log('API response status:', res.status)
-        console.log('API response data:', data)
-
         if (!res.ok) {
           throw new Error(data?.message || 'فشل في جلب الأماكن')
         }
 
-        const rawPlaces = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.data)
-            ? data.data
-            : Array.isArray(data?.places)
-              ? data.places
-              : []
+        const rawPlaces = Array.isArray(data?.data) ? data.data : []
 
         const normalizedPlaces = rawPlaces
           .map(normalizePlace)
           .filter(Boolean) as MapPlace[]
-
-        const badPlaces = rawPlaces.filter((item: any) => {
-          const lat = toSafeNumber(item?.lat ?? item?.latitude, NaN)
-          const lng = toSafeNumber(item?.lng ?? item?.longitude ?? item?.long, NaN)
-
-          return !Number.isFinite(lat) || !Number.isFinite(lng)
-        })
-
-        console.log('bad places:', badPlaces)
-        console.log('normalized places:', normalizedPlaces)
 
         setPlaces(normalizedPlaces)
       } catch (err) {
@@ -126,8 +90,7 @@ export default function ProjectMapPreviewPage() {
     loadPlaces()
   }, [])
 
-  console.log('places', places)
-
+  
   if (loading) {
     return <div className="p-6">جاري تحميل الخريطة...</div>
   }
@@ -142,10 +105,10 @@ export default function ProjectMapPreviewPage() {
 
   return (
     <div className="p-6">
-      <MapPreview
+      <MapLibrePreview
         height={700}
         adminPlaces={places}
-        osmEnabled={true}
+        osmEnabled={false}
       />
     </div>
   )
