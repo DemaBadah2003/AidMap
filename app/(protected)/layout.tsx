@@ -12,7 +12,6 @@ export default function ProtectedLayout({
   children: React.ReactNode;
 }) {
   const { data: session, status } = useSession();
-  console.log("SESSION USER:", session?.user);
   const router = useRouter();
 
   useEffect(() => {
@@ -25,5 +24,17 @@ export default function ProtectedLayout({
     return <ScreenLoader />;
   }
 
-  return session ? <Demo1Layout>{children}</Demo1Layout> : null;
+  return session ? (
+    <Demo1Layout>
+      {/* التعديل الجذري هنا: 
+          استخدمنا lg:pr-[285px] (Padding Right) لضمان دفع المحتوى بعيداً عن السايدبار الأيمن.
+          أضفنا w-full لضمان استغلال المساحة المتبقية.
+      */}
+      <main className="w-full min-h-screen bg-[#f9fafb] lg:pr-[285px] transition-all duration-300">
+        <div className="p-4 lg:p-8">
+          {children}
+        </div>
+      </main>
+    </Demo1Layout>
+  ) : null;
 }
