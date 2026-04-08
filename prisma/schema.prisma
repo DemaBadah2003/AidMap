@@ -199,23 +199,32 @@ model Supervisor {
 }
 
 model Camps {
-  id            String         @id @default(uuid())
-  name          String
-  area          String?
-  capacity      Int            @default(0)
-  status        CampFillStatus @default(NOT_FULL)
-  latitude      Decimal?       @db.Decimal(10, 7)
-  longitude     Decimal?       @db.Decimal(10, 7)
-  supervisorId  String
-  placeId       String?        @unique
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  isTrashed     Boolean        @default(false)
-  isProtected   Boolean        @default(false)
+  id                   String         @id @default(uuid())
+  name                 String // يمثل nameAr في الفرونت
+  area                 String? // المنطقة (شمال، جنوب، إلخ)
+  subArea              String? // الموقع الفرعي (جباليا، رفح، إلخ) - مضاف
+  capacity             Int            @default(0)
+  currentFamiliesCount Int            @default(0) // عدد العائلات الحالي - مضاف
+  status               CampFillStatus @default(NOT_FULL)
+
+  // الإحداثيات (اختياري حسب الكود الحالي)
+  latitude  Decimal? @db.Decimal(10, 7)
+  longitude Decimal? @db.Decimal(10, 7)
+
+  // العلاقات
+  supervisorId String? // جعلته اختياري إذا كان الفرونت لا يرسله حالياً
+  placeId      String? @unique
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isTrashed   Boolean  @default(false)
+  isProtected Boolean  @default(false)
+
+  // العلاقات الأخرى
   addresses     Address[]
   beneficiaries Beneficiary[]
-  place         Place?         @relation("CampPlace", fields: [placeId], references: [id])
-  supervisor    Supervisor     @relation(fields: [supervisorId], references: [id])
+  place         Place?        @relation("CampPlace", fields: [placeId], references: [id])
+  supervisor    Supervisor?   @relation(fields: [supervisorId], references: [id])
   emergencies   Emergency[]
 
   @@index([supervisorId])
@@ -228,18 +237,23 @@ model Beneficiary {
   phone          String              @unique
   numberOfFamily Int                 @default(0)
   priority       BeneficiaryPriority @default(NORMAL)
-  campId         String?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  role           String              @default("CITIZEN")
-  isActive       Boolean             @default(true)
-  isTrashed      Boolean             @default(false)
-  isProtected    Boolean             @default(false)
-  camp           Camps?              @relation(fields: [campId], references: [id])
-  contacts       Contact[]
-  distributions  Distribution[]
+
+  // الحقل الجديد
+  area String? // المنطقة: شمال، جنوب، شرق، غرب
+
+  campId        String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  role          String         @default("CITIZEN")
+  isActive      Boolean        @default(true)
+  isTrashed     Boolean        @default(false)
+  isProtected   Boolean        @default(false)
+  camp          Camps?         @relation(fields: [campId], references: [id])
+  contacts      Contact[]
+  distributions Distribution[]
 
   @@index([campId])
+  @@index([area]) // أضفنا اندكس هنا لسرعة الفلترة حسب المنطقة
   @@index([name])
   @@index([phone])
   @@index([isActive])
