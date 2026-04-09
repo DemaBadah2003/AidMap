@@ -2,20 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient, PlaceType, PlaceStatus, Prisma } from '@prisma/client'
 import { requireAdminApi } from '@/app/api/project/helpers/api-guards'
 
+// إعداد PrismaClient بطريقة تمنع تكرار الاتصالات في التطوير
 const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient
+  prisma: PrismaClient | undefined
 }
 
-const prisma =
+// تعديل هنا: التأكد من إنشاء الكائن بدون إعدادات "Engine" معقدة إذا لم تكن مطلوبة
+export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: ['error'],
   })
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 
+// --- أنواع البيانات والمساعدات ---
 type FrontPlaceType = 'shelter' | 'hospital' | 'water' | 'food'
 
 type CreatePlaceBody = {
@@ -46,95 +47,44 @@ function normalizeSpaces(value: string): string {
 }
 
 function isValidFrontPlaceType(value: unknown): value is FrontPlaceType {
-  return (
-    value === 'shelter' ||
-    value === 'hospital' ||
-    value === 'water' ||
-    value === 'food'
-  )
+  return ['shelter', 'hospital', 'water', 'food'].includes(value as string)
 }
 
 function mapFrontTypeToPrismaType(type: FrontPlaceType): PlaceType {
-  switch (type) {
-    case 'shelter':
-      return PlaceType.SHELTER
-    case 'hospital':
-      return PlaceType.MEDICAL
-    case 'water':
-      return PlaceType.WATER_POINT
-    case 'food':
-      return PlaceType.FOOD_SUPPORT_CENTER
-    default:
-      return PlaceType.SHELTER
+  const mapping: Record<FrontPlaceType, PlaceType> = {
+    shelter: PlaceType.SHELTER,
+    hospital: PlaceType.MEDICAL,
+    water: PlaceType.WATER_POINT,
+    food: PlaceType.FOOD_SUPPORT_CENTER,
   }
+  return mapping[type]
 }
 
 function mapStatusTextToPrismaStatus(statusText: string | null): PlaceStatus {
-  if (!statusText) {
-    return PlaceStatus.AVAILABLE
-  }
-
+  if (!statusText) return PlaceStatus.AVAILABLE
   const value = statusText.toLowerCase()
-
-  if (
-    value.includes('مغلق') ||
-    value.includes('closed') ||
-    value.includes('غير متاح')
-  ) {
-    return PlaceStatus.UNAVAILABLE
-  }
-
-  if (
-    value.includes('ممتلئ') ||
-    value.includes('full') ||
-    value.includes('مزدحم')
-  ) {
-    return PlaceStatus.FULL
-  }
-
+  if (value.includes('مغلق') || value.includes('closed') || value.includes('غير متاح')) return PlaceStatus.UNAVAILABLE
+  if (value.includes('ممتلئ') || value.includes('full') || value.includes('مزدحم')) return PlaceStatus.FULL
   return PlaceStatus.AVAILABLE
 }
 
-function parseOptionalText(
-  value: unknown,
-  maxLength: number
-): string | null | 'INVALID' {
-  if (value === null || value === undefined || value === '') {
-    return null
-  }
-
-  if (typeof value !== 'string') {
-    return 'INVALID'
-  }
-
+function parseOptionalText(value: unknown, maxLength: number): string | null | 'INVALID' {
+  if (value === null || value === undefined || value === '') return null
+  if (typeof value !== 'string') return 'INVALID'
   const normalized = normalizeSpaces(value)
-
-  if (!normalized) {
-    return null
-  }
-
-  if (normalized.length > maxLength) {
-    return 'INVALID'
-  }
-
+  if (!normalized) return null
+  if (normalized.length > maxLength) return 'INVALID'
   return normalized
 }
 
 function parseOptionalInteger(value: unknown): number | null | 'INVALID' {
-  if (value === null || value === undefined || value === '') {
-    return null
-  }
-
-  if (typeof value !== 'number' || !Number.isInteger(value)) {
-    return 'INVALID'
-  }
-
-  if (value < 0 || value > MAX_COUNT_VALUE) {
-    return 'INVALID'
-  }
-
-  return value
+  if (value === null || value === undefined || value === '') return null
+  const num = Number(value)
+  if (!Number.isInteger(num) || num < 0 || num > MAX_COUNT_VALUE) return 'INVALID'
+  return num
 }
+
+// --- GET Method ---
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -151,24 +101,17 @@ export async function GET(req: NextRequest) {
 
     const places = await prisma.place.findMany({
       where,
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     })
 
     const mappedPlaces = places.map((place) => ({
       id: place.id,
       name: place.name,
-      type:
-        place.type === PlaceType.SHELTER
-          ? 'shelter'
-          : place.type === PlaceType.MEDICAL
-            ? 'hospital'
-            : place.type === PlaceType.WATER_POINT
-              ? 'water'
-              : 'food',
-      lat: place.latitude != null ? Number(place.latitude) : 0,
-      lng: place.longitude != null ? Number(place.longitude) : 0,
+      type: place.type === PlaceType.SHELTER ? 'shelter' : 
+            place.type === PlaceType.MEDICAL ? 'hospital' : 
+            place.type === PlaceType.WATER_POINT ? 'water' : 'food',
+      lat: Number(place.latitude) || 0,
+      lng: Number(place.longitude) || 0,
       operator: place.operator ?? '',
       capacity: place.capacity ?? 0,
       occupancy: place.occupancy ?? 0,
@@ -176,255 +119,71 @@ export async function GET(req: NextRequest) {
       statusText: place.statusText ?? '',
     }))
 
-    return NextResponse.json(
-      {
-        success: true,
-        count: mappedPlaces.length,
-        data: mappedPlaces,
-      },
-      { status: 200 }
-    )
+    return NextResponse.json({ success: true, count: mappedPlaces.length, data: mappedPlaces })
   } catch (error) {
-    console.error('GET /api/project/places error:', error)
-
-    return NextResponse.json(
-      {
-        success: false,
-        message: 'فشل في جلب الأماكن',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    console.error('GET Error:', error)
+    return NextResponse.json({ success: false, message: 'فشل في جلب البيانات' }, { status: 500 })
   }
 }
+
+// --- POST Method ---
 export async function POST(req: NextRequest) {
   try {
     const unauthorized = await requireAdminApi(req)
-    if (unauthorized) {
-      return unauthorized
-    }
+    if (unauthorized) return unauthorized
 
     const body = (await req.json()) as CreatePlaceBody
+    const { name, type, latitude, longitude, description, operator, capacity, occupancy, availableBeds, statusText } = body
 
-    const {
-      name,
-      type,
-      latitude,
-      longitude,
-      description,
-      operator,
-      capacity,
-      occupancy,
-      availableBeds,
-      statusText,
-    } = body
-
-    if (typeof name !== 'string') {
-      return NextResponse.json(
-        { success: false, message: 'اسم المكان مطلوب' },
-        { status: 400 }
-      )
+    // التحقق من البيانات الأساسية
+    if (typeof name !== 'string' || !normalizeSpaces(name)) {
+      return NextResponse.json({ success: false, message: 'اسم المكان مطلوب' }, { status: 400 })
     }
 
     const normalizedName = normalizeSpaces(name)
-
-    if (!normalizedName) {
-      return NextResponse.json(
-        { success: false, message: 'اسم المكان مطلوب' },
-        { status: 400 }
-      )
-    }
-
-    if (normalizedName.length < NAME_MIN_LENGTH) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `اسم المكان يجب أن يكون على الأقل ${NAME_MIN_LENGTH} أحرف`,
-        },
-        { status: 400 }
-      )
-    }
-
-    if (normalizedName.length > NAME_MAX_LENGTH) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `اسم المكان يجب ألا يزيد عن ${NAME_MAX_LENGTH} حرفًا`,
-        },
-        { status: 400 }
-      )
-    }
-
     if (!ARABIC_NAME_REGEX.test(normalizedName)) {
-      return NextResponse.json(
-        { success: false, message: 'اسم المكان يجب أن يكون باللغة العربية فقط' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, message: 'الاسم يجب أن يكون بالعربية' }, { status: 400 })
     }
 
     if (!isValidFrontPlaceType(type)) {
-      return NextResponse.json(
-        { success: false, message: 'نوع المكان غير صالح' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, message: 'نوع المكان غير صالح' }, { status: 400 })
     }
 
     const lat = Number(latitude)
     const lng = Number(longitude)
-
-    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
-      return NextResponse.json(
-        { success: false, message: 'قيمة خط العرض يجب أن تكون بين -90 و 90' },
-        { status: 400 }
-      )
+    if (isNaN(lat) || isNaN(lng)) {
+      return NextResponse.json({ success: false, message: 'إحداثيات غير صحيحة' }, { status: 400 })
     }
 
-    if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
-      return NextResponse.json(
-        { success: false, message: 'قيمة خط الطول يجب أن تكون بين -180 و 180' },
-        { status: 400 }
-      )
-    }
+    // معالجة الحقول الاختيارية
+    const parsedDesc = parseOptionalText(description, DESCRIPTION_MAX_LENGTH)
+    const parsedOp = parseOptionalText(operator, OPERATOR_MAX_LENGTH)
+    const parsedStat = parseOptionalText(statusText, STATUS_TEXT_MAX_LENGTH)
+    const cap = parseOptionalInteger(capacity)
+    const occ = parseOptionalInteger(occupancy)
+    const avail = parseOptionalInteger(availableBeds)
 
-    const parsedDescription = parseOptionalText(description, DESCRIPTION_MAX_LENGTH)
-    if (parsedDescription === 'INVALID') {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `وصف المكان يجب ألا يزيد عن ${DESCRIPTION_MAX_LENGTH} حرف`,
-        },
-        { status: 400 }
-      )
-    }
-
-    const parsedOperator = parseOptionalText(operator, OPERATOR_MAX_LENGTH)
-    if (parsedOperator === 'INVALID') {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `الجهة المشغلة يجب ألا تزيد عن ${OPERATOR_MAX_LENGTH} حرف`,
-        },
-        { status: 400 }
-      )
-    }
-
-    if (parsedOperator && !OPERATOR_REGEX.test(parsedOperator)) {
-      return NextResponse.json(
-        { success: false, message: 'الجهة المشغلة يجب أن تحتوي على حروف فقط' },
-        { status: 400 }
-      )
-    }
-
-    const parsedStatusText = parseOptionalText(statusText, STATUS_TEXT_MAX_LENGTH)
-    if (parsedStatusText === 'INVALID') {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `حالة المكان يجب ألا تزيد عن ${STATUS_TEXT_MAX_LENGTH} حرف`,
-        },
-        { status: 400 }
-      )
-    }
-
-    const parsedCapacity = parseOptionalInteger(capacity)
-    if (parsedCapacity === 'INVALID') {
-      return NextResponse.json(
-        { success: false, message: `السعة يجب أن تكون رقمًا صحيحًا` },
-        { status: 400 }
-      )
-    }
-
-    const parsedOccupancy = parseOptionalInteger(occupancy)
-    if (parsedOccupancy === 'INVALID') {
-      return NextResponse.json(
-        { success: false, message: `الإشغال يجب أن يكون رقمًا صحيحًا` },
-        { status: 400 }
-      )
-    }
-
-    const parsedAvailableBeds = parseOptionalInteger(availableBeds)
-    if (parsedAvailableBeds === 'INVALID') {
-      return NextResponse.json(
-        { success: false, message: `المتاح يجب أن يكون رقمًا صحيحًا` },
-        { status: 400 }
-      )
-    }
-
-    if (type === 'shelter') {
-      if (
-        parsedCapacity !== null &&
-        parsedOccupancy !== null &&
-        parsedOccupancy > parsedCapacity
-      ) {
-        return NextResponse.json(
-          { success: false, message: 'الإشغال لا يمكن أن يكون أكبر من السعة' },
-          { status: 400 }
-        )
-      }
-
-      if (
-        parsedCapacity !== null &&
-        parsedAvailableBeds !== null &&
-        parsedAvailableBeds > parsedCapacity
-      ) {
-        return NextResponse.json(
-          { success: false, message: 'المتاح لا يمكن أن يكون أكبر من السعة' },
-          { status: 400 }
-        )
-      }
-
-      if (
-        parsedCapacity !== null &&
-        parsedOccupancy !== null &&
-        parsedAvailableBeds !== null &&
-        parsedOccupancy + parsedAvailableBeds > parsedCapacity
-      ) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: 'مجموع الإشغال والمتاح لا يمكن أن يكون أكبر من السعة',
-          },
-          { status: 400 }
-        )
-      }
-    }
-const newPlace = await prisma.place.create({
-  data: {
-    name: normalizedName,
-    type: mapFrontTypeToPrismaType(type),
-    latitude: lat,
-    longitude: lng,
-    description: parsedDescription,
-    operator: parsedOperator,
-    capacity: type === 'shelter' ? (parsedCapacity ?? 0) : 0,
-    occupancy: type === 'shelter' ? (parsedOccupancy ?? 0) : 0,
-    availableBeds: type === 'shelter' ? (parsedAvailableBeds ?? 0) : 0,
-    statusText: parsedStatusText,
-    status: mapStatusTextToPrismaStatus(parsedStatusText),
-    isActive: true,
-    isProtected: false,
-    isTrashed: false,
-  },
-})
-
-    return NextResponse.json(
-      {
-        success: true,
-        message: 'تمت إضافة المكان بنجاح',
-        data: newPlace,
+    const newPlace = await prisma.place.create({
+      data: {
+        name: normalizedName,
+        type: mapFrontTypeToPrismaType(type),
+        latitude: lat,
+        longitude: lng,
+        description: parsedDesc === 'INVALID' ? null : parsedDesc,
+        operator: parsedOp === 'INVALID' ? null : parsedOp,
+        capacity: type === 'shelter' ? (cap === 'INVALID' ? 0 : (cap ?? 0)) : 0,
+        occupancy: type === 'shelter' ? (occ === 'INVALID' ? 0 : (occ ?? 0)) : 0,
+        availableBeds: type === 'shelter' ? (avail === 'INVALID' ? 0 : (avail ?? 0)) : 0,
+        statusText: parsedStat === 'INVALID' ? null : parsedStat,
+        status: mapStatusTextToPrismaStatus(parsedStat === 'INVALID' ? null : parsedStat),
+        isActive: true,
+        isTrashed: false,
       },
-      { status: 201 }
-    )
+    })
+
+    return NextResponse.json({ success: true, message: 'تم الحفظ بنجاح', data: newPlace }, { status: 201 })
   } catch (error) {
-    console.error('POST /api/project/places error:', error)
-
-    return NextResponse.json(
-      {
-        success: false,
-        message: 'فشل في إضافة المكان',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    console.error('POST Error:', error)
+    return NextResponse.json({ success: false, message: 'خطأ في السيرفر' }, { status: 500 })
   }
 }

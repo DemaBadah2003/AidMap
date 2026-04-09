@@ -11,7 +11,7 @@ import {
   Dialog,
   DialogContent,
 } from '../../../components/ui/dialog';
-
+import { toast } from "sonner";
 export type Place = {
   id: string
   name: string
@@ -691,6 +691,7 @@ export function MapLibrePreview({
     setSelectedPlace(cardData)
 
     if (!userLocation) {
+      toast.warning("يرجى تحديد موقعك أولاً للحصول على أدق النتائج");
       clearRoute()
       map.flyTo({
         center: [place.lng, place.lat],
@@ -833,6 +834,12 @@ export function MapLibrePreview({
     if (!el) return
     if (mapRef.current) return
 
+    // --- ضيفي السطر هنا ---
+    console.log("الموقع يعمل الآن"); 
+    // أو إذا كنتِ تستخدمين التوستر:
+    // toast.info("يرجى إدخال موقع المستخدم");
+    // -----------------------
+
     if (typeof window !== 'undefined' && !window.__maplibreRTLInitialized) {
       const anyMap: any = maplibregl
       if (typeof anyMap.setRTLTextPlugin === 'function') {
@@ -863,6 +870,7 @@ export function MapLibrePreview({
     })
 
     geolocate.on('geolocate', (pos: GeolocationPosition) => {
+      toast.info("جاري تحديد موقعك الحالي...");
       const current = {
         lng: pos.coords.longitude,
         lat: pos.coords.latitude,
@@ -1065,7 +1073,9 @@ export function MapLibrePreview({
       el.style.cursor = 'pointer'
 
       el.addEventListener('click', async (evt) => {
-        evt.stopPropagation()
+        evt.stopPropagation();
+        // ضيفي التوستر هنا
+  toast.loading("جاري عرض تفاصيل الموقع...", { duration: 1500 });
 
         await openPlaceCardAndRoute({
           id: p.id,
@@ -1133,12 +1143,14 @@ export function MapLibrePreview({
       const onClick = async (e: any) => {
         const f = e.features?.[0] as any
         if (!f) return
+        toast.loading("جاري تحديد المسار إلى الموقع...", { duration: 2000 });
 
         const [clickedLng, clickedLat] = f.geometry.coordinates
         const p = f.properties || {}
 
         const kind = cleanText(p.kind || '')
         const name = cleanText(p.display_name || p.name || 'موقع')
+        toast.loading("جاري تحديد المسار إلى الموقع...", { duration: 2000 });
         const operator = cleanText(p.operator || '')
         const amenity = cleanText(p.amenity || '')
 

@@ -5,7 +5,7 @@ import { z, ZodError } from 'zod'
 import { Card, CardContent } from '../../../../../components/ui/card'
 import { Button } from '../../../../../components/ui/button'
 import { Input } from '../../../../../components/ui/input'
-import { Pencil, Plus, Search, Check, X, Loader2 } from 'lucide-react'
+import { Pencil, Plus, Search, Check, X, Loader2, ChevronRight, ChevronLeft } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -39,17 +39,13 @@ const CAMPS_OPTIONS_URL = '/api/project/projects/camps?forBeneficiary=true'
 
 const phoneRegex = /^(056|059)\d{7}$/
 
-// --- السكيما المعدلة (تم حذف شرط invalid_type_error) ---
 const beneficiarySchema = z.object({
   nameAr: z.string().min(1, 'اسم المستفيد مطلوب').trim(),
   phone: z.string().trim().min(1, 'رقم الهاتف مطلوب').regex(phoneRegex, 'يجب أن يبدأ بـ 056 أو 059'),
-  
-  // نكتفي بـ coerce لتحويل النص لرقم، ثم التحقق من الشروط الأخرى
   familyCount: z.coerce.number()
     .int('يجب أن يكون رقماً صحيحاً')
     .min(1, 'يجب أن يكون فرد واحد على الأقل')
     .max(50, 'الحد الأقصى المسموح به 50 فرداً'),
-
   area: z.string().min(1, 'يرجى اختيار المنطقة'),
   campId: z.string().min(1, 'يرجى اختيار المخيم'),
   priority: z.enum(['مستعجل', 'عادي', 'حرج']),
@@ -73,6 +69,9 @@ export default function BeneficiariesPage() {
   const [items, setItems] = useState<Beneficiary[]>([])
   const [campOptions, setCampOptions] = useState<CampOption[]>([])
   const [loading, setLoading] = useState(false)
+
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [addFormData, setAddFormData] = useState<Partial<Beneficiary>>({ priority: 'عادي' })
@@ -114,6 +113,12 @@ export default function BeneficiariesPage() {
     })
   }, [q, priorityFilter, items])
 
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage)
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage
+    return filteredItems.slice(start, start + itemsPerPage)
+  }, [filteredItems, currentPage])
+
   const handleAddSubmit = async () => {
     setErrors({})
     try {
@@ -126,6 +131,7 @@ export default function BeneficiariesPage() {
       setItems([newItem, ...items])
       setIsAddDialogOpen(false)
       setAddFormData({ priority: 'عادي' })
+      setCurrentPage(1) 
     } catch (err) {
       if (err instanceof ZodError) {
         const errs: Record<string, string> = {}
@@ -140,8 +146,7 @@ export default function BeneficiariesPage() {
     try {
       const validatedData = beneficiarySchema.parse(editFormData)
       setSubmitting(true)
-      const urlWithId = `${BASE_URL}?id=${id}` 
-      const savedItem = await requestJSON<Beneficiary>(urlWithId, {
+      const savedItem = await requestJSON<Beneficiary>(`${BASE_URL}?id=${id}`, {
         method: 'PATCH',
         body: JSON.stringify(validatedData)
       })
@@ -163,7 +168,7 @@ export default function BeneficiariesPage() {
     <div className="w-full px-4 py-6" dir="rtl">
       <div className="mb-6 flex flex-col gap-1 items-start">
         <h1 className="text-2xl font-bold text-slate-800">المستفيدون</h1>
-        <p className="text-sm text-slate-500">إدارة بيانات النازحين وتعديلها مباشرة في الجدول</p>
+        <p className="text-sm text-slate-500 font-normal">إدارة بيانات النازحين وتوزيع الحالات حسب الأولوية</p>
       </div>
 
       <Card>
@@ -172,12 +177,12 @@ export default function BeneficiariesPage() {
             <div className="flex gap-3 items-center">
               <div className="relative w-64">
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input placeholder="بحث سريع..." className="pr-9 h-10" value={q} onChange={e => setQ(e.target.value)} />
+                <Input placeholder="بحث سريع..." className="pr-9 h-10" value={q} onChange={e => { setQ(e.target.value); setCurrentPage(1); }} />
               </div>
               <select 
                 className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-right text-sm outline-none focus:ring-2 focus:ring-blue-500"
                 value={priorityFilter}
-                onChange={e => setPriorityFilter(e.target.value)}
+                onChange={e => { setPriorityFilter(e.target.value); setCurrentPage(1); }}
               >
                 <option value="all">جميع الحالات</option>
                 <option value="حرج">حالة حرجة</option>
@@ -186,7 +191,7 @@ export default function BeneficiariesPage() {
               </select>
             </div>
             
-            <Button onClick={() => { setErrors({}); setIsAddDialogOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white gap-2 shadow-sm">
+            <Button onClick={() => { setErrors({}); setIsAddDialogOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white gap-2 shadow-sm font-bold">
               <Plus className="h-4 w-4" /> إضافة مستفيد
             </Button>
           </div>
@@ -195,25 +200,35 @@ export default function BeneficiariesPage() {
             <table className="w-full text-sm text-right text-slate-600">
               <thead className="bg-slate-50 border-b text-slate-700 font-bold">
                 <tr>
-                  <th className="px-4 py-3">اسم المستفيد</th>
-                  <th className="px-4 py-3">رقم الهاتف</th>
-                  <th className="px-4 py-3">المنطقة</th>
-                  <th className="px-4 py-3">المخيم</th>
-                  <th className="px-4 py-3 text-center">الأفراد</th>
-                  <th className="px-4 py-3 text-center">الأولوية</th>
-                  <th className="px-4 py-3 text-center">الإجراءات</th>
+                  <th className="px-4 py-3 font-bold text-slate-800">اسم المستفيد</th>
+                  <th className="px-4 py-3 font-bold text-slate-800">رقم الهاتف</th>
+                  <th className="px-4 py-3 font-bold text-slate-800">المنطقة</th>
+                  <th className="px-4 py-3 font-bold text-slate-800">المخيم</th>
+                  <th className="px-4 py-3 text-center font-bold text-slate-800">الأفراد</th>
+                  <th className="px-4 py-3 text-center font-bold text-slate-800">الأولوية</th>
+                  <th className="px-4 py-3 text-center font-bold text-slate-800">الإجراءات</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredItems.map(b => {
+                {paginatedItems.map(b => {
                   const isEditing = editingId === b.id;
                   return (
                     <tr key={b.id} className={`border-b transition-colors ${isEditing ? 'bg-blue-50/50' : 'hover:bg-slate-50/50'}`}>
-                      <td className="px-4 py-2">
-                        {isEditing ? <Input className={inputClass} value={editFormData.nameAr} onChange={e => setEditFormData({...editFormData, nameAr: e.target.value})} /> : b.nameAr}
+                      <td className="px-4 py-2 font-medium">
+                        {isEditing ? (
+                          <div className="space-y-1">
+                            <Input className={inputClass} value={editFormData.nameAr} onChange={e => setEditFormData({...editFormData, nameAr: e.target.value})} />
+                            {errors.nameAr && <p className="text-[10px] text-red-500 font-normal">{errors.nameAr}</p>}
+                          </div>
+                        ) : b.nameAr}
                       </td>
                       <td className="px-4 py-2">
-                        {isEditing ? <Input className={inputClass} value={editFormData.phone} onChange={e => setEditFormData({...editFormData, phone: e.target.value})} /> : b.phone}
+                        {isEditing ? (
+                          <div className="space-y-1">
+                            <Input className={inputClass} value={editFormData.phone} onChange={e => setEditFormData({...editFormData, phone: e.target.value})} />
+                            {errors.phone && <p className="text-[10px] text-red-500 font-normal">{errors.phone}</p>}
+                          </div>
+                        ) : b.phone}
                       </td>
                       <td className="px-4 py-2">
                         {isEditing ? (
@@ -231,38 +246,30 @@ export default function BeneficiariesPage() {
                           </select>
                         ) : b.campName}
                       </td>
-                      <td className="px-4 py-2 text-center font-medium">
+                      <td className="px-4 py-2 text-center">
                         {isEditing ? (
-                          <div className="flex flex-col gap-1 items-center">
-                            <Input type="number" className="h-10 w-20 text-center border-blue-200" value={editFormData.familyCount} onChange={e => setEditFormData({...editFormData, familyCount: Number(e.target.value)})} />
+                          <div className="space-y-1">
+                            <Input type="number" className="h-10 w-20 text-center mx-auto" value={editFormData.familyCount} onChange={e => setEditFormData({...editFormData, familyCount: Number(e.target.value)})} />
                             {errors.familyCount && <p className="text-[10px] text-red-500 font-normal">{errors.familyCount}</p>}
                           </div>
                         ) : b.familyCount}
                       </td>
                       <td className="px-4 py-2 text-center">
-                        {isEditing ? (
-                          <select className={selectClass} value={editFormData.priority} onChange={e => setEditFormData({...editFormData, priority: e.target.value as Priority})}>
-                            <option value="عادي">عادي</option>
-                            <option value="مستعجل">مستعجل</option>
-                            <option value="حرج">حرج</option>
-                          </select>
-                        ) : (
-                          <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${b.priority === 'حرج' ? 'bg-red-100 text-red-700' : b.priority === 'مستعجل' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
-                            {b.priority}
-                          </span>
-                        )}
+                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${b.priority === 'حرج' ? 'bg-red-100 text-red-700' : b.priority === 'مستعجل' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {b.priority}
+                        </span>
                       </td>
                       <td className="px-4 py-2 text-center">
                         <div className="flex items-center justify-center gap-2">
                           {isEditing ? (
                             <>
-                              <Button size="icon" className="h-8 w-8 rounded-full bg-green-500 hover:bg-green-600" onClick={() => handleSaveEdit(b.id)} disabled={submitting}>
+                              <Button size="icon" className="h-8 w-8 bg-green-500 hover:bg-green-600" onClick={() => handleSaveEdit(b.id)} disabled={submitting}>
                                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                               </Button>
-                              <Button size="icon" className="h-8 w-8 rounded-full bg-slate-200" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></Button>
+                              <Button size="icon" className="h-8 w-8 bg-slate-200 text-slate-600" onClick={() => { setEditingId(null); setErrors({}); }}><X className="h-4 w-4" /></Button>
                             </>
                           ) : (
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingId(b.id); setEditFormData({...b}); }}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingId(b.id); setEditFormData({...b}); setErrors({}); }}>
                               <Pencil className="h-4 w-4" />
                             </Button>
                           )}
@@ -273,6 +280,23 @@ export default function BeneficiariesPage() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          <div className="p-4 border-t flex items-center justify-between bg-slate-50/50">
+            <span className="text-xs text-slate-500 font-normal">عرض {paginatedItems.length} من أصل {filteredItems.length} مستفيد</span>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="h-8 gap-1 font-normal text-xs" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
+                <ChevronRight className="h-4 w-4" /> السابق
+              </Button>
+              <div className="flex items-center gap-1 mx-2">
+                <span className="text-xs font-bold text-blue-600">{currentPage}</span>
+                <span className="text-xs text-slate-400">/</span>
+                <span className="text-xs text-slate-500">{totalPages || 1}</span>
+              </div>
+              <Button variant="outline" size="sm" className="h-8 gap-1 font-normal text-xs" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(prev => prev + 1)}>
+                التالي <ChevronLeft className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -295,21 +319,20 @@ export default function BeneficiariesPage() {
               {errors.phone && <p className="text-xs text-red-500">{errors.phone}</p>}
             </div>
 
-            <div className="grid grid-cols-2 gap-4 text-right">
-               <div className="space-y-1.5">
-                 <label className="text-sm font-semibold">المنطقة</label>
-                 <select className={selectClass} value={addFormData.area || ''} onChange={e => setAddFormData({...addFormData, area: e.target.value, campId: ''})}>
-                   <option value="">-- اختر --</option>
-                   {availableAreas.map(a => <option key={a} value={a}>{a}</option>)}
-                 </select>
-               </div>
-               <div className="space-y-1.5">
-                 <label className="text-sm font-semibold">المخيم</label>
-                 <select className={selectClass} value={addFormData.campId || ''} disabled={!addFormData.area} onChange={e => setAddFormData({...addFormData, campId: e.target.value})}>
-                   <option value="">-- اختر --</option>
-                   {filteredCampsForAdd.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                 </select>
-               </div>
+            <div className="space-y-1.5 text-right">
+              <label className="text-sm font-semibold">المنطقة</label>
+              <select className={selectClass} value={addFormData.area || ''} onChange={e => setAddFormData({...addFormData, area: e.target.value, campId: ''})}>
+                <option value="">-- اختر المنطقة --</option>
+                {availableAreas.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-1.5 text-right">
+              <label className="text-sm font-semibold">المخيم</label>
+              <select className={selectClass} value={addFormData.campId || ''} disabled={!addFormData.area} onChange={e => setAddFormData({...addFormData, campId: e.target.value})}>
+                <option value="">-- اختر المخيم --</option>
+                {filteredCampsForAdd.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
             </div>
 
             <div className="space-y-1.5 text-right">
@@ -319,11 +342,11 @@ export default function BeneficiariesPage() {
             </div>
           </div>
 
-          <DialogFooter className="mt-2 flex items-center justify-center gap-3 w-full">
-            <Button onClick={handleAddSubmit} disabled={submitting} className="flex-1 bg-blue-600 h-11">
+          <DialogFooter className="mt-2 flex flex-col sm:flex-row items-center gap-3 w-full">
+            <Button onClick={handleAddSubmit} disabled={submitting} className="w-full sm:flex-1 bg-blue-600 h-11 font-bold order-1">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : null} حفظ البيانات
             </Button>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="flex-1 h-11 text-slate-600">إلغاء</Button>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="w-full sm:flex-1 h-11 text-slate-600 font-normal order-2">إلغاء</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
