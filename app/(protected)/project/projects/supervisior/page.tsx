@@ -1,11 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
-
 import { Card, CardContent } from '../../../../../components/ui/card'
 import { Button } from '../../../../../components/ui/button'
 import { Input } from '../../../../../components/ui/input'
-
 import {
   Dialog,
   DialogContent,
@@ -14,8 +12,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '../../../../../components/ui/dialog'
-
-import { Pencil, Trash2, Save, X, Plus, Search } from 'lucide-react'
+import { Pencil, Save, X, Plus, Search } from 'lucide-react'
 
 type Supervisor = {
   id: string
@@ -32,17 +29,18 @@ type SupervisorApiItem = {
   status?: 'ACTIVE' | 'INACTIVE' | 'نشط' | 'موقوف'
 }
 
-const API_URL = '/api/project/projects/supervisor'
+const API_URL = '/api/project/projects/supervisior'
 
-const normalizePhone = (value: string) => value.replace(/[^\d+]/g, '')
+const normalizePhone = (value: string) => value.replace(/[^\d]/g, '')
+
+const isValidPalestinePhone = (phone: string) => {
+  const regex = /^(056|059)\d{7}$/
+  return regex.test(phone)
+}
 
 const toUiStatus = (status?: SupervisorApiItem['status']): Supervisor['status'] => {
   if (status === 'INACTIVE' || status === 'موقوف') return 'موقوف'
   return 'نشط'
-}
-
-const toApiStatus = (status: Supervisor['status']) => {
-  return status === 'موقوف' ? 'INACTIVE' : 'ACTIVE'
 }
 
 function getErrorMessage(err: unknown) {
@@ -80,14 +78,11 @@ async function readSupervisors(
   statusFilter: 'all' | 'active' | 'blocked'
 ): Promise<SupervisorApiItem[]> {
   const params = new URLSearchParams()
-
   if (statusFilter !== 'all') {
     params.set('status', statusFilter)
   }
-
   const queryString = params.toString()
   const url = `${API_URL}${queryString ? `?${queryString}` : ''}`
-
   return requestJSON<SupervisorApiItem[]>(url)
 }
 
@@ -98,17 +93,9 @@ async function createSupervisor(input: {
 }): Promise<SupervisorApiItem> {
   const nameAr = input.nameAr.trim()
   const phone = normalizePhone(input.phone.trim())
-
-  if (!nameAr) throw new Error('اسم المشرف مطلوب')
-  if (!phone) throw new Error('رقم الجوال مطلوب')
-
   return requestJSON<SupervisorApiItem>(API_URL, {
     method: 'POST',
-    body: JSON.stringify({
-      nameAr,
-      phone,
-      status: input.status,
-    }),
+    body: JSON.stringify({ nameAr, phone, status: input.status }),
   })
 }
 
@@ -120,35 +107,11 @@ async function updateSupervisor(
     status: Supervisor['status']
   }
 ): Promise<SupervisorApiItem> {
-  if (!id) throw new Error('معرّف المشرف مفقود')
-
   const nameAr = input.nameAr.trim()
   const phone = normalizePhone(input.phone.trim())
-
-  if (!nameAr) throw new Error('اسم المشرف مطلوب')
-  if (!phone) throw new Error('رقم الجوال مطلوب')
-
   return requestJSON<SupervisorApiItem>(`${API_URL}?id=${encodeURIComponent(id)}`, {
     method: 'PUT',
-    body: JSON.stringify({
-      nameAr,
-      phone,
-      status: input.status,
-    }),
-  })
-}
-
-async function deleteSupervisor(id: string): Promise<void> {
-  if (!id) throw new Error('معرّف المشرف مفقود')
-
-  await requestJSON(`${API_URL}?id=${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-  })
-}
-
-async function deleteAllSupervisors(): Promise<void> {
-  await requestJSON(`${API_URL}?all=true`, {
-    method: 'DELETE',
+    body: JSON.stringify({ nameAr, phone, status: input.status }),
   })
 }
 
@@ -156,8 +119,6 @@ const supervisorsApi = {
   list: readSupervisors,
   create: createSupervisor,
   update: updateSupervisor,
-  remove: deleteSupervisor,
-  removeAll: deleteAllSupervisors,
 }
 
 export default function SupervisorsPage() {
@@ -165,16 +126,16 @@ export default function SupervisorsPage() {
   const [items, setItems] = useState<Supervisor[]>([])
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
-
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'blocked'>('all')
-
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-
   const [addOpen, setAddOpen] = useState(false)
+  
   const [nameAr, setNameAr] = useState('')
   const [phone, setPhone] = useState('')
+  const [area, setArea] = useState('') 
   const [status, setStatus] = useState<Supervisor['status']>('نشط')
+  
   const [submitting, setSubmitting] = useState(false)
   const [addFormError, setAddFormError] = useState('')
 
@@ -200,7 +161,6 @@ export default function SupervisorsPage() {
   const fetchSupervisors = async () => {
     setLoading(true)
     setErrorMessage('')
-
     try {
       const data = await supervisorsApi.list(statusFilter)
       setItems(mapApiItems(data))
@@ -218,15 +178,13 @@ export default function SupervisorsPage() {
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
-
     return items.filter((sp) => {
-      const matchSearch =
+      return (
         !s ||
         sp.id.toLowerCase().includes(s) ||
         sp.nameAr.toLowerCase().includes(s) ||
         sp.phone.includes(s)
-
-      return matchSearch
+      )
     })
   }, [q, items])
 
@@ -236,7 +194,6 @@ export default function SupervisorsPage() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(page, totalPages)
-
   const pageItems = useMemo(() => {
     const start = (safePage - 1) * pageSize
     return filtered.slice(start, start + pageSize)
@@ -245,32 +202,24 @@ export default function SupervisorsPage() {
   const resetAddForm = () => {
     setNameAr('')
     setPhone('')
+    setArea('')
     setStatus('نشط')
     setAddFormError('')
   }
 
-  const isAddFormValid = !!nameAr.trim() && !!normalizePhone(phone.trim())
+  const isAddFormValid = 
+    nameAr.trim() !== '' && 
+    area !== '' && 
+    isValidPalestinePhone(normalizePhone(phone.trim()))
 
   const onAdd = async () => {
-    const ar = nameAr.trim()
-    const ph = normalizePhone(phone.trim())
-
-    if (!ar || !ph) {
-      setAddFormError('يرجى إدخال اسم المشرف ورقم الجوال')
-      return
-    }
+    if (!isAddFormValid) return
 
     setSubmitting(true)
-    setErrorMessage('')
-    setAddFormError('')
-
     try {
-      const created = await supervisorsApi.create({
-        nameAr: ar,
-        phone: ph,
-        status,
-      })
-
+      const ar = nameAr.trim()
+      const ph = normalizePhone(phone.trim())
+      const created = await supervisorsApi.create({ nameAr: ar, phone: ph, status })
       setItems((prev) => [
         {
           id: created.id,
@@ -280,9 +229,7 @@ export default function SupervisorsPage() {
         },
         ...prev,
       ])
-
-      resetAddForm()
-      setAddOpen(false)
+      resetAddOpen(false)
     } catch (err) {
       setAddFormError(getErrorMessage(err))
     } finally {
@@ -290,70 +237,35 @@ export default function SupervisorsPage() {
     }
   }
 
-  const onDeleteOne = async (id: string) => {
-    try {
-      setErrorMessage('')
-      await supervisorsApi.remove(id)
-
-      if (editingId === id) setEditingId(null)
-
-      setItems((prev) => prev.filter((x) => x.id !== id))
-    } catch (err) {
-      setErrorMessage(getErrorMessage(err))
-    }
-  }
-
-  const onDeleteAll = async () => {
-    try {
-      setSubmitting(true)
-      setErrorMessage('')
-
-      await supervisorsApi.removeAll()
-      setItems([])
-      setEditingId(null)
-    } catch (err) {
-      setErrorMessage(getErrorMessage(err))
-    } finally {
-      setSubmitting(false)
-    }
+  const resetAddOpen = (open: boolean) => {
+    setAddOpen(open)
+    if (!open) resetAddForm()
   }
 
   const startEditRow = (sp: Supervisor) => {
     setEditingId(sp.id)
-    setEditDraft({
-      nameAr: sp.nameAr,
-      phone: sp.phone,
-      status: sp.status,
-    })
+    setEditDraft({ nameAr: sp.nameAr, phone: sp.phone, status: sp.status })
   }
 
   const cancelEditRow = () => {
     setEditingId(null)
-    setEditDraft({
-      nameAr: '',
-      phone: '',
-      status: 'نشط',
-    })
   }
 
   const saveEditRow = async (id: string) => {
     const ar = editDraft.nameAr.trim()
     const ph = normalizePhone(editDraft.phone.trim())
 
-    if (!ar || !ph) {
-      setErrorMessage('يرجى إدخال الاسم ورقم الجوال قبل الحفظ')
+    if (!isValidPalestinePhone(ph) || ar === '') {
+      setErrorMessage('يرجى التأكد من ملء جميع الحقول وصحة رقم الجوال')
       return
     }
 
     try {
-      setErrorMessage('')
-
       const updated = await supervisorsApi.update(id, {
         nameAr: ar,
         phone: ph,
         status: editDraft.status,
       })
-
       setItems((prev) =>
         prev.map((sp) =>
           sp.id === id
@@ -366,8 +278,8 @@ export default function SupervisorsPage() {
             : sp
         )
       )
-
       setEditingId(null)
+      setErrorMessage('')
     } catch (err) {
       setErrorMessage(getErrorMessage(err))
     }
@@ -388,8 +300,8 @@ export default function SupervisorsPage() {
         </div>
       </div>
 
-      <div className="w-full max-w-[1200px]">
-        <Card>
+      <div className="w-full">
+        <Card className="w-full">
           <CardContent className="p-0" dir="rtl">
             <div className="p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -413,15 +325,6 @@ export default function SupervisorsPage() {
                     <option value="active">نشط</option>
                     <option value="blocked">موقوف</option>
                   </select>
-
-                  <Button
-                    variant="outline"
-                    className="!h-10 !rounded-lg border-slate-200 !px-4 !text-sm"
-                    onClick={fetchSupervisors}
-                    disabled={loading}
-                  >
-                    تحديث
-                  </Button>
                 </div>
 
                 <div className="flex items-center justify-end gap-2">
@@ -435,15 +338,6 @@ export default function SupervisorsPage() {
                   >
                     <Plus className="h-4 w-4" />
                     إضافة مشرف
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    className="!h-10 !rounded-lg border-slate-200 !px-4 !text-sm !font-semibold text-slate-700 hover:bg-slate-50"
-                    onClick={onDeleteAll}
-                    disabled={submitting || !items.length}
-                  >
-                    حذف الكل
                   </Button>
                 </div>
               </div>
@@ -459,18 +353,13 @@ export default function SupervisorsPage() {
 
             <div className="overflow-hidden rounded-b-lg">
               <div className="w-full overflow-x-auto">
-                <table className="min-w-[920px] w-full border-collapse text-sm">
-                  <thead
-                    style={{
-                      backgroundColor: '#F9FAFB',
-                      boxShadow: '0 1px 0 rgba(0,0,0,0.06)',
-                    }}
-                  >
+                <table className="min-w-full border-collapse text-sm">
+                  <thead style={{ backgroundColor: '#F9FAFB', boxShadow: '0 1px 0 rgba(0,0,0,0.06)' }}>
                     <tr className="text-right text-foreground/60">
-                      <th className="border-b border-l px-4 py-3 font-normal">المشرف</th>
-                      <th className="border-b border-l px-4 py-3 font-normal">رقم الجوال</th>
-                      <th className="border-b border-l px-4 py-3 font-normal">الحالة</th>
-                      <th className="border-b px-4 py-3 font-normal">الإجراءات</th>
+                      <th className="border-b border-l px-4 py-3 font-normal text-right">المشرف</th>
+                      <th className="border-b border-l px-4 py-3 font-normal text-right">رقم الجوال</th>
+                      <th className="border-b border-l px-4 py-3 font-normal text-right">الحالة</th>
+                      <th className="border-b px-4 py-3 font-normal text-right">الإجراءات</th>
                     </tr>
                   </thead>
 
@@ -484,106 +373,77 @@ export default function SupervisorsPage() {
                     ) : pageItems.length ? (
                       pageItems.map((sp) => {
                         const isEditing = editingId === sp.id
-
                         return (
                           <tr key={sp.id} className="hover:bg-muted/30">
-                            <td className="border-b border-l px-4 py-3 font-medium">
+                            <td className="border-b border-l px-4 py-3 font-medium text-right">
                               {isEditing ? (
                                 <Input
                                   value={editDraft.nameAr}
-                                  onChange={(e) =>
-                                    setEditDraft((p) => ({ ...p, nameAr: e.target.value }))
-                                  }
+                                  onChange={(e) => setEditDraft((p) => ({ ...p, nameAr: e.target.value }))}
                                   className="h-9"
                                 />
                               ) : (
-                                <div className="flex flex-col">
-                                  <span className="font-medium text-foreground">{sp.nameAr}</span>
-                                  <span className="text-xs text-muted-foreground">{sp.id}</span>
-                                </div>
+                                <span className="font-medium text-foreground">{sp.nameAr}</span>
                               )}
                             </td>
 
-                            <td className="border-b border-l px-4 py-3">
+                            <td className="border-b border-l px-4 py-3 text-right">
                               {isEditing ? (
-                                <Input
-                                  value={editDraft.phone}
-                                  onChange={(e) =>
-                                    setEditDraft((p) => ({
-                                      ...p,
-                                      phone: normalizePhone(e.target.value),
-                                    }))
-                                  }
-                                  className="h-9"
-                                />
+                                <div className="flex flex-col gap-1">
+                                  <Input
+                                    value={editDraft.phone}
+                                    onChange={(e) => setEditDraft((p) => ({ ...p, phone: normalizePhone(e.target.value) }))}
+                                    className={`h-9 ${editDraft.phone && !isValidPalestinePhone(editDraft.phone) ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                                    maxLength={10}
+                                  />
+                                  {editDraft.phone && !isValidPalestinePhone(editDraft.phone) && (
+                                    <span className="text-[10px] text-red-500">ابدأ بـ 056 أو 059 (10 أرقام)</span>
+                                  )}
+                                </div>
                               ) : (
                                 sp.phone
                               )}
                             </td>
 
-                            <td className="border-b border-l px-4 py-3">
+                            <td className="border-b border-l px-4 py-3 text-right">
                               {isEditing ? (
                                 <select
                                   value={editDraft.status}
-                                  onChange={(e) =>
-                                    setEditDraft((p) => ({
-                                      ...p,
-                                      status: e.target.value as Supervisor['status'],
-                                    }))
-                                  }
+                                  onChange={(e) => setEditDraft((p) => ({ ...p, status: e.target.value as Supervisor['status'] }))}
                                   className="h-9 rounded-md border bg-background px-3"
                                 >
                                   <option value="نشط">نشط</option>
                                   <option value="موقوف">موقوف</option>
                                 </select>
                               ) : (
-                                <span
-                                  className={
-                                    sp.status === 'نشط'
-                                      ? 'inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700'
-                                      : 'inline-flex rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700'
-                                  }
-                                >
+                                <span className={sp.status === 'نشط' ? 'inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700' : 'inline-flex rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700'}>
                                   {sp.status}
                                 </span>
                               )}
                             </td>
 
-                            <td className="border-b px-4 py-3">
+                            <td className="border-b px-4 py-3 text-right">
                               <div className="flex items-center gap-2">
                                 {!isEditing ? (
-                                  <>
-                                    <button
-                                      type="button"
-                                      className="inline-flex h-10 w-10 items-center justify-center rounded-md border hover:bg-muted"
-                                      title="تعديل"
-                                      onClick={() => startEditRow(sp)}
-                                    >
-                                      <Pencil className="size-4" />
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      className="inline-flex h-10 w-10 items-center justify-center rounded-md border hover:bg-muted"
-                                      title="حذف"
-                                      onClick={() => onDeleteOne(sp.id)}
-                                    >
-                                      <Trash2 className="size-4" />
-                                    </button>
-                                  </>
+                                  <button
+                                    type="button"
+                                    className="inline-flex h-10 w-10 items-center justify-center rounded-md border hover:bg-muted"
+                                    onClick={() => startEditRow(sp)}
+                                  >
+                                    <Pencil className="size-4" />
+                                  </button>
                                 ) : (
                                   <>
-                                    <Button className="h-10" size="sm" onClick={() => saveEditRow(sp.id)}>
+                                    <Button 
+                                      className="h-10" 
+                                      size="sm" 
+                                      onClick={() => saveEditRow(sp.id)}
+                                      disabled={!isValidPalestinePhone(editDraft.phone) || editDraft.nameAr.trim() === ''}
+                                    >
                                       <Save className="ms-2 size-4" />
                                       حفظ
                                     </Button>
-
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-10"
-                                      onClick={cancelEditRow}
-                                    >
+                                    <Button size="sm" variant="outline" className="h-10" onClick={cancelEditRow}>
                                       <X className="ms-2 size-4" />
                                       إلغاء
                                     </Button>
@@ -623,22 +483,10 @@ export default function SupervisorsPage() {
                   <div className="text-sm text-muted-foreground">
                     {rangeStart} - {rangeEnd} من {filtered.length}
                   </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={safePage <= 1}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  >
+                  <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
                     السابق
                   </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={safePage >= totalPages}
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  >
+                  <Button variant="outline" size="sm" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
                     التالي
                   </Button>
                 </div>
@@ -647,75 +495,89 @@ export default function SupervisorsPage() {
           </CardContent>
         </Card>
 
-        <Dialog
-          open={addOpen}
-          onOpenChange={(open) => {
-            setAddOpen(open)
-            if (!open) resetAddForm()
-          }}
-        >
-          <DialogContent className="sm:max-w-[560px]">
+        {/* إضافة مشرف - تعديل الأزرار لتكون بعرض الحقل وبالترتيب المطلوب */}
+        <Dialog open={addOpen} onOpenChange={resetAddOpen}>
+          <DialogContent className="sm:max-w-[500px]">
             <DialogHeader dir="rtl" className="text-right">
-              <DialogTitle>إضافة مشرف</DialogTitle>
-              <DialogDescription>أدخل بيانات المشرف الجديد</DialogDescription>
+              <DialogTitle>إضافة مشرف جديد</DialogTitle>
+              <DialogDescription>يرجى ملء جميع الحقول المطلوبة بشكل صحيح.</DialogDescription>
             </DialogHeader>
 
-            <div dir="rtl" className="grid gap-3">
-              <div className="grid gap-2">
-                <div className="text-sm">اسم المشرف</div>
-                <Input
-                  value={nameAr}
-                  onChange={(e) => {
-                    setNameAr(e.target.value)
-                    if (addFormError) setAddFormError('')
-                  }}
-                  placeholder="مثال: أحمد محمد"
+            <div dir="rtl" className="flex flex-col gap-5 py-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-bold text-gray-700">
+                  اسم المشرف <span className="text-red-500">*</span>
+                </label>
+                <Input 
+                  value={nameAr} 
+                  onChange={(e) => setNameAr(e.target.value)} 
+                  placeholder="أدخل اسم المشرف..." 
+                  className={`h-11 border-slate-200 ${nameAr === '' ? 'border-amber-200' : ''}`}
                 />
               </div>
 
-              <div className="grid gap-2">
-                <div className="text-sm">رقم الجوال</div>
-                <Input
-                  value={phone}
-                  onChange={(e) => {
-                    setPhone(normalizePhone(e.target.value))
-                    if (addFormError) setAddFormError('')
-                  }}
-                  placeholder="مثال: 0599123456"
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-bold text-gray-700">
+                  رقم الجوال <span className="text-red-500">*</span>
+                </label>
+                <Input 
+                  value={phone} 
+                  onChange={(e) => setPhone(normalizePhone(e.target.value))} 
+                  placeholder="مثال: 059xxxxxxx" 
+                  maxLength={10}
+                  className={`h-11 border-slate-200 ${phone && !isValidPalestinePhone(phone) ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                 />
+                {phone && !isValidPalestinePhone(phone) && (
+                  <p className="text-[11px] text-red-500 font-medium">ابدأ بـ 056 أو 059 ويتكون من 10 أرقام</p>
+                )}
               </div>
 
-              <div className="grid gap-2">
-                <div className="text-sm">الحالة</div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-bold text-gray-700">
+                  المنطقة <span className="text-red-500">*</span>
+                </label>
+                <select 
+                  value={area}
+                  onChange={(e) => setArea(e.target.value)}
+                  className={`h-11 rounded-md border border-slate-200 bg-background px-3 outline-none focus:ring-2 focus:ring-blue-100 ${area === '' ? 'border-amber-200' : ''}`}
+                >
+                  <option value="">اختر المنطقة...</option>
+                  <option value="north">شمال غزة</option>
+                  <option value="gaza">مدينة غزة</option>
+                  <option value="south">الجنوب</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-bold text-gray-700">الحالة</label>
                 <select
                   value={status}
-                  onChange={(e) => {
-                    setStatus(e.target.value as Supervisor['status'])
-                    if (addFormError) setAddFormError('')
-                  }}
-                  className="h-10 rounded-md border bg-background px-3"
+                  onChange={(e) => setStatus(e.target.value as Supervisor['status'])}
+                  className="h-11 rounded-md border border-slate-200 bg-background px-3 outline-none focus:ring-2 focus:ring-blue-100"
                 >
                   <option value="نشط">نشط</option>
                   <option value="موقوف">موقوف</option>
                 </select>
-
-                {!!addFormError && <div className="text-sm text-red-600">{addFormError}</div>}
               </div>
+
+              {addFormError && <p className="text-sm text-red-600 font-medium text-center">{addFormError}</p>}
             </div>
 
-            <DialogFooter dir="rtl" className="gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setAddOpen(false)
-                  resetAddForm()
-                }}
+            {/* الأزرار بعرض كامل (w-full) مع الحفظ يميناً والإلغاء يساراً */}
+            <DialogFooter dir="rtl" className="flex flex-row-reverse gap-3 pt-4 border-t">
+              <Button 
+                onClick={onAdd} 
+                disabled={!isAddFormValid || submitting}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-11"
               >
-                إغلاق
+                {submitting ? 'جارٍ الحفظ...' : 'حفظ البيانات'}
               </Button>
-
-              <Button onClick={onAdd} disabled={!isAddFormValid || submitting}>
-                {submitting ? 'جارٍ الإضافة...' : 'إضافة'}
+              <Button 
+                variant="outline" 
+                onClick={() => resetAddOpen(false)} 
+                className="w-full h-11"
+              >
+                إلغاء
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -723,4 +585,4 @@ export default function SupervisorsPage() {
       </div>
     </div>
   )
-} 
+}

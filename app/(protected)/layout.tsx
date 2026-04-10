@@ -25,16 +25,9 @@ export default function ProtectedLayout({
   }
 
   return session ? (
+    // نعود للنسخة الأصلية والبسيطة هنا، لأن Demo1Layout هو من يتحكم في السايدبار والتوزيع
     <Demo1Layout>
-      {/* التعديل الجذري هنا: 
-          استخدمنا lg:pr-[285px] (Padding Right) لضمان دفع المحتوى بعيداً عن السايدبار الأيمن.
-          أضفنا w-full لضمان استغلال المساحة المتبقية.
-      */}
-      <main className="w-full min-h-screen bg-[#f9fafb] lg:pr-[285px] transition-all duration-300">
-        <div className="p-4 lg:p-8">
-          {children}
-        </div>
-      </main>
+       {children}
     </Demo1Layout>
   ) : null;
 }

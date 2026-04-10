@@ -337,12 +337,23 @@ model Institution {
 }
 
 model Contact {
-  id            String        @id @default(uuid())
+  id            String @id @default(uuid())
   beneficiaryId String
   institutionId String
-  status        ContactStatus @default(NOT_DONE)
-  beneficiary   Beneficiary   @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
-  institution   Institution   @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+
+  // الحقول الجديدة التي أضيفت في الفرونت إند
+  type  String? // نوع التواصل (اتصال هاتف، زيارة، إلخ)
+  date  DateTime @default(now()) // تاريخ التواصل
+  notes String?  @db.Text // ملاحظات (استخدمنا Text للمساحات الطويلة)
+
+  status ContactStatus @default(NOT_DONE)
+
+  // العلاقات
+  beneficiary Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  institution Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+
+  @@index([beneficiaryId])
+  @@index([institutionId])
 }
 
 model Product {
@@ -538,8 +549,8 @@ enum PresenceStatus {
 }
 
 enum ContactStatus {
-  DONE
-  NOT_DONE
+  DONE // تم
+  NOT_DONE // لم يتم
 }
 
 enum DistributionStatus {
