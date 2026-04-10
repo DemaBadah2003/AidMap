@@ -44,9 +44,9 @@ export const MENU_SIDEBAR: MenuConfig = [
         children: [
           { title: 'معاينة الخريطة', path: '/project/MapPreview' },
           { title: 'إضافة مكان', path: '/project/admins/addPlaces' },
-          { title: 'إدارة المستفيدين', path: '/project/admins/adminBeneficiary' },
-          { title: 'إضافة مساعدة', path: '/project/admins/addAid' },
-          { title: 'توزيع المساعدات', path: '/project/admins/distributeAid' },
+          { title: 'تسجيل مستفيد', path: '/project/admins/adminBeneficiary' },
+          { title: 'فحص مساعدة', path: '/project/admins/addAid' },
+          { title:'طلب مساعدة ', path: '/project/admins/distributeAid' },
         ],
       },
     ],

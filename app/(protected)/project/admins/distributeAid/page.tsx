@@ -1,238 +1,225 @@
 'use client'
 
-import { useState } from 'react'
-import { Card, CardContent } from '../../../../../components/ui/card'
-import { Button } from '../../../../../components/ui/button'
-import { Input } from '../../../../../components/ui/input'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { requireCitizen } from '@/app/(protected)/project/helpers/route-guards'
 
-type DistributionStatus = 'SCHEDULED' | 'DONE' | 'CANCELED'
-type AidType = 'غذائية' | 'مياه' | 'دواء' | 'ملابس' | 'مواد نظافة' | 'بطانيات'
-
-const toIntOnly = (value: string) => {
-  const digits = value.replace(/\D/g, '')
-  return digits ? Number(digits) : 0
+type FormErrors = {
+  fullName?: string
+  nationalId?: string
+  phone?: string
+  aidType?: string
+  familyCount?: string
+  address?: string
+  notes?: string
 }
 
-export default function DistributeAidPage() {
-  const [beneficiaryName, setBeneficiaryName] = useState('')
-  const [aidType, setAidType] = useState<AidType | ''>('')
-  const [quantity, setQuantity] = useState<number>(0)
-  const [distributionDate, setDistributionDate] = useState('')
-  const [institutionId, setInstitutionId] = useState('')
-  const [status, setStatus] = useState<DistributionStatus>('SCHEDULED')
-  const [notes, setNotes] = useState('')
+const phoneRegex = /^(056|059)\d{7}$/
+const nationalIdRegex = /^\d{9}$/
+const repeatedDigitsRegex = /^(\d)\1+$/
 
-  const [submitting, setSubmitting] = useState(false)
+export default function RequestAidPage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    requireCitizen(router)
+  }, [router])
+
+  const [fullName, setFullName] = useState('')
+  const [nationalId, setNationalId] = useState('')
+  const [phone, setPhone] = useState('')
+  const [aidType, setAidType] = useState('')
+  const [familyCount, setFamilyCount] = useState('')
+  const [address, setAddress] = useState('')
+  const [notes, setNotes] = useState('')
+  const [loading, setLoading] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [errors, setErrors] = useState<FormErrors>({})
 
-  const resetForm = () => {
-    setBeneficiaryName('')
-    setAidType('')
-    setQuantity(0)
-    setDistributionDate('')
-    setInstitutionId('')
-    setStatus('SCHEDULED')
-    setNotes('')
+  const validateField = (name: string, value: string) => {
+    switch (name) {
+      case 'fullName': return !value.trim() ? 'الاسم مطلوب' : ''
+      case 'nationalId':
+        if (!value) return 'رقم الهوية مطلوب'
+        if (!nationalIdRegex.test(value)) return 'يجب أن يتكون رقم الهوية من 9 أرقام'
+        if (repeatedDigitsRegex.test(value)) return 'رقم هوية غير صالح (أرقام مكررة)'
+        return ''
+      case 'phone':
+        if (!value) return 'رقم الجوال مطلوب'
+        if (!phoneRegex.test(value)) return 'يجب أن يبدأ بـ 056 أو 059'
+        return ''
+      case 'aidType': return !value ? 'يرجى اختيار نوع المساعدة' : ''
+      case 'familyCount':
+        const num = Number(value)
+        if (!value || num < 1 || num > 20) return 'العدد يجب أن يكون بين 1 و 20'
+        return ''
+      case 'address': return !value.trim() ? 'العنوان مطلوب' : ''
+      default: return ''
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSuccessMessage(''); setErrorMessage('')
 
-    setSuccessMessage('')
-    setErrorMessage('')
-
-    if (
-      !beneficiaryName.trim() ||
-      !aidType ||
-      !Number.isInteger(quantity) ||
-      quantity <= 0 ||
-      !distributionDate.trim()
-    ) {
-      setErrorMessage('يرجى تعبئة جميع الحقول المطلوبة بشكل صحيح')
-      return
+    const newErrors: FormErrors = {
+      fullName: validateField('fullName', fullName),
+      nationalId: validateField('nationalId', nationalId),
+      phone: validateField('phone', phone),
+      aidType: validateField('aidType', aidType),
+      familyCount: validateField('familyCount', familyCount),
+      address: validateField('address', address),
     }
 
-    try {
-      setSubmitting(true)
+    setErrors(newErrors)
+    if (Object.values(newErrors).some(Boolean)) return
 
-      const res = await fetch('/api/project/distributeAid', {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/project/users/requestAid', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          beneficiaryName: beneficiaryName.trim(),
+          fullName: fullName.trim(),
+          nationalId,
+          phone,
           aidType,
-          institutionId: institutionId.trim() || null,
-          quantity,
-          distributionDate,
-          status,
-          notes: notes.trim() || null,
+          familyCount: Number(familyCount),
+          address: address.trim(),
+          notes: notes.trim(),
         }),
       })
 
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(
-          data.message ||
-          data.issues?.map((i: any) => i.message).join(' - ') ||
-          'فشل في حفظ عملية التوزيع'
-        )
-      }
-
-      setSuccessMessage('تم تسجيل توزيع المساعدة بنجاح')
-      resetForm()
+      if (!res.ok) throw new Error('فشل في إرسال الطلب')
+      setSuccessMessage('تم إرسال طلبك بنجاح.')
+      setFullName(''); setNationalId(''); setPhone(''); setAidType('');
+      setFamilyCount(''); setAddress(''); setNotes(''); setErrors({});
     } catch (error: any) {
-      setErrorMessage(error.message || 'حدث خطأ غير متوقع')
+      setErrorMessage(error?.message || 'حدث خطأ أثناء الإرسال')
     } finally {
-      setSubmitting(false)
+      setLoading(false)
     }
   }
 
   return (
-    <div className="w-full px-3 py-6 sm:px-6" dir="rtl">
-      <div className="mb-6" dir="ltr">
-        <div className="text-left">
-          <div className="text-2xl font-semibold text-foreground">Distribute Aid</div>
-          <div className="mt-1 text-sm text-muted-foreground">
-            Home <span className="mx-1">{'>'}</span>{' '}
-            <span className="text-foreground">Distribute Aid Form</span>
-          </div>
+    <div className="flex min-h-[calc(100vh-80px)] items-center justify-center bg-slate-50 p-4" dir="rtl">
+      <div className="w-full max-w-2xl">
+        
+        <div className="mb-5 text-center">
+          <h1 className="text-2xl font-bold text-slate-800">طلب مساعدة إغاثية</h1>
+          <p className="mt-1 text-sm text-slate-500 font-normal">يرجى إدخال بياناتك بدقة لضمان وصول المساعدة في أسرع وقت ممكن</p>
         </div>
-      </div>
 
-      <div className="w-full max-w-[1200px]">
-        <Card className="overflow-hidden border border-slate-200 shadow-none">
-          <CardContent className="p-0">
-            <div className="border-b bg-white px-6 py-5 text-right">
-              <h2 className="text-xl font-semibold text-foreground">إضافة توزيع مساعدة جديد</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                أدخل بيانات توزيع المساعدة ليتم إضافتها إلى النظام
-              </p>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/40 md:p-10">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-normal text-slate-600 mr-1">الاسم الكامل (رباعي)</label>
+              <input
+                type="text"
+                placeholder="مثال: محمد أحمد محمود علي"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+              />
+              {errors.fullName && <span className="text-[10px] text-red-500 mr-1">{errors.fullName}</span>}
             </div>
 
-            <div className="bg-white px-6 py-6">
-              {successMessage && (
-                <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                  {successMessage}
-                </div>
-              )}
-
-              {errorMessage && (
-                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {errorMessage}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="space-y-5 text-right">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-foreground">المستفيد</label>
-                  <Input
-                    type="text"
-                    value={beneficiaryName}
-                    onChange={(e) => setBeneficiaryName(e.target.value)}
-                    placeholder="أدخل اسم المستفيد"
-                    className="h-12 rounded-md border-slate-200 text-right shadow-none"
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-foreground">نوع المساعدة</label>
-                  <select
-                    value={aidType}
-                    onChange={(e) => setAidType(e.target.value as AidType | '')}
-                    className="h-12 w-full rounded-md border border-slate-200 bg-white px-3 text-right text-sm outline-none focus:ring-2 focus:ring-slate-200"
-                  >
-                    <option value="">اختر نوع المساعدة</option>
-                    <option value="غذائية">غذائية</option>
-                    <option value="مياه">مياه</option>
-                    <option value="دواء">دواء</option>
-                    <option value="ملابس">ملابس</option>
-                    <option value="مواد نظافة">مواد نظافة</option>
-                    <option value="بطانيات">بطانيات</option>
-                  </select>
-                </div>
-
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-foreground">الكمية</label>
-                  <Input
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    type="text"
-                    value={quantity ? String(quantity) : ''}
-                    onChange={(e) => setQuantity(toIntOnly(e.target.value))}
-                    placeholder="مثال: 2"
-                    className="h-12 rounded-md border-slate-200 text-right shadow-none"
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-foreground">تاريخ التوزيع</label>
-                  <Input
-                    type="date"
-                    value={distributionDate}
-                    onChange={(e) => setDistributionDate(e.target.value)}
-                    className="h-12 rounded-md border-slate-200 text-right shadow-none"
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-foreground">الجهة الموزعة</label>
-                  <Input
-                    type="text"
-                    value={institutionId}
-                    onChange={(e) => setInstitutionId(e.target.value)}
-                    placeholder="مثال: الهلال الأحمر"
-                    className="h-12 rounded-md border-slate-200 text-right shadow-none"
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-foreground">حالة التوزيع</label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as DistributionStatus)}
-                    className="h-12 w-full rounded-md border border-slate-200 bg-white px-3 text-right text-sm outline-none focus:ring-2 focus:ring-slate-200"
-                  >
-                    <option value="SCHEDULED">مجدول</option>
-                    <option value="DONE">تم</option>
-                    <option value="CANCELED">ملغي</option>
-                  </select>
-                </div>
-
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-foreground">ملاحظات</label>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="أي ملاحظات إضافية"
-                    rows={5}
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-3 text-right text-sm outline-none focus:ring-2 focus:ring-slate-200"
-                  />
-                </div>
-
-                <div className="flex justify-end pt-2" dir="ltr">
-                  <Button
-                    type="submit"
-                    disabled={
-                      submitting ||
-                      !beneficiaryName.trim() ||
-                      !aidType ||
-                      !Number.isInteger(quantity) ||
-                      quantity <= 0 ||
-                      !distributionDate.trim()
-                    }
-                    className="h-10 rounded-md bg-blue-600 px-5 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-blue-600 disabled:text-white disabled:opacity-100"
-                  >
-                    {submitting ? 'جاري الحفظ...' : 'حفظ التوزيع'}
-                  </Button>
-                </div>
-              </form>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-normal text-slate-600 mr-1">رقم الهوية</label>
+              <input
+                type="text"
+                maxLength={9}
+                placeholder="9xxxxxxx"
+                value={nationalId}
+                onChange={(e) => setNationalId(e.target.value.replace(/\D/g, ''))}
+                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500"
+              />
+              {errors.nationalId && <span className="text-[10px] text-red-500 mr-1">{errors.nationalId}</span>}
             </div>
-          </CardContent>
-        </Card>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-normal text-slate-600 mr-1">رقم الجوال</label>
+              <input
+                type="text"
+                maxLength={10}
+                placeholder="05xxxxxxx"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500"
+              />
+              {errors.phone && <span className="text-[10px] text-red-500 mr-1">{errors.phone}</span>}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-normal text-slate-600 mr-1">نوع المساعدة</label>
+              <select
+                value={aidType}
+                onChange={(e) => setAidType(e.target.value)}
+                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500 bg-white"
+              >
+                <option value="">اختر النوع...</option>
+                <option value="food">مساعدة غذائية</option>
+                <option value="medical">مساعدة طبية</option>
+                <option value="financial">مساعدة مالية</option>
+                <option value="shelter">مساعدة سكن</option>
+              </select>
+              {errors.aidType && <span className="text-[10px] text-red-500 mr-1">{errors.aidType}</span>}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-normal text-slate-600 mr-1">عدد أفراد الأسرة</label>
+              <input
+                type="number"
+                placeholder="مثال: 5"
+                value={familyCount}
+                onChange={(e) => setFamilyCount(e.target.value)}
+                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500"
+              />
+              {errors.familyCount && <span className="text-[10px] text-red-500 mr-1">{errors.familyCount}</span>}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-normal text-slate-600 mr-1">العنوان بالتفصيل</label>
+              <input
+                type="text"
+                placeholder="المدينة، الحي، الشارع"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500"
+              />
+              {errors.address && <span className="text-[10px] text-red-500 mr-1">{errors.address}</span>}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-normal text-slate-600 mr-1">ملاحظات أو احتياجات خاصة</label>
+              <textarea
+                rows={2}
+                placeholder="أي معلومات إضافية تود ذكرها..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal outline-none focus:border-blue-500 resize-none"
+              />
+            </div>
+
+            {(successMessage || errorMessage) && (
+              <div className={`rounded-lg p-3 text-xs text-center ${successMessage ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+                {successMessage || errorMessage}
+              </div>
+            )}
+
+            <div className="flex justify-center pt-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="h-11 w-full max-w-[280px] rounded-xl bg-blue-600 text-[15px] font-normal text-white shadow-md transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-50"
+              >
+                {loading ? 'جارٍ الإرسال...' : 'إرسال طلب المساعدة'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   )

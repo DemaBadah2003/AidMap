@@ -1,23 +1,21 @@
+'use client';
+
 import { ReactNode } from 'react';
 import Link from 'next/link';
 import { I18N_LANGUAGES, Language } from '@/i18n/config';
 import {
-  BetweenHorizontalStart,
-  Coffee,
-  CreditCard,
-  FileText,
   Globe,
   Moon,
   Settings,
-  Shield,
   User,
   UserCircle,
-  Users,
+  Lock,
+  LogOut,
 } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 import { useTheme } from 'next-themes';
 import { toAbsoluteUrl } from '@/lib/helpers';
-import { useLanguage } from '@/providers/i18n-provider';
+import { useLanguage } from '@/providers/i18n-provider'; 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,8 +34,22 @@ import { Switch } from '@/components/ui/switch';
 
 export function DropdownMenuUser({ trigger }: { trigger: ReactNode }) {
   const { data: session } = useSession();
-  const { changeLanguage, language } = useLanguage();
   const { theme, setTheme } = useTheme();
+  const { language, changeLanguage } = useLanguage(); 
+
+  const t = (key: string) => {
+    const translations: any = {
+      'pro': 'احترافي',
+      'profileSection': 'الملف الشخصي',
+      'preferences': 'التفضيلات',
+      'viewProfile': 'عرض الملف الشخصي',
+      'changePassword': 'تغيير كلمة المرور',
+      'language': 'اللغة',
+      'theme': 'الثيم',
+      'logout': 'تسجيل الخروج'
+    };
+    return translations[key] || key;
+  };
 
   const handleLanguage = (lang: Language) => {
     changeLanguage(lang.code);
@@ -48,207 +60,105 @@ export function DropdownMenuUser({ trigger }: { trigger: ReactNode }) {
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu dir={language.direction}>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      
       <DropdownMenuContent className="w-64" side="bottom" align="end">
-        {/* Header */}
-        <div className="flex items-center justify-between p-3">
-          <div className="flex items-center gap-2">
-            <img
-              className="w-9 h-9 rounded-full border border-border"
-              src={toAbsoluteUrl(
-                session?.user.avatar || '/media/avatars/300-2.png',
-              )}
-              alt="User avatar"
-            />
-            <div className="flex flex-col">
-              <Link
-                href="/account/home/get-started"
-                className="text-sm text-mono hover:text-primary font-semibold"
-              >
-                {session?.user.name || ''}
-              </Link>
-              <Link
-                href="mailto:c.fisher@gmail.com"
-                className="text-xs text-muted-foreground hover:text-primary"
-              >
-                {session?.user.email || ''}
-              </Link>
-            </div>
+        
+        {/* الحل هنا: استخدمنا flex-row العادي لأن dir="rtl" سيتكفل بوضع الصورة على اليمين */}
+        {/* أضفنا items-center و gap-3 للتنسيق */}
+        <div className="flex items-center gap-3 p-3 flex-row">
+          {/* الصورة ستظهر يميناً لأن الأب ماخد dir="rtl" */}
+          <img
+            className="h-10 w-10 rounded-full border border-border shrink-0"
+            src={toAbsoluteUrl(session?.user.avatar || '/media/avatars/300-2.png')}
+            alt="avatar"
+          />
+          
+          <div className="flex flex-col items-start overflow-hidden grow">
+            <span className="text-sm font-bold text-foreground truncate w-full text-right">
+              {session?.user.name || 'مستخدم'}
+            </span>
+            <span className="text-xs text-muted-foreground truncate w-full text-right">
+              {session?.user.email}
+            </span>
           </div>
-          <Badge variant="primary" appearance="light" size="sm">
-            Pro
+
+          <Badge variant="outline" className="text-[10px] shrink-0">
+             {t('pro')}
           </Badge>
         </div>
 
         <DropdownMenuSeparator />
 
-        {/* Menu Items */}
-        <DropdownMenuItem asChild>
-          <Link
-            href="/public-profile/profiles/default"
-            className="flex items-center gap-2"
-          >
-            <UserCircle />
-            Public Profile
+        <DropdownMenuItem asChild className="cursor-pointer gap-2 justify-start focus:bg-accent">
+          <Link href="/public-profile/profiles/default" className="flex items-center gap-2 w-full">
+            <UserCircle className="size-4" />
+            <span>{t('profileSection')}</span>
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link
-            href="/account/home/user-profile"
-            className="flex items-center gap-2"
-          >
-            <User />
-            My Profile
-          </Link>
-        </DropdownMenuItem>
-
-        {/* My Account Submenu */}
+        
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="flex items-center gap-2">
-            <Settings />
-            My Account
+          <DropdownMenuSubTrigger className="gap-2 justify-start">
+            <Settings className="size-4" />
+            <span className="grow text-right">{t('preferences')}</span>
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="w-48">
-            <DropdownMenuItem asChild>
-              <Link
-                href="/account/home/get-started"
-                className="flex items-center gap-2"
-              >
-                <Coffee />
-                Get Started
+            <DropdownMenuItem asChild className="cursor-pointer gap-2 justify-start">
+              <Link href="/account/home/user-profile" className="flex items-center gap-2 w-full">
+                <User className="size-4" />
+                <span>{t('viewProfile')}</span>
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link
-                href="/account/home/user-profile"
-                className="flex items-center gap-2"
-              >
-                <FileText />
-                My Profile
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link
-                href="/account/billing/basic"
-                className="flex items-center gap-2"
-              >
-                <CreditCard />
-                Billing
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link
-                href="/account/security/overview"
-                className="flex items-center gap-2"
-              >
-                <Shield />
-                Security
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link
-                href="/account/members/teams"
-                className="flex items-center gap-2"
-              >
-                <Users />
-                Members & Roles
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link
-                href="/account/integrations"
-                className="flex items-center gap-2"
-              >
-                <BetweenHorizontalStart />
-                Integrations
+            <DropdownMenuItem asChild className="cursor-pointer gap-2 justify-start">
+              <Link href="/account/security/overview" className="flex items-center gap-2 w-full">
+                <Lock className="size-4" />
+                <span>{t('changePassword')}</span>
               </Link>
             </DropdownMenuItem>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
 
-        <DropdownMenuItem asChild>
-          <Link
-            href="https://devs.keenthemes.com"
-            className="flex items-center gap-2"
-          >
-            <FileText />
-            Dev Forum
-          </Link>
-        </DropdownMenuItem>
-
-        {/* Language Submenu with Radio Group */}
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="flex items-center gap-2 [&_[data-slot=dropdown-menu-sub-trigger-indicator]]:hidden hover:[&_[data-slot=badge]]:border-input data-[state=open]:[&_[data-slot=badge]]:border-input">
-            <Globe />
-            <span className="flex items-center justify-between gap-2 grow relative">
-              Language
-              <Badge
-                variant="outline"
-                className="absolute end-0 top-1/2 -translate-y-1/2"
-              >
+          <DropdownMenuSubTrigger className="gap-2 justify-start">
+            <Globe className="size-4" />
+            <div className="flex grow items-center justify-between gap-2">
+              <span className="text-right">{t('language')}</span>
+              <Badge variant="outline" className="flex gap-1 items-center px-1 font-normal">
                 {language.name}
-                <img
-                  src={language.flag}
-                  className="w-3.5 h-3.5 rounded-full"
-                  alt={language.name}
-                />
+                <img src={language.flag} className="w-3 h-3 rounded-full" alt="" />
               </Badge>
-            </span>
+            </div>
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="w-48">
-            <DropdownMenuRadioGroup
-              value={language.code}
-              onValueChange={(value) => {
-                const selectedLang = I18N_LANGUAGES.find(
-                  (lang) => lang.code === value,
-                );
-                if (selectedLang) handleLanguage(selectedLang);
-              }}
-            >
+            <DropdownMenuRadioGroup value={language.code} onValueChange={(v) => {
+              const l = I18N_LANGUAGES.find(i => i.code === v);
+              if (l) handleLanguage(l);
+            }}>
               {I18N_LANGUAGES.map((item) => (
-                <DropdownMenuRadioItem
-                  key={item.code}
-                  value={item.code}
-                  className="flex items-center gap-2"
-                >
-                  <img
-                    src={item.flag}
-                    className="w-4 h-4 rounded-full"
-                    alt={item.name}
-                  />
-                  <span>{item.name}</span>
+                <DropdownMenuRadioItem key={item.code} value={item.code} className="gap-2 flex-row-reverse">
+                  <img src={item.flag} className="w-4 h-4 rounded-full" alt="" />
+                  <span className="grow text-right">{item.name}</span>
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
 
-        <DropdownMenuSeparator />
-
-        {/* Footer */}
-        <DropdownMenuItem
-          className="flex items-center gap-2"
-          onSelect={(event) => event.preventDefault()}
-        >
-          <Moon />
-          <div className="flex items-center gap-2 justify-between grow">
-            Dark Mode
-            <Switch
-              size="sm"
-              checked={theme === 'dark'}
-              onCheckedChange={handleThemeToggle}
-            />
+        <DropdownMenuItem className="gap-2 justify-start" onSelect={(e) => e.preventDefault()}>
+          <Moon className="size-4" />
+          <div className="flex grow items-center justify-between">
+            <span>{t('theme')}</span>
+            <Switch size="sm" checked={theme === 'dark'} onCheckedChange={handleThemeToggle} />
           </div>
         </DropdownMenuItem>
-        <div className="p-2 mt-1">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full"
-            onClick={() => signOut()}
-          >
-            Logout
+
+        <DropdownMenuSeparator />
+        
+        <div className="p-2">
+          <Button variant="destructive" size="sm" className="w-full font-bold gap-2 flex-row" onClick={() => signOut()}>
+            <LogOut className="size-4" />
+            {t('logout')}
           </Button>
         </div>
       </DropdownMenuContent>
