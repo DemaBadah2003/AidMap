@@ -1,235 +1,110 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
-import prisma from '@/lib/prisma'
-import { PresenceStatus } from '@prisma/client'
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import prisma from '@/lib/prisma';
+import { PresenceStatus } from '@prisma/client';
 
-type UiPresenceStatus = 'متاح' | 'غير متاح'
-type DbPresenceStatus = PresenceStatus
-
-type FieldErrors = Partial<
-  Record<'managerName' | 'nameAr' | 'email' | 'serviceType' | 'presence' | 'placeId', string>
->
-
-function toDbPresence(status: UiPresenceStatus): DbPresenceStatus {
-  return status === 'متاح' ? PresenceStatus.AVAILABLE : PresenceStatus.UNAVAILABLE
-}
-
-function toUiPresence(status: PresenceStatus | string): UiPresenceStatus {
-  return status === PresenceStatus.AVAILABLE ? 'متاح' : 'غير متاح'
-}
-
-function normalizeEmail(value: string) {
-  return value.trim().toLowerCase()
-}
-
-function mapZodIssuesToFieldErrors(error: z.ZodError): FieldErrors {
-  const fieldErrors: FieldErrors = {}
-
-  for (const issue of error.issues) {
-    const fieldName = issue.path[0]
-    if (typeof fieldName === 'string' && !(fieldName in fieldErrors)) {
-      fieldErrors[fieldName as keyof FieldErrors] = issue.message
-    }
-  }
-
-  return fieldErrors
-}
-
-// شروط البريد الإلكتروني: إنجليزي، يحتوي على @، ينتهي بـ .com
-const englishComEmailSchema = z
-  .string()
-  .trim()
-  .regex(
-    /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.com$/,
-    'البريد الإلكتروني يجب أن يكون باللغة الإنجليزية ويحتوي على @ وينتهي بـ .com'
-  )
-
-const createSchema = z.object({
-  managerName: z.string().trim().min(1, 'اسم مسؤول المؤسسة مطلوب'),
-  nameAr: z.string().trim().min(1, 'اسم المؤسسة مطلوب'),
-  email: englishComEmailSchema,
-  serviceType: z.string().trim().min(1, 'نوع الخدمة مطلوب'),
-  presence: z.enum(['متاح', 'غير متاح']).default('متاح'),
-  placeId: z.string().uuid().optional().nullable(),
-})
-
-const updateSchema = z.object({
-  managerName: z.string().trim().min(1, 'اسم مسؤول المؤسسة مطلوب').optional(),
-  nameAr: z.string().trim().min(1, 'اسم المؤسسة مطلوب').optional(),
-  email: englishComEmailSchema.optional(),
-  serviceType: z.string().trim().min(1, 'نوع الخدمة مطلوب').optional(),
-  presence: z.enum(['متاح', 'غير متاح']).optional(),
-  placeId: z.string().uuid().optional().nullable(),
-})
-
-function normalizeInstitution(institution: {
-  id: string
-  name: string
-  instagramId: string | null // سنستمر في قراءته من الداتابيز كمصدر للبيانات
-  email: string | null
-  serviceType: string | null
-  presence: PresenceStatus
-  placeId?: string | null
-  place?: unknown
-}) {
+// دالة تنظيف البيانات المرسلة للفرونت
+function normalizeInstitution(ins: any) {
   return {
-    id: institution.id,
-    nameAr: institution.name,
-    managerName: institution.instagramId ?? '', // تحويله لليوزرفيس باسم مسؤول المؤسسة
-    email: institution.email ?? '',
-    serviceType: institution.serviceType ?? '',
-    presence: toUiPresence(institution.presence),
-    placeId: institution.placeId ?? null,
-    place: institution.place ?? null,
-  }
+    id: ins.id,
+    nameAr: ins.name,
+    email: ins.email || '',
+    serviceType: ins.serviceType || '',
+    presence: ins.presence === PresenceStatus.AVAILABLE ? 'متاح' : 'غير متاح',
+    placeId: ins.placeId || null,
+  };
 }
 
+// مخطط التحقق
+const institutionSchema = z.object({
+  nameAr: z.string().min(1, 'الاسم مطلوب'),
+  email: z.string().email('بريد غير صالح'),
+  serviceType: z.string().min(1, 'نوع الخدمة مطلوب'),
+  presence: z.enum(['متاح', 'غير متاح']),
+  placeId: z.string().uuid().optional().nullable(),
+});
+
+// --- GET: جلب البيانات ---
 export async function GET(req: NextRequest) {
   try {
-    const q = req.nextUrl.searchParams.get('q')?.trim() || ''
-    const presence = req.nextUrl.searchParams.get('presence')?.trim() || ''
-    const placeId = req.nextUrl.searchParams.get('placeId')?.trim() || ''
-
-    const presenceFilter =
-      presence === 'متاح'
-        ? PresenceStatus.AVAILABLE
-        : presence === 'غير متاح'
-          ? PresenceStatus.UNAVAILABLE
-          : undefined
+    const { searchParams } = new URL(req.url);
+    const q = searchParams.get('q');
+    const presence = searchParams.get('presence');
 
     const institutions = await prisma.institution.findMany({
       where: {
-        AND: [
-          q
-            ? {
-                OR: [
-                  { id: { contains: q, mode: 'insensitive' } },
-                  { instagramId: { contains: q, mode: 'insensitive' } }, // البحث في حقل المسؤول
-                  { name: { contains: q, mode: 'insensitive' } },
-                  { email: { contains: q, mode: 'insensitive' } },
-                  { serviceType: { contains: q, mode: 'insensitive' } },
-                ],
-              }
-            : {},
-          presenceFilter ? { presence: presenceFilter } : {},
-          placeId ? { placeId } : {},
-        ],
+        isTrashed: false,
+        ...(q && { name: { contains: q, mode: 'insensitive' } }),
+        ...(presence && { 
+          presence: presence === 'متاح' ? PresenceStatus.AVAILABLE : PresenceStatus.UNAVAILABLE 
+        }),
       },
-      orderBy: { name: 'asc' },
-      include: {
-        place: true,
-      },
-    })
+      orderBy: { createdAt: 'desc' },
+    });
 
-    return NextResponse.json(institutions.map(normalizeInstitution))
+    return NextResponse.json(institutions.map(normalizeInstitution));
   } catch (e) {
-    console.error('GET institutions error:', e)
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
+    console.error("GET ERROR:", e);
+    return NextResponse.json({ message: 'فشل جلب البيانات' }, { status: 500 });
   }
 }
 
+// --- POST: إضافة مؤسسة ---
 export async function POST(req: NextRequest) {
   try {
-    const body = createSchema.parse(await req.json())
+    const body = await req.json();
+    const result = institutionSchema.safeParse(body);
 
-    const normalizedEmailValue = normalizeEmail(body.email)
-    const normalizedServiceType = body.serviceType.trim()
-
-    // التحقق من تكرار البريد الإلكتروني
-    const duplicateEmail = await prisma.institution.findFirst({
-      where: {
-        email: { equals: normalizedEmailValue, mode: 'insensitive' },
-      },
-      select: { id: true },
-    })
-
-    if (duplicateEmail) {
-      return NextResponse.json(
-        {
-          message: 'البريد الإلكتروني مستخدم مسبقًا',
-          fieldErrors: { email: 'البريد الإلكتروني مستخدم مسبقًا' },
-        },
-        { status: 409 }
-      )
+    if (!result.success) {
+      return NextResponse.json({ errors: result.error.flatten().fieldErrors }, { status: 400 });
     }
 
+    const data = result.data;
     const created = await prisma.institution.create({
       data: {
-        name: body.nameAr,
-        instagramId: body.managerName.trim(), // تخزين اسم المسؤول في حقل instagramId
-        email: normalizedEmailValue,
-        serviceType: normalizedServiceType,
-        presence: toDbPresence(body.presence),
-        placeId: body.placeId || null,
+        name: data.nameAr,
+        email: data.email.toLowerCase().trim(),
+        serviceType: data.serviceType,
+        presence: data.presence === 'متاح' ? PresenceStatus.AVAILABLE : PresenceStatus.UNAVAILABLE,
+        ...(data.placeId && { place: { connect: { id: data.placeId } } }),
       },
-      include: {
-        place: true,
-      },
-    })
+    });
 
-    return NextResponse.json(normalizeInstitution(created), { status: 201 })
-  } catch (e) {
-    if (e instanceof z.ZodError) {
-      return NextResponse.json(
-        { message: 'فشل التحقق من صحة البيانات', fieldErrors: mapZodIssuesToFieldErrors(e) },
-        { status: 400 }
-      )
-    }
-    return NextResponse.json({ message: 'خطأ في الخادم' }, { status: 500 })
+    return NextResponse.json(normalizeInstitution(created), { status: 201 });
+  } catch (e: any) {
+    console.error("POST ERROR:", e);
+    return NextResponse.json({ message: 'فشل الحفظ', detail: e.message }, { status: 500 });
   }
 }
 
+// --- PUT: تعديل مؤسسة ---
 export async function PUT(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get('id')
-  if (!id) return NextResponse.json({ message: 'معرّف المؤسسة مفقود' }, { status: 400 })
-
   try {
-    const body = updateSchema.parse(await req.json())
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    if (!id) return NextResponse.json({ message: 'ID مفقود' }, { status: 400 });
 
+    const body = await req.json();
+    const result = institutionSchema.partial().safeParse(body);
+
+    if (!result.success) return NextResponse.json({ errors: result.error.flatten() }, { status: 400 });
+
+    const data = result.data;
     const updated = await prisma.institution.update({
       where: { id },
       data: {
-        name: body.nameAr,
-        instagramId: body.managerName !== undefined ? body.managerName.trim() : undefined,
-        email: body.email !== undefined ? normalizeEmail(body.email) : undefined,
-        serviceType: body.serviceType !== undefined ? body.serviceType.trim() : undefined,
-        presence: body.presence !== undefined ? toDbPresence(body.presence) : undefined,
-        placeId: body.placeId !== undefined ? body.placeId || null : undefined,
+        ...(data.nameAr && { name: data.nameAr }),
+        ...(data.email && { email: data.email.toLowerCase().trim() }),
+        ...(data.serviceType && { serviceType: data.serviceType }),
+        ...(data.presence && { 
+          presence: data.presence === 'متاح' ? PresenceStatus.AVAILABLE : PresenceStatus.UNAVAILABLE 
+        }),
       },
-      include: {
-        place: true,
-      },
-    })
+    });
 
-    return NextResponse.json(normalizeInstitution(updated))
+    return NextResponse.json(normalizeInstitution(updated));
   } catch (e) {
-    if (e instanceof z.ZodError) {
-      return NextResponse.json(
-        { message: 'فشل التحقق من صحة البيانات', fieldErrors: mapZodIssuesToFieldErrors(e) },
-        { status: 400 }
-      )
-    }
-    return NextResponse.json({ message: 'خطأ في الخادم' }, { status: 500 })
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get('id')
-  const all = req.nextUrl.searchParams.get('all')
-
-  try {
-    if (all === 'true') {
-      const result = await prisma.institution.deleteMany({})
-      return NextResponse.json({ ok: true, deletedCount: result.count })
-    }
-    if (!id) return NextResponse.json({ message: 'معرّف المؤسسة مفقود' }, { status: 400 })
-
-    await prisma.institution.delete({ where: { id } })
-    return NextResponse.json({ ok: true, deletedId: id })
-  } catch (e) {
-    return NextResponse.json({ message: 'خطأ في الخادم' }, { status: 500 })
+    console.error("PUT ERROR:", e);
+    return NextResponse.json({ message: 'فشل التعديل' }, { status: 500 });
   }
 }

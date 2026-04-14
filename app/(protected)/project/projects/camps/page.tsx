@@ -17,8 +17,6 @@ import {
   Search, 
   Loader2, 
   AlertCircle, 
-  ChevronRight, 
-  ChevronLeft 
 } from 'lucide-react'
 
 const AREAS_DATA: Record<string, string[]> = {
@@ -49,8 +47,9 @@ export default function CampsPage() {
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<'all' | 'FULL' | 'NOT_FULL'>('all')
 
+  // Pagination States - تم تعديل القيمة الافتراضية إلى 5
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10 
+  const [itemsPerPage, setItemsPerPage] = useState(5) 
 
   const [addOpen, setAddOpen] = useState(false)
   const [name, setName] = useState('')
@@ -137,38 +136,42 @@ export default function CampsPage() {
     })
   }, [q, items, statusFilter])
 
-  const totalPages = Math.ceil(filtered.length / itemsPerPage)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage))
+  
   const paginatedData = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage
     return filtered.slice(start, start + itemsPerPage)
-  }, [filtered, currentPage])
+  }, [filtered, currentPage, itemsPerPage])
 
-  useEffect(() => { setCurrentPage(1) }, [q, statusFilter])
+  useEffect(() => { setCurrentPage(1) }, [q, statusFilter, itemsPerPage])
+
+  const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1
+  const rangeEnd = Math.min(currentPage * itemsPerPage, filtered.length)
 
   return (
     <div className="w-full px-4 py-6" dir="rtl">
       <div className="mb-6 text-right">
         <h1 className="text-2xl font-bold text-slate-900">إدارة المخيمات</h1>
-        <p className="text-sm text-slate-500 mt-1 font-normal font-arabic">الرئيسية &gt; إدارة المخيمات</p>
+        <p className="text-sm text-slate-500 mt-1 font-normal">الرئيسية &gt; إدارة المخيمات</p>
       </div>
 
-      <Card className="overflow-hidden border-slate-200 shadow-sm rounded-xl">
-        <CardContent className="p-0 font-arabic">
-          <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b bg-white">
+      <Card className="overflow-hidden border-slate-200 shadow-sm rounded-xl bg-white">
+        <CardContent className="p-0">
+          <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b">
             <div className="relative w-full max-w-xs">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="ابحث..."
-                className={`${inputBaseClass} ${topControlHeight} pr-10`}
+                className={`${inputBaseClass} ${topControlHeight} pr-10 bg-slate-50 border-none`}
               />
             </div>
             
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
-              className={`${selectBaseClass} ${topControlHeight} sm:w-[130px]`}
+              className={`${selectBaseClass} ${topControlHeight} sm:w-[130px] bg-slate-50 border-slate-200`}
             >
               <option value="all">كل الحالات</option>
               <option value="FULL">ممتلئ</option>
@@ -177,7 +180,7 @@ export default function CampsPage() {
 
             <Button
               onClick={() => setAddOpen(true)}
-              className={`bg-blue-600 text-white hover:bg-blue-700 ${topControlHeight} px-4 rounded-lg mr-auto`}
+              className={`bg-blue-600 text-white hover:bg-blue-700 ${topControlHeight} px-4 rounded-lg mr-auto shadow-sm`}
             >
               <Plus className="h-4 w-4 ml-2" />
               إضافة مخيم
@@ -185,27 +188,27 @@ export default function CampsPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse">
-              <thead className="bg-[#F9FAFB] border-b border-slate-100">
+            <table className="w-full text-right border-collapse text-sm">
+              <thead className="bg-slate-50/80 border-b border-slate-100">
                 <tr>
-                  <th className="p-4 text-[12px] text-slate-500 font-bold">اسم المخيم</th>
-                  <th className="p-4 text-[12px] text-slate-500 font-bold">المنطقة</th>
-                  <th className="p-4 text-[12px] text-slate-500 font-bold">الموقع</th>
-                  <th className="p-4 text-center text-[12px] text-slate-500 font-bold">السعة</th>
-                  <th className="p-4 text-center text-[12px] text-slate-500 font-bold">الحالي</th>
-                  <th className="p-4 text-center text-[12px] text-slate-500 font-bold">الحالة</th>
-                  <th className="p-4 text-center text-[12px] text-slate-500 font-bold">الإجراءات</th>
+                  <th className="p-4 text-slate-500 font-bold">اسم المخيم</th>
+                  <th className="p-4 text-slate-500 font-bold">المنطقة</th>
+                  <th className="p-4 text-slate-500 font-bold">الموقع</th>
+                  <th className="p-4 text-center text-slate-500 font-bold">السعة</th>
+                  <th className="p-4 text-center text-slate-500 font-bold">الحالي</th>
+                  <th className="p-4 text-center text-slate-500 font-bold">الحالة</th>
+                  <th className="p-4 text-center text-slate-500 font-bold">الإجراءات</th>
                 </tr>
               </thead>
-              <tbody className="text-sm bg-white divide-y divide-slate-100 font-arabic">
+              <tbody className="divide-y divide-slate-100 bg-white font-arabic">
                 {loading ? (
-                  <tr><td colSpan={7} className="p-10 text-center text-slate-400"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />جاري التحميل...</td></tr>
+                  <tr><td colSpan={7} className="p-20 text-center text-slate-400"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />جاري التحميل...</td></tr>
                 ) : paginatedData.length === 0 ? (
-                  <tr><td colSpan={7} className="p-10 text-center text-slate-400 italic">لا توجد نتائج مطابقة لبحثك.</td></tr>
+                  <tr><td colSpan={7} className="p-20 text-center text-slate-400 italic">لا توجد نتائج مطابقة لبحثك.</td></tr>
                 ) : paginatedData.map((c) => {
                   const isEditing = editingId === c.id;
                   return (
-                    <tr key={c.id} className={`hover:bg-slate-50/50 ${isEditing ? 'bg-blue-50/40' : ''}`}>
+                    <tr key={c.id} className={`hover:bg-slate-50/50 transition-colors ${isEditing ? 'bg-blue-50/40' : ''}`}>
                       <td className="p-4">{isEditing ? <Input className="h-9 border-blue-400" value={editDraft.name} onChange={e => setEditDraft({...editDraft, name: e.target.value})} /> : c.name}</td>
                       <td className="p-4">{isEditing ? (
                         <select className={`${selectBaseClass} h-9 border-blue-400`} value={editDraft.area} onChange={e => setEditDraft({...editDraft, area: e.target.value, subArea: ''})}>
@@ -233,7 +236,7 @@ export default function CampsPage() {
                             <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>إلغاء</Button>
                           </div>
                         ) : (
-                          <button onClick={() => { setEditingId(c.id); setEditDraft(c); }} className="text-slate-400 hover:text-blue-600 transition-colors">
+                          <button onClick={() => { setEditingId(c.id); setEditDraft(c); }} className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-md border border-slate-100 text-slate-400 transition-all">
                             <Pencil className="w-4 h-4"/>
                           </button>
                         )}
@@ -245,64 +248,82 @@ export default function CampsPage() {
             </table>
           </div>
 
-          <div className="p-4 border-t flex items-center justify-between bg-slate-50/50">
-            <span className="text-xs text-slate-500 font-normal">عرض {paginatedData.length} من أصل {filtered.length} مخيم</span>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" size="sm" className="h-8 gap-1 font-normal text-xs" 
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => prev - 1)}
+          {/* Pagination Area - تم تعديل الـ Droplist لتكون 5, 10, 15 */}
+          <div className="p-4 flex items-center justify-between border-t bg-slate-50/30 font-arabic">
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <span>عرض صفوف:</span>
+              <select 
+                value={itemsPerPage} 
+                onChange={(e) => setItemsPerPage(Number(e.target.value))} 
+                className="border rounded-md h-8 px-1 bg-white outline-none cursor-pointer"
               >
-                <ChevronRight className="h-4 w-4" /> السابق
-              </Button>
-              <div className="flex items-center gap-1 mx-2">
-                <span className="text-xs font-bold text-blue-600">{currentPage}</span>
-                <span className="text-xs text-slate-400">/</span>
-                <span className="text-xs text-slate-500">{totalPages || 1}</span>
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-4 text-sm">
+              <span className="text-slate-500 font-medium">
+                {rangeStart} - {rangeEnd} <span className="mx-1 text-slate-300">|</span> من {filtered.length}
+              </span>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 px-3 border-slate-200 hover:bg-white font-normal" 
+                  disabled={currentPage <= 1} 
+                  onClick={() => setCurrentPage(p => p - 1)}
+                >
+                  السابق
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 px-3 border-slate-200 hover:bg-white font-normal" 
+                  disabled={currentPage >= totalPages} 
+                  onClick={() => setCurrentPage(p => p + 1)}
+                >
+                  التالي
+                </Button>
               </div>
-              <Button 
-                variant="outline" size="sm" className="h-8 gap-1 font-normal text-xs" 
-                disabled={currentPage === totalPages || totalPages === 0}
-                onClick={() => setCurrentPage(prev => prev + 1)}
-              >
-                التالي <ChevronLeft className="h-4 w-4" />
-              </Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Add Modal */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="max-w-md font-arabic shadow-2xl border-none">
+        <DialogContent dir="rtl" className="max-w-md shadow-2xl border-none rounded-2xl font-arabic">
           <DialogHeader>
             <DialogTitle className="text-right text-lg font-bold">إضافة مخيم جديد</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-4 text-right">
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-slate-700">اسم المخيم</label>
-               <Input value={name} onChange={e => setName(e.target.value)} placeholder="أدخل اسم المخيم" />
+               <Input className="h-11 bg-slate-50 border-slate-200" value={name} onChange={e => setName(e.target.value)} placeholder="أدخل اسم المخيم" />
             </div>
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-slate-700">المنطقة</label>
-               <select className={selectBaseClass} value={selectedArea} onChange={e => {setSelectedArea(e.target.value); setSelectedSubArea('')}}>
+               <select className={`${selectBaseClass} h-11 bg-slate-50 border-slate-200`} value={selectedArea} onChange={e => {setSelectedArea(e.target.value); setSelectedSubArea('')}}>
                   <option value="">اختر المنطقة</option>
                   {Object.keys(AREAS_DATA).map(a => <option key={a} value={a}>{a}</option>)}
                </select>
             </div>
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-slate-700">الموقع</label>
-               <select className={selectBaseClass} value={selectedSubArea} onChange={e => setSelectedSubArea(e.target.value)} disabled={!selectedArea}>
+               <select className={`${selectBaseClass} h-11 bg-slate-50 border-slate-200`} value={selectedSubArea} onChange={e => setSelectedSubArea(e.target.value)} disabled={!selectedArea}>
                   <option value="">اختر الموقع</option>
                   {selectedArea && AREAS_DATA[selectedArea].map(s => <option key={s} value={s}>{s}</option>)}
                </select>
             </div>
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-slate-700">السعة القصوى</label>
-               <Input type="number" placeholder="0" value={capacity || ''} onChange={e => setCapacity(Number(e.target.value))} />
+               <Input className="h-11 bg-slate-50 border-slate-200" type="number" placeholder="0" value={capacity || ''} onChange={e => setCapacity(Number(e.target.value))} />
             </div>
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-slate-700">العائلات حالياً</label>
-               <Input type="number" placeholder="0" value={currentFamiliesCount || ''} onChange={e => setCurrentFamiliesCount(Number(e.target.value))} />
+               <Input className="h-11 bg-slate-50 border-slate-200" type="number" placeholder="0" value={currentFamiliesCount || ''} onChange={e => setCurrentFamiliesCount(Number(e.target.value))} />
             </div>
             {!isAddValid && (
               <div className="text-[10px] text-amber-600 flex items-center gap-2 bg-amber-50 p-2.5 rounded-lg border border-amber-100">
@@ -311,19 +332,18 @@ export default function CampsPage() {
             )}
           </div>
           
-          {/* تم التعديل هنا لضمان تبديل الأماكن فعلياً في المتصفح */}
           <DialogFooter className="mt-2 flex flex-row items-center gap-3 w-full">
             <Button 
               onClick={onAdd} 
               disabled={submitting || !isAddValid} 
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold h-11"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 rounded-xl"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null} حفظ البيانات
             </Button>
             <Button 
               variant="outline" 
               onClick={() => setAddOpen(false)} 
-              className="flex-1 h-11 font-normal text-slate-600 bg-white hover:bg-slate-50 border-slate-200"
+              className="flex-1 h-11 font-normal text-slate-600 bg-white hover:bg-slate-50 border-slate-200 rounded-xl"
             >
               إلغاء
             </Button>

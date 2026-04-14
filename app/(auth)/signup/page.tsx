@@ -45,11 +45,11 @@ export default function Page() {
     try {
       setIsProcessing(true);
       setError(null);
-      const response = await apiFetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
-      });
+      const response = await fetch('/api/auth/signup', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(values),
+});
 
       if (!response.ok) {
         const data = await response.json();

@@ -2,173 +2,68 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import prisma from '@/lib/prisma'
 
-const createSchema = z.object({
-  institutionId: z.string().uuid('معرف المؤسسة غير صالح'),
-  serviceId: z.string().uuid('معرف الخدمة غير صالح'),
+// مخطط التحقق
+const serviceSchema = z.object({
+  institutionId: z.string().uuid(),
+  serviceId: z.string().uuid(),
+  status: z.string().min(1),
 })
 
-const updateSchema = z.object({
-  institutionId: z.string().uuid('معرف المؤسسة غير صالح').optional(),
-  serviceId: z.string().uuid('معرف الخدمة غير صالح').optional(),
-})
-
+// 1. جلب البيانات
 export async function GET() {
   try {
     const items = await prisma.institutionService.findMany({
       orderBy: { id: 'desc' },
       include: {
-        institution: true,
-        service: true,
+        institution: { select: { id: true, name: true } }, // استبدال nameAr بـ name
+        service: { select: { id: true, serviceType: true } },
       },
     })
-
     return NextResponse.json(items)
   } catch (e) {
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
+    return NextResponse.json({ message: 'خطأ في جلب البيانات' }, { status: 500 })
   }
 }
 
+// 2. إضافة ربط جديد
 export async function POST(req: NextRequest) {
   try {
-    const body = createSchema.parse(await req.json())
-
-    const exists = await prisma.institutionService.findFirst({
-      where: {
-        institutionId: body.institutionId,
-        serviceId: body.serviceId,
-      },
-      select: { id: true },
-    })
-
-    if (exists) {
-      return NextResponse.json(
-        { message: 'الخدمة مرتبطة بالفعل بهذه المؤسسة.' },
-        { status: 409 }
-      )
-    }
-
+    const body = serviceSchema.parse(await req.json())
     const created = await prisma.institutionService.create({
-      data: {
-        institutionId: body.institutionId,
-        serviceId: body.serviceId,
-      },
+      data: body,
       include: {
-        institution: true,
-        service: true,
+        institution: { select: { name: true } },
+        service: { select: { serviceType: true } },
       },
     })
-
     return NextResponse.json(created, { status: 201 })
   } catch (e) {
-    if (e instanceof z.ZodError) {
-      return NextResponse.json(
-        { message: 'فشل التحقق من صحة البيانات', issues: e.issues },
-        { status: 400 }
-      )
-    }
-
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
+    return NextResponse.json({ message: 'فشل الإضافة' }, { status: 500 })
   }
 }
 
+// 3. تحديث البيانات (حل مشكلة الايرور في الصورة)
 export async function PUT(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get('id')
-
-  if (!id) {
-    return NextResponse.json({ message: 'معرّف السجل مفقود' }, { status: 400 })
-  }
+  const { searchParams } = new URL(req.url)
+  const id = searchParams.get('id')
+  if (!id) return NextResponse.json({ message: 'المعرف مفقود' }, { status: 400 })
 
   try {
-    const body = updateSchema.parse(await req.json())
-
-    const existing = await prisma.institutionService.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        institutionId: true,
-        serviceId: true,
-      },
-    })
-
-    if (!existing) {
-      return NextResponse.json({ message: 'السجل غير موجود' }, { status: 404 })
-    }
-
-    if (body.institutionId || body.serviceId) {
-      const exists = await prisma.institutionService.findFirst({
-        where: {
-          institutionId: body.institutionId ?? existing.institutionId,
-          serviceId: body.serviceId ?? existing.serviceId,
-          NOT: { id },
-        },
-        select: { id: true },
-      })
-
-      if (exists) {
-        return NextResponse.json(
-          { message: 'الخدمة مرتبطة بالفعل بهذه المؤسسة.' },
-          { status: 409 }
-        )
-      }
-    }
-
+    const body = await req.json()
     const updated = await prisma.institutionService.update({
       where: { id },
       data: {
         institutionId: body.institutionId,
         serviceId: body.serviceId,
+        status: body.status,
       },
       include: {
-        institution: true,
-        service: true,
+        institution: { select: { name: true } }, // التصحيح هنا: استخدام name بدلاً من nameAr
+        service: { select: { serviceType: true } },
       },
     })
-
     return NextResponse.json(updated)
   } catch (e) {
-    if (e instanceof z.ZodError) {
-      return NextResponse.json(
-        { message: 'فشل التحقق من صحة البيانات', issues: e.issues },
-        { status: 400 }
-      )
-    }
-
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get('id')
-  const all = req.nextUrl.searchParams.get('all')
-
-  try {
-    if (all === 'true') {
-      await prisma.institutionService.deleteMany()
-      return NextResponse.json({ ok: true })
-    }
-
-    if (!id) {
-      return NextResponse.json({ message: 'معرّف السجل مفقود' }, { status: 400 })
-    }
-
-    await prisma.institutionService.delete({
-      where: { id },
-    })
-
-    return NextResponse.json({ ok: true })
-  } catch (e) {
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
+    return NextResponse.json({ message: 'فشل التعديل' }, { status: 500 })
   }
 }

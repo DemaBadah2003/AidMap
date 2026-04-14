@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { requireCitizen } from '@/app/(protected)/project/helpers/route-guards'
+// تم حذف استيراد requireCitizen من هنا
 
 type FormErrors = {
   fullName?: string
@@ -21,9 +21,8 @@ const repeatedDigitsRegex = /^(\d)\1+$/
 export default function RequestAidPage() {
   const router = useRouter()
 
-  useEffect(() => {
-    requireCitizen(router)
-  }, [router])
+  // تم حذف الـ useEffect الذي كان يحتوي على requireCitizen(router)
+  // الآن يمكن لأي شخص الوصول للصفحة بمجرد تحميلها
 
   const [fullName, setFullName] = useState('')
   const [nationalId, setNationalId] = useState('')

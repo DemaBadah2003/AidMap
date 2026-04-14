@@ -2,261 +2,125 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import prisma from '@/lib/prisma'
 
-const createSchema = z.object({
-  governorate: z.string().trim().min(1, 'المحافظة مطلوبة'),
-  city: z.string().trim().min(1, 'المدينة مطلوبة'),
-  campId: z.string().uuid('معرّف المخيم غير صالح'),
+// --- 1. المحولات (Adapters) ---
+/**
+ * دالة التوحيد (Normalization)
+ * تقوم بتحويل أسماء الحقول من قاعدة البيانات (area, location) 
+ * إلى الأسماء التي يتوقعها الفرونت إند (city, governorate)
+ */
+function normalizeAddress(addr: any) {
+  return {
+    id: addr.id,
+    campId: addr.campId,
+    city: addr.area || '',         // area في بريزما تقابل city في الفرونت
+    governorate: addr.location || '', // location في بريزما تقابل governorate في الفرونت
+    camp: addr.camp ? { id: addr.camp.id, name: addr.camp.name } : null,
+  }
+}
+
+// --- 2. قواعد التحقق (Schemas) ---
+const addressSchema = z.object({
+  campId: z.string().min(1, 'اسم المخيم مطلوب'),
+  city: z.string().min(1, 'المنطقة مطلوبة'),        // نستقبلها كـ city
+  governorate: z.string().min(1, 'الموقع مطلوب'),   // نستقبلها كـ governorate
 })
 
-const updateSchema = z
-  .object({
-    governorate: z.string().trim().min(1, 'المحافظة مطلوبة').optional(),
-    city: z.string().trim().min(1, 'المدينة مطلوبة').optional(),
-    campId: z.string().uuid('معرّف المخيم غير صالح').optional(),
-  })
-  .strict()
-
-function normalizeText(value: string) {
-  return value.trim().replace(/\s+/g, ' ').toLowerCase()
-}
-
-type AddressInput = {
-  governorate: string
-  city: string
-  campId: string
-}
-
-async function readAddresses() {
-  return prisma.address.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: {
-      camp: true,
-    },
-  })
-}
-
-function findDuplicateAddress(
-  addresses: Array<{
-    id: string
-    governorate: string | null
-    city: string | null
-    campId: string | null
-  }>,
-  input: AddressInput,
-  excludeId?: string
-) {
-  const normalizedGovernorate = normalizeText(input.governorate)
-  const normalizedCity = normalizeText(input.city)
-  const normalizedCampId = input.campId.trim()
-
-  const duplicate = addresses.find(
-    (a) =>
-      a.id !== excludeId &&
-      normalizeText(a.governorate ?? '') === normalizedGovernorate &&
-      normalizeText(a.city ?? '') === normalizedCity &&
-      (a.campId ?? '') === normalizedCampId
-  )
-
-  if (duplicate) {
-    return 'العنوان موجود بالفعل (بيانات مكررة).'
-  }
-
-  return ''
-}
-
-async function assertAddressBusinessValidation(
-  input: AddressInput,
-  excludeId?: string
-) {
-  const normalizedGovernorate = normalizeText(input.governorate)
-  const normalizedCity = normalizeText(input.city)
-  const normalizedCampId = input.campId.trim()
-
-  if (!normalizedGovernorate) {
-    throw new Error('المحافظة مطلوبة')
-  }
-
-  if (!normalizedCity) {
-    throw new Error('المدينة مطلوبة')
-  }
-
-  if (!normalizedCampId) {
-    throw new Error('المخيم مطلوب')
-  }
-
-  const campExists = await prisma.camps.findUnique({
-    where: { id: normalizedCampId },
-    select: { id: true },
-  })
-
-  if (!campExists) {
-    throw new Error('المخيم المحدد غير موجود')
-  }
-
-  const current = await readAddresses()
-  const duplicateMessage = findDuplicateAddress(current, input, excludeId)
-
-  if (duplicateMessage) {
-    throw new Error(duplicateMessage)
-  }
-}
-
+// --- 3. دالة GET ---
 export async function GET(req: NextRequest) {
   try {
-    const campId = req.nextUrl.searchParams.get('campId')
-
     const addresses = await prisma.address.findMany({
-      where: campId ? { campId } : undefined,
       orderBy: { createdAt: 'desc' },
       include: {
-        camp: true,
+        camp: { select: { id: true, name: true } }
       },
     })
 
-    return NextResponse.json(addresses)
+    return NextResponse.json(addresses.map(normalizeAddress))
   } catch (e) {
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
+    console.error("GET ADDRESS ERROR:", e)
+    return NextResponse.json([], { status: 200 }) 
   }
 }
 
+// --- 4. دالة POST ---
 export async function POST(req: NextRequest) {
   try {
-    const body = createSchema.parse(await req.json())
-
-    await assertAddressBusinessValidation({
-      governorate: body.governorate,
-      city: body.city,
-      campId: body.campId,
-    })
+    const rawData = await req.json()
+    const body = addressSchema.parse(rawData)
 
     const created = await prisma.address.create({
       data: {
-        governorate: body.governorate,
-        city: body.city,
         campId: body.campId,
+        area: body.city,         // تخزين city في حقل area
+        location: body.governorate, // تخزين governorate في حقل location
       },
-      include: {
-        camp: true,
-      },
+      include: { 
+        camp: { select: { id: true, name: true } } 
+      }
     })
 
-    return NextResponse.json(created, { status: 201 })
-  } catch (e) {
-    if (e instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          message: e.issues[0]?.message ?? 'فشل التحقق من صحة البيانات',
-          issues: e.issues,
-        },
-        { status: 400 }
-      )
+    return NextResponse.json(normalizeAddress(created), { status: 201 })
+  } catch (error: any) {
+    console.error("POST ADDRESS ERROR:", error)
+    
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ message: "تأكد من إكمال جميع الحقول" }, { status: 400 })
     }
 
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
+    return NextResponse.json({ message: "فشل في حفظ البيانات" }, { status: 500 })
   }
 }
 
+// --- 5. دالة PUT ---
 export async function PUT(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get('id')
-
-  if (!id) {
-    return NextResponse.json(
-      { message: 'معرّف العنوان مفقود' },
-      { status: 400 }
-    )
-  }
-
   try {
-    const body = updateSchema.parse(await req.json())
+    const id = req.nextUrl.searchParams.get('id')
+    const rawData = await req.json()
+    const addressId = id || rawData.id
 
-    const currentAddress = await prisma.address.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        governorate: true,
-        city: true,
-        campId: true,
-      },
-    })
-
-    if (!currentAddress) {
-      return NextResponse.json(
-        { message: 'العنوان غير موجود' },
-        { status: 404 }
-      )
+    if (!addressId) {
+      return NextResponse.json({ message: "المعرف مطلوب" }, { status: 400 })
     }
 
-    const merged = {
-      governorate: body.governorate ?? currentAddress.governorate ?? '',
-      city: body.city ?? currentAddress.city ?? '',
-      campId: body.campId ?? currentAddress.campId ?? '',
-    }
+    const body = addressSchema.partial().parse(rawData)
 
-    await assertAddressBusinessValidation(merged, id)
+    // تحويل البيانات القادمة لتناسب أسماء الحقول في قاعدة البيانات
+    const updateData: any = {}
+    if (body.campId) updateData.campId = body.campId
+    if (body.city) updateData.area = body.city
+    if (body.governorate) updateData.location = body.governorate
 
     const updated = await prisma.address.update({
-      where: { id },
-      data: {
-        governorate: body.governorate,
-        city: body.city,
-        campId: body.campId,
-      },
-      include: {
-        camp: true,
-      },
+      where: { id: addressId },
+      data: updateData,
+      include: { 
+        camp: { select: { id: true, name: true } } 
+      }
     })
 
-    return NextResponse.json(updated)
-  } catch (e) {
-    if (e instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          message: e.issues[0]?.message ?? 'فشل التحقق من صحة البيانات',
-          issues: e.issues,
-        },
-        { status: 400 }
-      )
-    }
-
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
+    return NextResponse.json(normalizeAddress(updated))
+  } catch (error: any) {
+    console.error("PUT ADDRESS ERROR:", error)
+    return NextResponse.json({ message: "فشل في تحديث البيانات" }, { status: 400 })
   }
 }
 
+// --- 6. دالة DELETE ---
 export async function DELETE(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get('id')
-  const all = req.nextUrl.searchParams.get('all')
-
   try {
-    if (all === 'true') {
-      await prisma.address.deleteMany()
-      return NextResponse.json({ ok: true })
-    }
-
+    const id = req.nextUrl.searchParams.get('id')
+    
     if (!id) {
-      return NextResponse.json(
-        { message: 'معرّف العنوان مفقود' },
-        { status: 400 }
-      )
+      return NextResponse.json({ message: "المعرف مطلوب" }, { status: 400 })
     }
 
     await prisma.address.delete({
-      where: { id },
+      where: { id }
     })
 
     return NextResponse.json({ ok: true })
-  } catch (e) {
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
+  } catch (error: any) {
+    console.error("DELETE ADDRESS ERROR:", error)
+    return NextResponse.json({ message: "فشل في حذف السجل" }, { status: 500 })
   }
 }

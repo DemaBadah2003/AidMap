@@ -2,184 +2,150 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import prisma from '@/lib/prisma'
 
-/* ============================= */
-/* 🔁 أدوات التحويل (Helpers) */
-/* ============================= */
+// --- 1. المحولات (Adapters) ---
+type DbStatus = 'DONE' | 'NOT_DONE'
 
-// تحويل الحالة من العرض (تم/لم يتم) إلى قيم قاعدة البيانات
-function toDbStatus(status: 'تم' | 'لم يتم') {
-  return status === 'تم' ? 'DONE' : 'NOT_DONE'
+// تحويل الحالة لتناسب قاعدة البيانات - تم التعديل لتقبل كل الصيغ الممكنة
+function toDbStatus(status: any): DbStatus {
+  const s = String(status).trim()
+  if (s === 'تم' || s === 'DONE') return 'DONE'
+  return 'NOT_DONE'
 }
 
-// تحويل الكائن القادم من قاعدة البيانات ليتناسب مع الواجهة الأمامية
-function formatContact(contact: any) {
+// تحويل الحالة لتناسب الواجهة
+function toUiStatus(status: string): string {
+  return status === 'DONE' ? 'تم' : 'لم يتم'
+}
+
+function normalizeContact(contact: any) {
   return {
-    ...contact,
-    status: contact.status === 'DONE' ? 'تم' : 'لم يتم',
+    id: contact.id,
+    beneficiaryId: contact.beneficiaryId,
+    institutionId: contact.institutionId,
+    type: contact.type ?? '',
+    notes: contact.notes ?? '',
+    status: toUiStatus(contact.status),
+    date: contact.date ? new Date(contact.date).toISOString().split('T')[0] : '',
+    beneficiary: contact.beneficiary ?? null,
+    institution: contact.institution ?? null,
   }
 }
 
-/* ============================= */
-/* 🧾 Schemas */
-/* ============================= */
-
+// --- 2. قواعد التحقق (Schemas) ---
 const createSchema = z.object({
-  beneficiaryId: z.string().trim().min(1, 'معرّف المستفيد مطلوب'),
-  institutionId: z.string().trim().min(1, 'معرّف المؤسسة مطلوب'),
-  status: z.enum(['تم', 'لم يتم'], { 
-    error_map: () => ({ message: "الحالة يجب أن تكون 'تم' أو 'لم يتم'" }) 
-  }),
+  beneficiaryId: z.string().min(1, 'المستفيد مطلوب'),
+  institutionId: z.string().min(1, 'المؤسسة مطلوبة'),
+  status: z.string().min(1, 'الحالة مطلوبة'),
+  type: z.string().min(1, 'نوع التواصل مطلوب'),
+  date: z.string().min(1, 'التاريخ مطلوب'),
+  notes: z.string().optional().nullable(),
 })
 
-const updateSchema = createSchema.partial()
+const updateSchema = z.object({
+  beneficiaryId: z.string().min(1).optional(),
+  institutionId: z.string().min(1).optional(),
+  status: z.string().min(1).optional(),
+  type: z.string().min(1).optional(),
+  date: z.string().min(1).optional(),
+  notes: z.string().optional().nullable(),
+})
 
-/* ============================= */
-/* 🔍 التحقق من التكرار */
-/* ============================= */
-
-async function checkDuplicate(
-  beneficiaryId: string,
-  institutionId: string,
-  excludeId?: string
-) {
-  const existing = await prisma.contact.findFirst({
-    where: {
-      beneficiaryId,
-      institutionId,
-      ...(excludeId ? { NOT: { id: excludeId } } : {}),
-    },
-  })
-  return !!existing
-}
-
-/* ============================= */
-/* 📥 GET - جلب كافة البيانات */
-/* ============================= */
-
-export async function GET() {
+// --- 3. دالة GET ---
+export async function GET(req: NextRequest) {
   try {
+    const typeParam = req.nextUrl.searchParams.get('type')
+    
+    if (typeParam === 'options') {
+      const [beneficiaries, institutions] = await Promise.all([
+        prisma.beneficiary.findMany({ select: { id: true, name: true } }),
+        prisma.institution.findMany({ select: { id: true, name: true } }),
+      ])
+      return NextResponse.json({ beneficiaries, institutions })
+    }
+
     const contacts = await prisma.contact.findMany({
-      orderBy: { id: 'desc' },
+      orderBy: { date: 'desc' },
       include: {
-        beneficiary: { select: { id: true, name: true } }, // جلب بيانات محددة لتحسين الأداء
-        institution: { select: { id: true, name: true } },
+        beneficiary: { select: { name: true } },
+        institution: { select: { name: true } },
       },
     })
 
-    return NextResponse.json(contacts.map(formatContact))
+    return NextResponse.json(contacts.map(normalizeContact))
   } catch (e) {
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ داخلي في الخادم' },
-      { status: 500 }
-    )
+    return NextResponse.json({ message: 'خطأ في جلب البيانات' }, { status: 500 })
   }
 }
 
-/* ============================= */
-/* ➕ POST - إضافة تواصل جديد */
-/* ============================= */
-
+// --- 4. دالة POST (إضافة سجل) ---
 export async function POST(req: NextRequest) {
   try {
-    const body = createSchema.parse(await req.json())
-
-    if (await checkDuplicate(body.beneficiaryId, body.institutionId)) {
-      return NextResponse.json(
-        {
-          message: 'هذا المستفيد مسجل بالفعل لدى هذه المؤسسة',
-          fieldErrors: { beneficiaryId: 'مكرر', institutionId: 'مكرر' },
-        },
-        { status: 409 }
-      )
-    }
+    const rawData = await req.json()
+    const body = createSchema.parse(rawData)
 
     const created = await prisma.contact.create({
       data: {
         beneficiaryId: body.beneficiaryId,
         institutionId: body.institutionId,
         status: toDbStatus(body.status),
+        type: body.type,
+        date: new Date(body.date),
+        notes: body.notes || '',
       },
-      include: { beneficiary: true, institution: true },
+      include: { 
+        beneficiary: { select: { name: true } }, 
+        institution: { select: { name: true } } 
+      },
     })
 
-    return NextResponse.json(formatContact(created), { status: 201 })
-  } catch (e) {
-    return handleApiError(e)
+    return NextResponse.json(normalizeContact(created), { status: 201 })
+  } catch (e: any) {
+    return NextResponse.json({ message: 'بيانات غير مكتملة أو خاطئة' }, { status: 400 })
   }
 }
 
-/* ============================= */
-/* ✏️ PUT - تحديث تواصل */
-/* ============================= */
-
+// --- 5. دالة PUT (تعديل سجل) ---
 export async function PUT(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get('id')
-  if (!id) return NextResponse.json({ message: 'المعرّف مطلوب' }, { status: 400 })
-
   try {
-    const body = updateSchema.parse(await req.json())
+    const id = req.nextUrl.searchParams.get('id')
+    const rawData = await req.json()
+    const contactId = id || rawData.id
+
+    if (!contactId) return NextResponse.json({ message: 'المعرّف مفقود' }, { status: 400 })
+
+    const body = updateSchema.parse(rawData)
+    const updateData: any = {}
     
-    const existing = await prisma.contact.findUnique({ where: { id } })
-    if (!existing) return NextResponse.json({ message: 'غير موجود' }, { status: 404 })
-
-    // التحقق من التكرار في حالة تغيير المعرفات
-    const bId = body.beneficiaryId ?? existing.beneficiaryId
-    const iId = body.institutionId ?? existing.institutionId
-
-    if (await checkDuplicate(bId, iId, id)) {
-      return NextResponse.json(
-        { message: 'توجد بيانات مطابقة مسجلة مسبقاً', fieldErrors: { beneficiaryId: 'مكرر' } },
-        { status: 409 }
-      )
-    }
+    if (body.beneficiaryId) updateData.beneficiaryId = body.beneficiaryId
+    if (body.institutionId) updateData.institutionId = body.institutionId
+    if (body.type) updateData.type = body.type
+    if (body.status) updateData.status = toDbStatus(body.status)
+    if (body.date) updateData.date = new Date(body.date)
+    if (body.notes !== undefined) updateData.notes = body.notes
 
     const updated = await prisma.contact.update({
-      where: { id },
-      data: {
-        ...body,
-        status: body.status ? toDbStatus(body.status) : undefined,
+      where: { id: contactId },
+      data: updateData,
+      include: { 
+        beneficiary: { select: { name: true } }, 
+        institution: { select: { name: true } } 
       },
-      include: { beneficiary: true, institution: true },
     })
 
-    return NextResponse.json(formatContact(updated))
-  } catch (e) {
-    return handleApiError(e)
+    return NextResponse.json(normalizeContact(updated))
+  } catch (e: any) {
+    return NextResponse.json({ message: 'فشل التحديث' }, { status: 400 })
   }
 }
 
-/* ============================= */
-/* 🗑️ DELETE - حذف */
-/* ============================= */
-
+// --- 6. دالة DELETE ---
 export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id')
-  const all = req.nextUrl.searchParams.get('all')
-
   try {
-    if (all === 'true') {
-      await prisma.contact.deleteMany()
-      return NextResponse.json({ ok: true, message: 'تم مسح الكل' })
-    }
-
     if (!id) return NextResponse.json({ message: 'المعرّف مطلوب' }, { status: 400 })
-
     await prisma.contact.delete({ where: { id } })
     return NextResponse.json({ ok: true })
   } catch (e) {
-    return NextResponse.json({ message: 'فشل الحذف أو العنصر غير موجود' }, { status: 500 })
+    return NextResponse.json({ message: 'فشل الحذف' }, { status: 500 })
   }
-}
-
-/* ============================= */
-/* 🛠️ موحد معالجة الأخطاء */
-/* ============================= */
-
-function handleApiError(e: any) {
-  if (e instanceof z.ZodError) {
-    const fieldErrors: any = {}
-    e.issues.forEach((i) => { fieldErrors[i.path[0]] = i.message })
-    return NextResponse.json({ message: 'خطأ في البيانات المرسلة', fieldErrors }, { status: 400 })
-  }
-  return NextResponse.json({ message: 'خطأ في الخادم' }, { status: 500 })
 }

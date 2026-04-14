@@ -200,19 +200,17 @@ model Supervisor {
 
 model Camps {
   id                   String         @id @default(uuid())
-  name                 String // يمثل nameAr في الفرونت
-  area                 String? // المنطقة (شمال، جنوب، إلخ)
-  subArea              String? // الموقع الفرعي (جباليا، رفح، إلخ) - مضاف
+  name                 String
+  area                 String?
+  subArea              String?
   capacity             Int            @default(0)
-  currentFamiliesCount Int            @default(0) // عدد العائلات الحالي - مضاف
+  currentFamiliesCount Int            @default(0)
   status               CampFillStatus @default(NOT_FULL)
 
-  // الإحداثيات (اختياري حسب الكود الحالي)
   latitude  Decimal? @db.Decimal(10, 7)
   longitude Decimal? @db.Decimal(10, 7)
 
-  // العلاقات
-  supervisorId String? // جعلته اختياري إذا كان الفرونت لا يرسله حالياً
+  supervisorId String?
   placeId      String? @unique
 
   createdAt   DateTime @default(now())
@@ -220,7 +218,6 @@ model Camps {
   isTrashed   Boolean  @default(false)
   isProtected Boolean  @default(false)
 
-  // العلاقات الأخرى
   addresses     Address[]
   beneficiaries Beneficiary[]
   place         Place?        @relation("CampPlace", fields: [placeId], references: [id])
@@ -237,23 +234,20 @@ model Beneficiary {
   phone          String              @unique
   numberOfFamily Int                 @default(0)
   priority       BeneficiaryPriority @default(NORMAL)
-
-  // الحقل الجديد
-  area String? // المنطقة: شمال، جنوب، شرق، غرب
-
-  campId        String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  role          String         @default("CITIZEN")
-  isActive      Boolean        @default(true)
-  isTrashed     Boolean        @default(false)
-  isProtected   Boolean        @default(false)
-  camp          Camps?         @relation(fields: [campId], references: [id])
-  contacts      Contact[]
-  distributions Distribution[]
+  area           String?
+  campId         String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  role           String              @default("CITIZEN")
+  isActive       Boolean             @default(true)
+  isTrashed      Boolean             @default(false)
+  isProtected    Boolean             @default(false)
+  camp           Camps?              @relation(fields: [campId], references: [id])
+  contacts       Contact[]
+  distributions  Distribution[]
 
   @@index([campId])
-  @@index([area]) // أضفنا اندكس هنا لسرعة الفلترة حسب المنطقة
+  @@index([area])
   @@index([name])
   @@index([phone])
   @@index([isActive])
@@ -274,13 +268,13 @@ model Aid {
 }
 
 model Address {
-  id          String   @id @default(uuid())
-  governorate String?
-  city        String?
-  campId      String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  camp        Camps?   @relation(fields: [campId], references: [id])
+  id        String   @id @default(uuid())
+  location  String?
+  area      String?
+  campId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  camp      Camps    @relation(fields: [campId], references: [id], onDelete: Cascade)
 }
 
 model Emergency {
@@ -311,7 +305,6 @@ model Clinic {
 model Institution {
   id                  String               @id @default(uuid())
   name                String
-  instagramId         String?              @unique
   email               String?
   serviceType         String?
   presence            PresenceStatus       @default(AVAILABLE)
@@ -337,18 +330,14 @@ model Institution {
 }
 
 model Contact {
-  id            String @id @default(uuid())
+  id            String        @id @default(uuid())
   beneficiaryId String
   institutionId String
+  type          String?
+  date          DateTime      @default(now())
+  notes         String?       @db.Text
+  status        ContactStatus @default(NOT_DONE)
 
-  // الحقول الجديدة التي أضيفت في الفرونت إند
-  type  String? // نوع التواصل (اتصال هاتف، زيارة، إلخ)
-  date  DateTime @default(now()) // تاريخ التواصل
-  notes String?  @db.Text // ملاحظات (استخدمنا Text للمساحات الطويلة)
-
-  status ContactStatus @default(NOT_DONE)
-
-  // العلاقات
   beneficiary Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
   institution Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
 
@@ -357,10 +346,12 @@ model Contact {
 }
 
 model Product {
-  id                  String               @id @default(uuid())
-  name                String
-  quantity            Int                  @default(0)
-  status              ActiveStatus         @default(ACTIVE)
+  id       String        @id @default(uuid())
+  nameAr   String // الاسم بالعربي
+  price    Float         @default(0)
+  quantity Int           @default(0)
+  status   ProductStatus @default(GHAIR_MOJOUD)
+
   distributions       Distribution[]
   enterpriseProducts  EnterpriseProduct[]
   institutionProducts InstitutionProduct[]
@@ -374,12 +365,23 @@ model Service {
 }
 
 model InstitutionService {
-  id            String      @id @default(uuid())
-  institutionId String
-  serviceId     String
-  institution   Institution @relation(fields: [institutionId], references: [id])
-  service       Service     @relation(fields: [serviceId], references: [id])
+  // المعرف (أساسي): يتم توليده تلقائياً كـ UUID عند الإنشاء
+  id String @id @default(uuid())
 
+  // معرف المؤسسة: يربط السجل بمؤسسة معينة
+  institutionId String
+
+  // معرف الخدمة (مرجع): يربط السجل بخدمة معينة
+  serviceId String
+
+  // الحالة: يتم تعيينها تلقائياً كـ "مفعل" عند الإضافة من الباك إند
+  status String @default("مفعل")
+
+  // العلاقات (Relations)
+  institution Institution @relation(fields: [institutionId], references: [id])
+  service     Service     @relation(fields: [serviceId], references: [id])
+
+  // ضمان عدم تكرار نفس الخدمة لنفس المؤسسة
   @@unique([institutionId, serviceId])
 }
 
@@ -549,8 +551,8 @@ enum PresenceStatus {
 }
 
 enum ContactStatus {
-  DONE // تم
-  NOT_DONE // لم يتم
+  DONE
+  NOT_DONE
 }
 
 enum DistributionStatus {
@@ -568,4 +570,9 @@ enum DistributeAidFormStatus {
   SCHEDULED
   DONE
   CANCELED
+}
+
+enum ProductStatus {
+  MOJOUD
+  GHAIR_MOJOUD
 }

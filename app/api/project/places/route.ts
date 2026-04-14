@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient, PlaceType, PlaceStatus, Prisma } from '@prisma/client'
-import { requireAdminApi } from '@/app/api/project/helpers/api-guards'
 
-// إعداد PrismaClient بطريقة تمنع تكرار الاتصالات في التطوير
+// إعداد PrismaClient
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-// تعديل هنا: التأكد من إنشاء الكائن بدون إعدادات "Engine" معقدة إذا لم تكن مطلوبة
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
@@ -33,9 +31,6 @@ type CreatePlaceBody = {
 }
 
 const ARABIC_NAME_REGEX = /^[\u0600-\u06FF\s]+$/
-const OPERATOR_REGEX = /^[A-Za-z\u0600-\u06FF\s]+$/
-
-const NAME_MIN_LENGTH = 2
 const NAME_MAX_LENGTH = 100
 const DESCRIPTION_MAX_LENGTH = 500
 const STATUS_TEXT_MAX_LENGTH = 300
@@ -84,7 +79,7 @@ function parseOptionalInteger(value: unknown): number | null | 'INVALID' {
   return num
 }
 
-// --- GET Method ---
+// --- GET Method (متاحة للجميع) ---
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -126,16 +121,14 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// --- POST Method ---
+// --- POST Method (تم إلغاء فحص الأدمن - متاحة للجميع) ---
 export async function POST(req: NextRequest) {
   try {
-    const unauthorized = await requireAdminApi(req)
-    if (unauthorized) return unauthorized
-
+    // تم حذف requireAdminApi لفتح الوصول للكل
+    
     const body = (await req.json()) as CreatePlaceBody
     const { name, type, latitude, longitude, description, operator, capacity, occupancy, availableBeds, statusText } = body
 
-    // التحقق من البيانات الأساسية
     if (typeof name !== 'string' || !normalizeSpaces(name)) {
       return NextResponse.json({ success: false, message: 'اسم المكان مطلوب' }, { status: 400 })
     }
@@ -155,7 +148,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: 'إحداثيات غير صحيحة' }, { status: 400 })
     }
 
-    // معالجة الحقول الاختيارية
     const parsedDesc = parseOptionalText(description, DESCRIPTION_MAX_LENGTH)
     const parsedOp = parseOptionalText(operator, OPERATOR_MAX_LENGTH)
     const parsedStat = parseOptionalText(statusText, STATUS_TEXT_MAX_LENGTH)

@@ -5,95 +5,45 @@ import prisma from '@/lib/prisma'
 
 type FrontServiceStatus = 'نشط' | 'مغلق'
 
-const createSchema = z.object({
+const serviceSchema = z.object({
   serviceType: z.string().trim().min(1, 'نوع الخدمة مطلوب'),
   status: z.enum(['نشط', 'مغلق']).default('نشط'),
 })
 
-const updateSchema = z
-  .object({
-    serviceType: z.string().trim().min(1, 'نوع الخدمة مطلوب').optional(),
-    status: z.enum(['نشط', 'مغلق']).optional(),
-  })
-  .strict()
-
-function normalizeText(value: string) {
-  return value.trim().replace(/\s+/g, ' ').toLowerCase()
-}
-
+// محولات الحالة
 function toDbStatus(status: FrontServiceStatus): GeneralStatus {
-  if (status === 'نشط') {
-    return 'ACTIVE' as GeneralStatus
-  }
-
-  return 'INACTIVE' as GeneralStatus
+  return status === 'نشط' ? 'ACTIVE' : 'INACTIVE'
 }
 
 function fromDbStatus(status: GeneralStatus): FrontServiceStatus {
-  const value = String(status)
-
-  if (value === 'ACTIVE') return 'نشط'
-  return 'مغلق'
-}
-
-function mapServiceToFrontend(service: {
-  id: string
-  serviceType: string
-  status: GeneralStatus
-}) {
-  return {
-    id: service.id,
-    serviceType: service.serviceType,
-    status: fromDbStatus(service.status),
-  }
+  return status === 'ACTIVE' ? 'نشط' : 'مغلق'
 }
 
 export async function GET(req: NextRequest) {
   try {
-    const id = req.nextUrl.searchParams.get('id')
-
-    if (id) {
-      const service = await prisma.service.findUnique({
-        where: { id },
-      })
-
-      if (!service) {
-        return NextResponse.json(
-          { message: 'الخدمة غير موجودة' },
-          { status: 404 }
-        )
-      }
-
-      return NextResponse.json(mapServiceToFrontend(service))
-    }
-
-    const services = await prisma.service.findMany({
-      orderBy: { id: 'desc' },
-    })
-
-    return NextResponse.json(services.map(mapServiceToFrontend))
+    const services = await prisma.service.findMany({ orderBy: { id: 'desc' } })
+    return NextResponse.json(services.map(s => ({
+      id: s.id,
+      serviceType: s.serviceType,
+      status: fromDbStatus(s.status)
+    })))
   } catch (e) {
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
+    return NextResponse.json({ message: 'خطأ في الخادم' }, { status: 500 })
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = createSchema.parse(await req.json())
+    const body = serviceSchema.parse(await req.json())
 
+    // التحقق من التكرار مع تجاهل المسافات الزائدة
     const exists = await prisma.service.findFirst({
-      where: {
-        serviceType: body.serviceType,
-      },
-      select: { id: true },
+      where: { serviceType: body.serviceType.trim() }
     })
 
     if (exists) {
       return NextResponse.json(
-        { message: 'الخدمة موجودة بالفعل (نوع خدمة مكرر).' },
+        { message: `الخدمة "${body.serviceType}" موجودة بالفعل في النظام.` },
         { status: 409 }
       )
     }
@@ -105,137 +55,51 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    return NextResponse.json(mapServiceToFrontend(created), { status: 201 })
-  } catch (e) {
-    if (e instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          message: e.issues[0]?.message ?? 'فشل التحقق من صحة البيانات',
-          issues: e.issues,
-        },
-        { status: 400 }
-      )
-    }
+    return NextResponse.json({
+      id: created.id,
+      serviceType: created.serviceType,
+      status: fromDbStatus(created.status)
+    }, { status: 201 })
 
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
+  } catch (e: any) {
+    if (e instanceof z.ZodError) return NextResponse.json({ message: e.issues[0].message }, { status: 400 })
+    return NextResponse.json({ message: e.message || 'خطأ في الخادم' }, { status: 500 })
   }
 }
 
 export async function PUT(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id')
-
-  if (!id) {
-    return NextResponse.json(
-      { message: 'معرّف الخدمة مفقود' },
-      { status: 400 }
-    )
-  }
+  if (!id) return NextResponse.json({ message: 'المعرف مفقود' }, { status: 400 })
 
   try {
-    const body = updateSchema.parse(await req.json())
+    const body = serviceSchema.parse(await req.json())
 
-    const current = await prisma.service.findUnique({
-      where: { id },
+    // التأكد أن الاسم الجديد لا يخص خدمة أخرى
+    const duplicate = await prisma.service.findFirst({
+      where: {
+        serviceType: body.serviceType,
+        NOT: { id: id }
+      }
     })
-
-    if (!current) {
-      return NextResponse.json(
-        { message: 'الخدمة غير موجودة' },
-        { status: 404 }
-      )
-    }
-
-    const nextServiceType = body.serviceType?.trim() ?? current.serviceType
-    const normalizedNextType = normalizeText(nextServiceType)
-
-    const allServices = await prisma.service.findMany({
-      select: {
-        id: true,
-        serviceType: true,
-      },
-    })
-
-    const duplicate = allServices.find(
-      (item) =>
-        item.id !== id &&
-        normalizeText(item.serviceType) === normalizedNextType
-    )
 
     if (duplicate) {
-      return NextResponse.json(
-        { message: 'الخدمة موجودة بالفعل (نوع خدمة مكرر).' },
-        { status: 409 }
-      )
+      return NextResponse.json({ message: 'الاسم مكرر لخدمة أخرى' }, { status: 409 })
     }
 
     const updated = await prisma.service.update({
       where: { id },
       data: {
-        serviceType: body.serviceType?.trim(),
-        status: body.status ? toDbStatus(body.status) : undefined,
-      },
+        serviceType: body.serviceType,
+        status: toDbStatus(body.status)
+      }
     })
 
-    return NextResponse.json(mapServiceToFrontend(updated))
-  } catch (e) {
-    if (e instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          message: e.issues[0]?.message ?? 'فشل التحقق من صحة البيانات',
-          issues: e.issues,
-        },
-        { status: 400 }
-      )
-    }
-
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get('id')
-  const all = req.nextUrl.searchParams.get('all')
-
-  try {
-    if (all === 'true') {
-      await prisma.service.deleteMany()
-      return NextResponse.json({ ok: true })
-    }
-
-    if (!id) {
-      return NextResponse.json(
-        { message: 'معرّف الخدمة مفقود' },
-        { status: 400 }
-      )
-    }
-
-    const current = await prisma.service.findUnique({
-      where: { id },
-      select: { id: true },
+    return NextResponse.json({
+      id: updated.id,
+      serviceType: updated.serviceType,
+      status: fromDbStatus(updated.status)
     })
-
-    if (!current) {
-      return NextResponse.json(
-        { message: 'الخدمة غير موجودة' },
-        { status: 404 }
-      )
-    }
-
-    await prisma.service.delete({
-      where: { id },
-    })
-
-    return NextResponse.json({ ok: true })
-  } catch (e) {
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
+  } catch (e: any) {
+    return NextResponse.json({ message: e.message }, { status: 500 })
   }
 }

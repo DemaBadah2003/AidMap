@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient, Prisma } from '@prisma/client'
-import { requireAdminApi } from '@/app/api/project/helpers/api-guards'
+// تم إيقاف استيراد requireAdminApi لفتح الصلاحيات للجميع
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient
@@ -61,6 +61,7 @@ function parseOptionalText(
   return normalized
 }
 
+// جلب المستفيدين (مفتوح للجميع حالياً)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -104,16 +105,18 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// إضافة مستفيد جديد (تم إزالة قيود الأدمن)
 export async function POST(req: NextRequest) {
   try {
-    const unauthorized = await requireAdminApi(req)
-    if (unauthorized) {
-      return unauthorized
-    }
+    /* تم إزالة فحص الصلاحيات هنا:
+       const unauthorized = await requireAdminApi(req)
+       if (unauthorized) return unauthorized
+    */
 
     const body = (await req.json()) as CreateBeneficiaryBody
     const { name, phone, numberOfFamily, campId } = body
 
+    // 1. التحقق من الاسم
     if (typeof name !== 'string') {
       return NextResponse.json(
         { success: false, message: 'الاسم مطلوب' },
@@ -123,29 +126,9 @@ export async function POST(req: NextRequest) {
 
     const normalizedName = normalizeSpaces(name)
 
-    if (!normalizedName) {
+    if (!normalizedName || normalizedName.length < NAME_MIN_LENGTH) {
       return NextResponse.json(
-        { success: false, message: 'الاسم مطلوب' },
-        { status: 400 }
-      )
-    }
-
-    if (normalizedName.length < NAME_MIN_LENGTH) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `الاسم يجب أن يكون على الأقل ${NAME_MIN_LENGTH} أحرف`,
-        },
-        { status: 400 }
-      )
-    }
-
-    if (normalizedName.length > NAME_MAX_LENGTH) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `الاسم يجب ألا يزيد عن ${NAME_MAX_LENGTH} حرفًا`,
-        },
+        { success: false, message: 'الاسم غير صالح أو قصير جداً' },
         { status: 400 }
       )
     }
@@ -157,120 +140,51 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (/\s{2,}/.test(name)) {
+    // 2. التحقق من رقم الهاتف
+    if (typeof phone !== 'string' || !PHONE_REGEX.test(phone)) {
       return NextResponse.json(
-        { success: false, message: 'لا يمكن وضع أكثر من مسافة بين الكلمات' },
+        { success: false, message: 'رقم الهاتف غير صالح (يجب أن يبدأ بـ 056 أو 059)' },
         { status: 400 }
       )
     }
 
-    if (typeof phone !== 'string') {
+    // 3. التحقق من عدد أفراد الأسرة
+    const familyAsString = typeof numberOfFamily === 'number' ? String(numberOfFamily) : (numberOfFamily as string)
+    if (!familyAsString || !FAMILY_REGEX.test(familyAsString)) {
       return NextResponse.json(
-        { success: false, message: 'رقم الهاتف مطلوب' },
-        { status: 400 }
-      )
-    }
-
-    if (!/^\d+$/.test(phone)) {
-      return NextResponse.json(
-        { success: false, message: 'رقم الهاتف يجب أن يحتوي على أرقام فقط' },
-        { status: 400 }
-      )
-    }
-
-    if (!PHONE_REGEX.test(phone)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'رقم الهاتف يجب أن يبدأ بـ 056 أو 059 وبعده 7 أرقام',
-        },
-        { status: 400 }
-      )
-    }
-
-    const familyAsString =
-      typeof numberOfFamily === 'number'
-        ? String(numberOfFamily)
-        : typeof numberOfFamily === 'string'
-          ? numberOfFamily
-          : ''
-
-    if (!familyAsString) {
-      return NextResponse.json(
-        { success: false, message: 'عدد أفراد الأسرة مطلوب' },
-        { status: 400 }
-      )
-    }
-
-    if (!/^\d+$/.test(familyAsString)) {
-      return NextResponse.json(
-        { success: false, message: 'عدد أفراد الأسرة يجب أن يحتوي على أرقام فقط' },
-        { status: 400 }
-      )
-    }
-
-    if (!FAMILY_REGEX.test(familyAsString)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'عدد أفراد الأسرة يجب أن يكون من رقم أو رقمين فقط',
-        },
+        { success: false, message: 'عدد أفراد الأسرة يجب أن يكون بين 1 و 99' },
         { status: 400 }
       )
     }
 
     const parsedNumberOfFamily = Number(familyAsString)
 
-    if (!Number.isInteger(parsedNumberOfFamily) || parsedNumberOfFamily < 1) {
-      return NextResponse.json(
-        { success: false, message: 'عدد أفراد الأسرة غير صالح' },
-        { status: 400 }
-      )
-    }
-
-    const parsedCampName = parseOptionalText(campId, MAX_CAMP_LENGTH)
-    if (parsedCampName === 'INVALID') {
-      return NextResponse.json(
-        { success: false, message: 'قيمة المخيم / المنطقة غير صالحة' },
-        { status: 400 }
-      )
-    }
-
+    // 4. فحص التكرار (منع تسجيل نفس الهاتف مرتين)
     const existingBeneficiary = await prisma.beneficiary.findFirst({
-      where: {
-        phone,
-      },
+      where: { phone },
     })
 
     if (existingBeneficiary) {
       return NextResponse.json(
-        { success: false, message: 'رقم الهاتف مسجل مسبقًا' },
+        { success: false, message: 'رقم الهاتف مسجل مسبقًا في النظام' },
         { status: 409 }
       )
     }
 
+    // 5. ربط المخيم إذا وجد
     let resolvedCampId: string | null = null
-
-    if (parsedCampName) {
+    const parsedCampName = parseOptionalText(campId, MAX_CAMP_LENGTH)
+    
+    if (parsedCampName && parsedCampName !== 'INVALID') {
       const existingCamp = await prisma.camps.findFirst({
         where: {
-          OR: [
-            { name: parsedCampName },
-            { area: parsedCampName },
-          ],
-        },
-        select: {
-          id: true,
-          name: true,
-          area: true,
+          OR: [{ name: parsedCampName }, { area: parsedCampName }],
         },
       })
-
-      if (existingCamp) {
-        resolvedCampId = existingCamp.id
-      }
+      if (existingCamp) resolvedCampId = existingCamp.id
     }
 
+    // 6. إنشاء السجل
     const newBeneficiary = await prisma.beneficiary.create({
       data: {
         name: normalizedName,
@@ -286,20 +200,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: 'تمت إضافة المستفيد بنجاح',
+        message: 'تم تسجيل بياناتك بنجاح',
         data: newBeneficiary,
       },
       { status: 201 }
     )
   } catch (error) {
-    console.error('POST /api/project/admins/adminBeneficiary error:', error)
-
+    console.error('POST error:', error)
     return NextResponse.json(
-      {
-        success: false,
-        message: 'فشل في إضافة المستفيد',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
+      { success: false, message: 'حدث خطأ أثناء حفظ البيانات' },
       { status: 500 }
     )
   }

@@ -12,7 +12,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '../../../../../components/ui/dialog'
-import { Pencil, Save, X, Plus, Search } from 'lucide-react'
+import { Pencil, Save, X, Plus, Search, ChevronRight, ChevronLeft } from 'lucide-react'
 
 type Supervisor = {
   id: string
@@ -301,7 +301,7 @@ export default function SupervisorsPage() {
       </div>
 
       <div className="w-full">
-        <Card className="w-full">
+        <Card className="w-full border-slate-200 shadow-sm">
           <CardContent className="p-0" dir="rtl">
             <div className="p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -351,19 +351,19 @@ export default function SupervisorsPage() {
 
             <div className="border-t" />
 
-            <div className="overflow-hidden rounded-b-lg">
+            <div className="overflow-hidden">
               <div className="w-full overflow-x-auto">
                 <table className="min-w-full border-collapse text-sm">
-                  <thead style={{ backgroundColor: '#F9FAFB', boxShadow: '0 1px 0 rgba(0,0,0,0.06)' }}>
-                    <tr className="text-right text-foreground/60">
-                      <th className="border-b border-l px-4 py-3 font-normal text-right">المشرف</th>
-                      <th className="border-b border-l px-4 py-3 font-normal text-right">رقم الجوال</th>
-                      <th className="border-b border-l px-4 py-3 font-normal text-right">الحالة</th>
-                      <th className="border-b px-4 py-3 font-normal text-right">الإجراءات</th>
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr className="text-right text-slate-600">
+                      <th className="px-4 py-3 font-semibold text-right">المشرف</th>
+                      <th className="px-4 py-3 font-semibold text-right">رقم الجوال</th>
+                      <th className="px-4 py-3 font-semibold text-right">الحالة</th>
+                      <th className="px-4 py-3 font-semibold text-right">الإجراءات</th>
                     </tr>
                   </thead>
 
-                  <tbody>
+                  <tbody className="divide-y divide-slate-100">
                     {loading ? (
                       <tr>
                         <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
@@ -374,8 +374,8 @@ export default function SupervisorsPage() {
                       pageItems.map((sp) => {
                         const isEditing = editingId === sp.id
                         return (
-                          <tr key={sp.id} className="hover:bg-muted/30">
-                            <td className="border-b border-l px-4 py-3 font-medium text-right">
+                          <tr key={sp.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-3 font-medium">
                               {isEditing ? (
                                 <Input
                                   value={editDraft.nameAr}
@@ -383,11 +383,11 @@ export default function SupervisorsPage() {
                                   className="h-9"
                                 />
                               ) : (
-                                <span className="font-medium text-foreground">{sp.nameAr}</span>
+                                <span className="font-medium text-slate-900">{sp.nameAr}</span>
                               )}
                             </td>
 
-                            <td className="border-b border-l px-4 py-3 text-right">
+                            <td className="px-4 py-3 text-slate-600">
                               {isEditing ? (
                                 <div className="flex flex-col gap-1">
                                   <Input
@@ -405,7 +405,7 @@ export default function SupervisorsPage() {
                               )}
                             </td>
 
-                            <td className="border-b border-l px-4 py-3 text-right">
+                            <td className="px-4 py-3">
                               {isEditing ? (
                                 <select
                                   value={editDraft.status}
@@ -422,12 +422,12 @@ export default function SupervisorsPage() {
                               )}
                             </td>
 
-                            <td className="border-b px-4 py-3 text-right">
+                            <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
                                 {!isEditing ? (
                                   <button
                                     type="button"
-                                    className="inline-flex h-10 w-10 items-center justify-center rounded-md border hover:bg-muted"
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-colors"
                                     onClick={() => startEditRow(sp)}
                                   >
                                     <Pencil className="size-4" />
@@ -435,16 +435,16 @@ export default function SupervisorsPage() {
                                 ) : (
                                   <>
                                     <Button 
-                                      className="h-10" 
+                                      className="h-9 bg-blue-600 hover:bg-blue-700" 
                                       size="sm" 
                                       onClick={() => saveEditRow(sp.id)}
                                       disabled={!isValidPalestinePhone(editDraft.phone) || editDraft.nameAr.trim() === ''}
                                     >
-                                      <Save className="ms-2 size-4" />
+                                      <Save className="ml-2 size-4" />
                                       حفظ
                                     </Button>
-                                    <Button size="sm" variant="outline" className="h-10" onClick={cancelEditRow}>
-                                      <X className="ms-2 size-4" />
+                                    <Button size="sm" variant="outline" className="h-9" onClick={cancelEditRow}>
+                                      <X className="ml-2 size-4" />
                                       إلغاء
                                     </Button>
                                   </>
@@ -465,28 +465,51 @@ export default function SupervisorsPage() {
                 </table>
               </div>
 
-              <div className="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>عدد الصفوف</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="h-9 rounded-md border bg-background px-2 text-sm"
-                  >
-                    <option value={5}>5</option>
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                  </select>
+              {/* Pagination Section المحسن */}
+              <div className="flex flex-col gap-4 border-t border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between bg-slate-50/50">
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <span>عرض</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => setPageSize(Number(e.target.value))}
+                      className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-blue-100"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                    </select>
+                    <span>صفوف</span>
+                  </div>
+                  <span className="hidden sm:inline-block text-slate-300">|</span>
+                  <div className="font-medium text-slate-600">
+                    عرض {rangeStart} - {rangeEnd} من {filtered.length}
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="text-sm text-muted-foreground">
-                    {rangeStart} - {rangeEnd} من {filtered.length}
-                  </div>
-                  <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                <div className="flex items-center justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={safePage <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="h-9 gap-1 px-4 font-medium transition-colors hover:bg-white hover:text-blue-600 disabled:opacity-50"
+                  >
                     السابق
                   </Button>
-                  <Button variant="outline" size="sm" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                  
+                  <div className="flex h-9 items-center justify-center rounded-md border border-slate-200 bg-white px-4 text-sm font-bold text-blue-600 shadow-sm">
+                    {safePage} / {totalPages}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={safePage >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className="h-9 gap-1 px-4 font-medium transition-colors hover:bg-white hover:text-blue-600 disabled:opacity-50"
+                  >
                     التالي
                   </Button>
                 </div>
@@ -495,7 +518,7 @@ export default function SupervisorsPage() {
           </CardContent>
         </Card>
 
-        {/* إضافة مشرف - تعديل الأزرار لتكون بعرض الحقل وبالترتيب المطلوب */}
+        {/* إضافة مشرف */}
         <Dialog open={addOpen} onOpenChange={resetAddOpen}>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader dir="rtl" className="text-right">
@@ -563,7 +586,6 @@ export default function SupervisorsPage() {
               {addFormError && <p className="text-sm text-red-600 font-medium text-center">{addFormError}</p>}
             </div>
 
-            {/* الأزرار بعرض كامل (w-full) مع الحفظ يميناً والإلغاء يساراً */}
             <DialogFooter dir="rtl" className="flex flex-row-reverse gap-3 pt-4 border-t">
               <Button 
                 onClick={onAdd} 
