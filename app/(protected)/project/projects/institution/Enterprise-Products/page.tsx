@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Card, CardContent } from '../../../../../components/ui/card'
-import { Button } from '../../../../../components/ui/button'
-import { Input } from '../../../../../components/ui/input'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../../../components/ui/dialog'
+import { Card, CardContent } from '../../../../../../components/ui/card'
+import { Button } from '../../../../../../components/ui/button'
+import { Input } from '../../../../../../components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../../../../components/ui/dialog'
 import { Pencil, Save, X, Plus, Search, Loader2, ChevronRight, ChevronLeft } from 'lucide-react'
 
 export default function EnterpriseProductsPage() {

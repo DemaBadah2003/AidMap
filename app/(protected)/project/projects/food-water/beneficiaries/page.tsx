@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { z, ZodError } from 'zod'
-import { Card, CardContent } from '../../../../../components/ui/card'
-import { Button } from '../../../../../components/ui/button'
-import { Input } from '../../../../../components/ui/input'
+import { Card, CardContent } from '../../../../../../components/ui/card'
+import { Button } from '../../../../../../components/ui/button'
+import { Input } from '../../../../../../components/ui/input'
 import { Pencil, Plus, Search, Check, X, Loader2, AlertCircle } from 'lucide-react'
 import {
   Dialog,
@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "../../../../../components/ui/dialog"
+} from "../../../../../../components/ui/dialog"
 
 // --- التعريفات الثابتة ---
 const AREAS = ["شمال", "جنوب", "شرق", "غرب"]

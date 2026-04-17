@@ -14,46 +14,100 @@ export const MENU_SIDEBAR: MenuConfig = [
   {
     title: 'لوحات التحكم',
     icon: LayoutGrid,
-    expanded: true, // ✅ يفتح قسم "لوحات التحكم" تلقائياً
+    expanded: true, 
     children: [
       {
         title: 'إدارة المشاريع',
-        expanded: true, // ✅ يفتح قائمة "إدارة المشاريع" لتظهر المخيمات والمستفيدين فوراً
+        expanded: true, 
         children: [
-          { title: 'المخيمات', path: '/project/projects/camps' },
-          { title: 'المستفيدين', path: '/project/projects/beneficiaries' },
-          { title: 'العيادة', path: '/project/projects/clinic' },
-          { title: 'المراكز الإيوائية', path: '/project/projects/shelters' },
-          { title: 'المشرفين', path: '/project/projects/supervisior' },
-          { title: 'المؤسسات', path: '/project/projects/institutions' },
-          { title: 'جهات الاتصال', path: '/project/projects/contacts' },
-          { title: 'العناوين', path: '/project/projects/address' },
-          { title: 'منتجات المؤسسات', path: '/project/projects/Enterprise-Products' },
-          { title: 'المنتجات', path: '/project/projects/products' },
-          { title: 'الخدمات', path: '/project/projects/service' },
-          { title: 'الخدمات المؤسساتية', path: '/project/projects/institutional-services' },
-          { title: 'الطوارئ', path: '/project/projects/Emergency' },
-          { title: 'التوزيعات', path: '/project/projects/Distributions' },
+          // 1. الخدمات الطبية (معدل ليكون أشمل)
+          {
+            title: 'الخدمات الطبية والصحية',
+            path: '/project/projects/Medical-Services/clinic',
+            children: [
+              { title: 'جدول المستشفيات', path: '/project/projects/Medical-Services/hospitals' },
+              { title: 'جدول الدكاترة', path: '/project/projects/Medical-Services/doctors' },
+              { title: 'جدول المرضى', path: '/project/projects/Medical-Services/patients' },
+              { title: 'جدول المعايير', path: '/project/projects/Medical-Services/criteria' },
+              { title: 'جدول الصيدليات', path: '/project/projects/Medical-Services/pharmacies' },
+              { title: 'جدول مدير المستشفى', path: '/project/projects/Medical-Services/hospital-manager' },
+              { title: 'جدول العروض', path: '/project/projects/Medical-Services/offers' },
+              { title: 'طلبات الرعاية الطبية', path: '/project/projects/Medical-Services/Medical-care' },
+            ],
+          },
+
+          // 2. الخدمات التعليمية (القسم الجديد المضاف)
+          {
+            title: 'الخدمات التعليمية والطلاب',
+            path: '/project/projects/education',
+            children: [
+              { title: 'أماكن خيام التعليم', path: '/project/projects/education/camps' },
+              { title: 'مراكز الدعم النفسي', path: '/project/projects/education/psychological' },
+              { title: 'نقاط الإنترنت للدراسة', path: '/project/projects/education/internet' },
+              { title: 'قضايا الطلاب والتعليم', path: '/project/projects/education/student-issues' },
+              { title: 'جدول المدارس', path: '/project/projects/education/school' },
+              { title: 'جدول الطلاب', path: '/project/projects/education/students' },
+            ],
+          },
+
+          // 3. الغذاء والمياه (القسم الجديد المضاف)
+          {
+            title: 'الغذاء والمياه (المعونات)',
+            path: '/project/projects/food-water',
+            children: [
+              { title: 'نقاط توزيع المياه', path: '/project/projects/food-water/water' },
+              { title: 'نقاط توزيع الطعام', path: '/project/projects/food-water/food' },
+              { title: 'التوزيعات المؤسساتية', path: '/project/projects/food-water/Distributions' },
+              { title: 'المنتجات', path: '/project/projects/food-water/products' },
+               { title: 'المستفيد', path: '/project/projects/food-water/beneficiaries' },
+
+
+
+            ],
+          },
+
+          // 4. المراكز الإيوائية
+          {
+            title: 'المراكز الإيوائية',
+            path: '/project/projects/camp',
+            children: [
+              { title: 'جدول مركز الايواء', path: '/project/projects/camp/shelters' },
+              { title: 'جدول المشرفين', path: '/project/projects/camp/supervisior' },
+              { title: 'جدول الطوارئ', path: '/project/projects/camp/Emergency' },
+            ],
+          },
+
+          // 5. المؤسسات الداعمة
+          {
+            title: 'المؤسسات الداعمة',
+            path: '/project/projects/institutions',
+            children: [
+              { title: 'المؤسسات', path: '/project/projects/institution/institutions' },
+              { title: 'منتجات المؤسسات', path: '/project/projects/institution/Enterprise-Products' },
+              { title: 'الخدمات', path: '/project/projects/institution/service' },
+              { title: 'الخدمات المؤسساتية', path: '/project/projects/institution/institutional-services' },
+            ],
+          },
         ],
       },
       {
         title: 'لوحة تحكم المسؤول',
         path: '/store-admin/dashboard',
         roles: ['admin'],
-        expanded: true, // ✅ يفتح قائمة "لوحة تحكم المسؤول" لتظهر معاينة الخريطة وإضافة مكان فوراً
+        expanded: true, 
         children: [
           { title: 'معاينة الخريطة', path: '/project/MapPreview' },
           { title: 'إضافة مكان', path: '/project/admins/addPlaces' },
           { title: 'تسجيل مستفيد', path: '/project/admins/adminBeneficiary' },
           { title: 'فحص مساعدة', path: '/project/admins/addAid' },
-          { title:'طلب مساعدة ', path: '/project/admins/distributeAid' },
+          { title: 'طلب مساعدة ', path: '/project/admins/distributeAid' },
         ],
       },
     ],
   },
 ];
 
-// القوائم الأخرى فارغة كما طلبت في تعديلاتك السابقة
+// القوائم الأخرى والوظائف تظل كما هي في كودك الأصلي...
 export const MENU_SIDEBAR_CUSTOM: MenuConfig = [];
 export const MENU_SIDEBAR_COMPACT: MenuConfig = [];
 export const MENU_ROOT: MenuConfig = [];
@@ -64,7 +118,7 @@ export const MENU_HELP: MenuConfig = [
   {
     title: 'الدعم والمساعدة',
     icon: HelpCircle,
-    expanded: true, // ✅ مفتوحة تلقائياً
+    expanded: true, 
     children: [
       {
         title: 'ابدأ هنا',

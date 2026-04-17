@@ -1,16 +1,16 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Card, CardContent } from '../../../../../components/ui/card'
-import { Button } from '../../../../../components/ui/button'
-import { Input } from '../../../../../components/ui/input'
+import { Card, CardContent } from '../../../../../../components/ui/card'
+import { Button } from '../../../../../../components/ui/button'
+import { Input } from '../../../../../../components/ui/input'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '../../../../../components/ui/dialog'
+} from '../../../../../../components/ui/dialog'
 import { Pencil, Save, X, Plus, Search, ChevronRight, ChevronLeft, Loader2 } from 'lucide-react'
 
 type ClinicStatus = 'مفتوحة' | 'مغلقة'

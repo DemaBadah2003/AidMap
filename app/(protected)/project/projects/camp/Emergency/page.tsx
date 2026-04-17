@@ -1,16 +1,16 @@
 'use client'
 
 import { useMemo, useState, useEffect } from 'react'
-import { Card, CardContent } from '../../../../../components/ui/card'
-import { Button } from '../../../../../components/ui/button'
-import { Input } from '../../../../../components/ui/input'
+import { Card, CardContent } from '../../../../../../components/ui/card'
+import { Button } from '../../../../../../components/ui/button'
+import { Input } from '../../../../../../components/ui/input'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '../../../../../components/ui/dialog'
+} from '../../../../../../components/ui/dialog'
 import { Pencil, Plus, Search, Check, X, Loader2 } from 'lucide-react'
 
 type EmergencyStatus = 'جديدة' | 'قيد المعالجة' | 'مغلقة'
