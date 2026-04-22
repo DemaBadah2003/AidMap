@@ -19,17 +19,6 @@ import {
   AlertCircle 
 } from 'lucide-react'
 
-// قائمة أنواع الأمراض المقترحة
-const DISEASE_TYPES = [
-  'ضغط دم',
-  'سكري',
-  'أمراض قلب',
-  'جراحة عامة',
-  'عظام',
-  'باطنة',
-  'أخرى'
-]
-
 type Patient = {
   id: string
   name: string
@@ -40,7 +29,6 @@ type Patient = {
 const BASE_URL = '/api/project/projects/medical/patients'
 const topControlHeight = 'h-10'
 const inputBaseClass = 'w-full min-w-0 rounded-lg border-slate-200 bg-white text-right text-xs sm:text-sm outline-none focus:!ring-2 focus:!ring-slate-100 font-normal'
-const selectBaseClass = 'w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-right text-xs sm:text-sm outline-none focus:ring-2 focus:ring-slate-100 font-normal'
 
 export default function PatientsPage() {
   const [q, setQ] = useState('')
@@ -68,17 +56,15 @@ export default function PatientsPage() {
 
   useEffect(() => { fetchPatients() }, [])
 
-  // التحقق من صحة رقم الهاتف (056 أو 059 + 7 أرقام إضافية = 10 أرقام إجمالاً)
   const isPhoneValid = useMemo(() => {
     const phoneRegex = /^(056|059)\d{7}$/
     return phoneRegex.test(phone)
   }, [phone])
 
-  // التحقق من أن كل الحقول معبأة بشكل صحيح
   const isAddValid = useMemo(() => {
     return (
       name.trim() !== '' && 
-      diseaseType !== '' && 
+      diseaseType.trim() !== '' && 
       isPhoneValid
     )
   }, [name, diseaseType, isPhoneValid])
@@ -215,16 +201,12 @@ export default function PatientsPage() {
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">نوع المرض</label>
-              <select 
-                className={selectBaseClass + " h-11 bg-slate-50"} 
+              <Input 
+                className="h-11 bg-slate-50" 
+                placeholder="أدخل نوع المرض (مثلاً: سكري، ضغط...)" 
                 value={diseaseType} 
-                onChange={e => setDiseaseType(e.target.value)}
-              >
-                <option value="">اختر نوع المرض</option>
-                {DISEASE_TYPES.map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
+                onChange={e => setDiseaseType(e.target.value)} 
+              />
             </div>
 
             <div className="space-y-1.5">

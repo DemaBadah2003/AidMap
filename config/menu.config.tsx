@@ -25,14 +25,14 @@ export const MENU_SIDEBAR: MenuConfig = [
             title: 'الخدمات الطبية والصحية',
             path: '/project/projects/Medical-Services/clinic',
             children: [
+               { title: 'الصفحة الرئيسية ', path: '/project/projects/Medical-Services/home' },
+                { title: 'جدول المرضى', path: '/project/projects/Medical-Services/patients' },
+               { title: 'جدول العناوين', path: '/project/projects/Medical-Services/Address' },
               { title: 'جدول المستشفيات', path: '/project/projects/Medical-Services/hospitals' },
-              { title: 'جدول الدكاترة', path: '/project/projects/Medical-Services/doctors' },
-              { title: 'جدول المرضى', path: '/project/projects/Medical-Services/patients' },
-              { title: 'جدول المعايير', path: '/project/projects/Medical-Services/criteria' },
+              { title: 'جدول الأقسام', path: '/project/projects/Medical-Services/department' },
+              { title: 'جدول الخدمات', path: '/project/projects/Medical-Services/service' },
+              { title: 'جدول الاطباء', path: '/project/projects/Medical-Services/doctors' },
               { title: 'جدول الصيدليات', path: '/project/projects/Medical-Services/pharmacies' },
-              { title: 'جدول مدير المستشفى', path: '/project/projects/Medical-Services/hospital-manager' },
-              { title: 'جدول العروض', path: '/project/projects/Medical-Services/offers' },
-              { title: 'طلبات الرعاية الطبية', path: '/project/projects/Medical-Services/Medical-care' },
             ],
           },
 
@@ -60,6 +60,7 @@ export const MENU_SIDEBAR: MenuConfig = [
               { title: 'التوزيعات المؤسساتية', path: '/project/projects/food-water/Distributions' },
               { title: 'المنتجات', path: '/project/projects/food-water/products' },
                { title: 'المستفيد', path: '/project/projects/food-water/beneficiaries' },
+               
 
 
 

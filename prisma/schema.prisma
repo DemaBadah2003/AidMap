@@ -163,29 +163,27 @@ model Supervisor {
   @@index([status])
 }
 
-// --- قسم المستشفيات والخدمات الطبية (الـ 7 جداول الجديدة) ---
+// --- قسم المستشفيات والخدمات الطبية المحدث ---
 
 model Hospital {
   id        String       @id @default(uuid())
-  type      HospitalType // خاص، وكالة، حكومية
+  type      HospitalType
   name      String
-  region    Region // شرق، غرب، شمال، جنوب
+  region    Region
   location  String
   phone     String
   latitude  Decimal?     @db.Decimal(10, 7)
   longitude Decimal?     @db.Decimal(10, 7)
-  placeId   String?      @unique
 
-  // العلاقات
-  manager    HospitalManager?
-  doctors    Doctor[]
-  patients   Patient[]
-  pharmacies Pharmacy[]
-  offers     Offer[]
-  standards  HospitalStandard[]
-  place      Place?             @relation("HospitalPlace", fields: [placeId], references: [id])
+  placeId String? @unique
+  place   Place?  @relation("HospitalPlace", fields: [placeId], references: [id])
 
-  // لضمان التوافق مع جداول التوزيع السابقة
+  departments Department[]
+  doctors     Doctor[]
+  patients    Patient[]
+  pharmacies  Pharmacy[]
+  addresses   Address[]
+
   distributions Distribution[]
 
   createdAt DateTime @default(now())
@@ -195,53 +193,46 @@ model Hospital {
   @@index([region])
 }
 
+model Department {
+  id   String @id @default(uuid())
+  name String
+
+  hospitalId String
+  hospital   Hospital @relation(fields: [hospitalId], references: [id])
+
+  services Service[]
+  doctors  Doctor[]
+
+  createdAt DateTime @default(now())
+}
+
+model Service {
+  id          String  @id @default(uuid())
+  name        String
+  price       Float   @default(0.0)
+  isAvailable Boolean @default(true)
+
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+
+  institutionServices InstitutionService[]
+
+  createdAt DateTime @default(now())
+}
+
 model Doctor {
   id          String  @id @default(uuid())
   name        String
-  specialty   String
   phone       String
-  schedule    String // مواعيد
+  specialty   String
   description String? @db.Text
 
-  hospitalId String
-  hospital   Hospital  @relation(fields: [hospitalId], references: [id])
+  hospitalId   String
+  hospital     Hospital    @relation(fields: [hospitalId], references: [id])
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
 
   createdAt DateTime @default(now())
-}
-
-model HospitalManager {
-  id       String @id @default(uuid())
-  name     String
-  email    String @unique
-  password String
-  phone    String
-
-  hospitalId String   @unique
-  hospital   Hospital @relation(fields: [hospitalId], references: [id])
-}
-
-model Offer {
-  id       String @id @default(uuid())
-  title    String
-  discount Float
-  oldPrice Float
-  newPrice Float
-
-  hospitalId String
-  hospital   Hospital @relation(fields: [hospitalId], references: [id])
-
-  createdAt DateTime @default(now())
-}
-
-model HospitalStandard {
-  id            String  @id @default(uuid())
-  choseStandard String
-  title         String
-  details       String  @db.Text
-  cover         String?
-
-  hospitalId String
-  hospital   Hospital @relation(fields: [hospitalId], references: [id])
 }
 
 model Patient {
@@ -250,8 +241,6 @@ model Patient {
   phone       String
   diseaseType String
 
-  doctorId   String
-  doctor     Doctor   @relation(fields: [doctorId], references: [id])
   hospitalId String
   hospital   Hospital @relation(fields: [hospitalId], references: [id])
 
@@ -267,6 +256,20 @@ model Pharmacy {
 
   hospitalId String
   hospital   Hospital @relation(fields: [hospitalId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model Address {
+  id          String  @id @default(uuid())
+  title       String
+  description String?
+
+  hospitalId String?
+  hospital   Hospital? @relation(fields: [hospitalId], references: [id])
+
+  campId String?
+  camp   Camps?  @relation(fields: [campId], references: [id])
 
   createdAt DateTime @default(now())
 }
@@ -347,13 +350,13 @@ model Distribution {
   quantity      Int                @default(0)
   status        DistributionStatus @default(PENDING)
   aidId         String?
-  hospitalId    String? // بدلاً من clinicId القديم
+  hospitalId    String?
   placeId       String?
   aid           Aid?               @relation(fields: [aidId], references: [id])
   beneficiary   Beneficiary?       @relation(fields: [beneficiaryId], references: [id])
   hospital      Hospital?          @relation(fields: [hospitalId], references: [id])
   institution   Institution        @relation(fields: [institutionId], references: [id])
-  place         Place?             @relation(fields: [placeId], references: [id])
+  place         Place?             @relation("PlaceDistribution", fields: [placeId], references: [id])
   product       Product?           @relation(fields: [productId], references: [id])
 }
 
@@ -367,13 +370,6 @@ model Product {
   distributions       Distribution[]
   enterpriseProducts  EnterpriseProduct[]
   institutionProducts InstitutionProduct[]
-}
-
-model Service {
-  id                  String               @id @default(uuid())
-  serviceType         String
-  status              GeneralStatus        @default(ACTIVE)
-  institutionServices InstitutionService[]
 }
 
 model InstitutionService {
@@ -417,11 +413,11 @@ model Place {
   statusText    String?
 
   camp        Camps?       @relation("CampPlace")
-  hospital    Hospital?    @relation("HospitalPlace") // تم الربط بالمستشفى هنا
+  hospital    Hospital?    @relation("HospitalPlace")
   shelter     Shelter?     @relation("ShelterPlace")
   institution Institution? @relation("InstitutionPlace")
 
-  distributions Distribution[]
+  distributions Distribution[] @relation("PlaceDistribution")
 
   @@index([type])
   @@index([status])
@@ -429,8 +425,6 @@ model Place {
   @@index([isTrashed])
   @@index([name])
 }
-
-// --- باقي الجداول (Logs, Sessions, الخ) ---
 
 model Session {
   id           String   @id @default(cuid())
@@ -471,16 +465,6 @@ model Contact {
   @@index([institutionId])
 }
 
-model Address {
-  id        String   @id @default(uuid())
-  location  String?
-  area      String?
-  campId    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  camp      Camps    @relation(fields: [campId], references: [id], onDelete: Cascade)
-}
-
 model Emergency {
   id            String          @id @default(uuid())
   emergencyType String
@@ -513,17 +497,17 @@ model VerificationToken {
 
 model SystemSetting {
   id                             String   @id @default(uuid())
-  name                           String   @default("My Company")
+  name                           String   @default("AidMap")
   logo                           String?
   active                         Boolean  @default(true)
   address                        String?
   websiteURL                     String?
   supportEmail                   String?
   supportPhone                   String?
-  language                       String   @default("en")
-  timezone                       String   @default("UTC")
-  currency                       String   @default("USD")
-  currencyFormat                 String   @default("$ {value}")
+  language                       String   @default("ar")
+  timezone                       String   @default("Asia/Gaza")
+  currency                       String   @default("ILS")
+  currencyFormat                 String   @default("₪ {value}")
   socialFacebook                 String?
   socialTwitter                  String?
   socialInstagram                String?
