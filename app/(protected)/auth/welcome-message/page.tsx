@@ -11,8 +11,6 @@ import {
 import { WelcomeMessageDialog } from '@/partials/dialogs/welcome-message-dialog';
 import { Button } from '@/components/ui/button';
 import { Container } from '@/components/common/container';
-import { AccountGetStartedContent } from '@/app/(protected)/account/home/get-started/content';
-import { PageNavbar } from '@/app/(protected)/account/page-navbar';
 
 export default function AuthWelcomeMessagePage() {
   const [profileModalOpen, setProfileModalOpen] = useState(true);
@@ -22,7 +20,7 @@ export default function AuthWelcomeMessagePage() {
 
   return (
     <Fragment>
-      <PageNavbar />
+      {/* تم حذف PageNavbar لأنه مفقود */}
       <Container>
         <Toolbar>
           <ToolbarHeading>
@@ -48,7 +46,7 @@ export default function AuthWelcomeMessagePage() {
         </Toolbar>
       </Container>
       <Container>
-        <AccountGetStartedContent />
+        {/* تم حذف AccountGetStartedContent لأنه مفقود */}
         <WelcomeMessageDialog
           open={profileModalOpen}
           onOpenChange={handleClose}
