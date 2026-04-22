@@ -31,17 +31,18 @@ function normalizeEnterpriseProduct(item: any) {
     availability: toUiAvailability(item.availability),
     institution: item.institution ? {
       ...item.institution,
-      nameAr: item.institution.nameAr || item.institution.name || 'غير مسمى'
+      name: item.institution.name || 'غير مسمى'
     } : null,
     product: item.product ? {
       ...item.product,
-      nameAr: item.product.nameAr || item.product.name || 'غير مسمى'
+      nameAr: item.product.nameAr || 'غير مسمى'
     } : null,
   }
 }
 
 export async function GET(req: NextRequest) {
   try {
+    // تم التأكد أن الاسم هو enterpriseProduct كما في السكيما
     const items = await prisma.enterpriseProduct.findMany({
       orderBy: { id: 'desc' },
       include: { institution: true, product: true },
@@ -75,8 +76,11 @@ export async function PUT(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ message: 'ID مفقود' }, { status: 400 })
+  
   try {
     const body = await req.json()
+    
+    // ملاحظة: هنا قمنا باستخدام enterpriseProduct وليس products
     const updated = await prisma.enterpriseProduct.update({
       where: { id },
       data: {
