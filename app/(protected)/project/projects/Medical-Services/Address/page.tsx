@@ -27,7 +27,7 @@ type AddressData = {
   region: string    
 }
 
-const BASE_URL = '/api/project/Medical-Services/addresses'
+const BASE_URL = '/api/project/Medical-Services/Address'
 
 export default function AddressesPage() {
   const [items, setItems] = useState<AddressData[]>([])

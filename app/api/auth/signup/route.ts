@@ -1,146 +1,119 @@
-// pages/api/auth/signup.ts
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
 import prisma from '@/lib/prisma';
-// import { verifyRecaptchaToken } from '@/lib/recaptcha';
 import { sendEmail } from '@/services/send-email';
 import {
   getSignupSchema,
   SignupSchemaType,
 } from '@/app/(auth)/forms/signup-schema';
-import { User, UserStatus } from '@/app/models/user';
 
-// Helper function to generate a verification token and send the email.
-async function sendVerificationEmail(user: User) {
-  // Create a new verification token.
+// دالة محسنة لإرسال إيميل التفعيل
+async function sendVerificationEmail(userId: string, userEmail: string, userName: string) {
+  // إنشاء توكن عشوائي آمن (أفضل من الهاش الذي يحتوي على رموز غريبة)
+  const tokenString = Math.random().toString(36).substring(2) + Date.now().toString(36);
+
   const token = await prisma.verificationToken.create({
     data: {
-      identifier: user.id,
-      token: bcrypt.hashSync(user.id, 10),
-      expires: new Date(Date.now() + 1 * 60 * 60 * 1000), // 1 hour from now
+      identifier: userId,
+      token: tokenString,
+      expires: new Date(Date.now() + 1 * 60 * 60 * 1000), // ساعة واحدة
     },
   });
 
-  // Construct the verification URL.
-  const verificationUrl = `${process.env.NEXTAUTH_URL}/verify-email?token=${token.token}`;
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  const verificationUrl = `${baseUrl}/verify-email?token=${token.token}`;
 
-  // Send the verification email.
   await sendEmail({
-    to: user.email,
-    subject: 'Account Activation',
+    to: userEmail,
+    subject: 'تفعيل الحساب - نظام الإغاثة',
     content: {
-      title: `Hello, ${user.name}`,
-      subtitle:
-        'Click the below link to verify your email address and activate your account.',
-      buttonLabel: 'Activate account',
+      title: `أهلاً بك، ${userName}`,
+      subtitle: 'يرجى الضغط على الزر أدناه لتفعيل حسابك والبدء في استخدام النظام.',
+      buttonLabel: 'تفعيل الحساب',
       buttonUrl: verificationUrl,
-      description:
-        'This link is valid for 1 hour. If you did not request this email you can safely ignore it.',
+      description: 'هذا الرابط صالح لمدة ساعة واحدة فقط. إذا لم تطلب هذا التسجيل، يمكنك تجاهل الرسالة.',
     },
   });
 }
 
 export async function POST(req: NextRequest) {
   try {
-    // const recaptchaToken = req.headers.get('x-recaptcha-token');
-
-    // if (!recaptchaToken) {
-    //   return NextResponse.json(
-    //     { message: 'reCAPTCHA verification required' },
-    //     { status: 400 },
-    //   );
-    // }
-
-    // const isValidToken = await verifyRecaptchaToken(recaptchaToken);
-
-    // if (!isValidToken) {
-    //   return NextResponse.json(
-    //     { message: 'reCAPTCHA verification failed' },
-    //     { status: 400 },
-    //   );
-    // }
-
-    // Parse the request body as JSON.
     const body = await req.json();
 
-    // Validate the data using safeParse.
+    // 1. التحقق من صحة البيانات باستخدام Zod
     const result = getSignupSchema().safeParse(body);
     if (!result.success) {
       return NextResponse.json(
-        {
-          message: 'Invalid input. Please check your data and try again.',
-        },
-        { status: 400 },
+        { message: 'البيانات المدخلة غير صالحة. يرجى التأكد من الحقول.' },
+        { status: 400 }
       );
     }
 
     const { email, password, name }: SignupSchemaType = result.data;
 
-    // Check if a user with the given email already exists.
+    // 2. التحقق من وجود المستخدم
     const existingUser = await prisma.user.findUnique({
       where: { email },
-      include: { role: true },
     });
 
     if (existingUser) {
-      if (existingUser.status === UserStatus.INACTIVE) {
-        // Resend verification email for inactive user.
-        await prisma.verificationToken.deleteMany({
-          where: { identifier: existingUser.id },
-        });
-        await sendVerificationEmail(existingUser);
+      if (existingUser.status === 'INACTIVE') {
+        // إذا كان الحساب موجوداً ولكنه غير مفعل، نحذف التوكنات القديمة ونرسل واحداً جديداً
+        await prisma.verificationToken.deleteMany({ where: { identifier: existingUser.id } });
+        await sendVerificationEmail(existingUser.id, existingUser.email, existingUser.name || 'مستخدم');
         return NextResponse.json(
-          { message: 'Verification email resent. Please check your email.' },
-          { status: 200 },
-        );
-      } else {
-        // User exists and is active.
-        return NextResponse.json(
-          { message: 'Email is already registered.' },
-          { status: 409 },
+          { message: 'هذا الحساب موجود مسبقاً ولكنه غير مفعل. تم إعادة إرسال بريد التفعيل.' },
+          { status: 200 }
         );
       }
+      return NextResponse.json({ message: 'هذا البريد الإلكتروني مسجل مسبقاً.' }, { status: 409 });
     }
 
+    // 3. جلب الـ Role الافتراضي (المواطن)
     const defaultRole = await prisma.userRole.findFirst({
       where: { isDefault: true },
     });
 
     if (!defaultRole) {
-      throw new Error('Default role not found. Unable to create a new user.');
+      console.error("Critical Error: No default role found in database.");
+      return NextResponse.json(
+        { message: 'خطأ في إعدادات النظام: لم يتم العثور على الصلاحيات الافتراضية.' },
+        { status: 500 }
+      );
     }
-    console.log('Default role found:', defaultRole.name);
 
-    // Hash the password.
+    // 4. تشفير كلمة المرور
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create a new user with INACTIVE status.
+    // 5. إنشاء المستخدم في قاعدة البيانات
     const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         name,
-        status: UserStatus.INACTIVE,
+        status: 'INACTIVE',
         roleId: defaultRole.id,
       },
-      include: { role: true },
     });
 
-    // Send the verification email.
-    await sendVerificationEmail(user);
+    // 6. إرسال بريد التفعيل
+    try {
+      await sendVerificationEmail(user.id, user.email, user.name || 'مستخدم');
+    } catch (emailError) {
+      console.error("Email sending failed:", emailError);
+      // لا نوقف العملية هنا، المستخدم أُنشئ بالفعل ويمكنه طلب إعادة الإرسال لاحقاً
+    }
 
     return NextResponse.json(
-      {
-        message:
-          'Registration successful. Check your email to verify your account.',
-      },
-      { status: 200 },
+      { message: 'تم التسجيل بنجاح! يرجى مراجعة بريدك الإلكتروني لتفعيل الحساب.' },
+      { status: 200 }
     );
-  } catch (error) {
-    console.error('Error during user registration:', error);
+
+  } catch (error: any) {
+    console.error('Registration Error:', error);
     return NextResponse.json(
-      { message: 'Registration failed. Please try again later.' },
-      { status: 500 },
+      { message: 'حدث خطأ داخلي أثناء التسجيل. يرجى المحاولة لاحقاً.' },
+      { status: 500 }
     );
   }
 }
