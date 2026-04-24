@@ -50,7 +50,6 @@ export default function Page() {
       setIsProcessing(true);
       setStatusInfo(null);
 
-      // استخدام fetch مباشر لضمان عدم وجود undefined في الرابط
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,7 +62,6 @@ export default function Page() {
         setStatusInfo({ type: 'error', message: data.message || 'فشل التسجيل' });
       } else {
         setStatusInfo({ type: 'success', message: data.message });
-        // تأخير التوجيه قليلاً ليتمكن المستخدم من قراءة الرسالة
         setTimeout(() => router.push('/signin'), 3000);
       }
     } catch (err) {
@@ -105,14 +103,13 @@ export default function Page() {
 
               {/* تنبيهات النجاح والفشل */}
               {statusInfo && (
-                <Alert variant={statusInfo.type === 'error' ? "destructive" : "success"} className={statusInfo.type === 'success' ? "border-green-500 bg-green-50 text-green-700" : ""}>
+                <Alert variant={statusInfo.type === 'error' ? "destructive" : undefined} className={statusInfo.type === 'success' ? "border-green-500 bg-green-50 text-green-700" : ""}>
                   {statusInfo.type === 'error' ? <AlertCircle className="size-4" /> : <CheckCircle2 className="size-4 text-green-600" />}
                   <AlertTitle>{statusInfo.type === 'error' ? 'تنبيه' : 'تم بنجاح'}</AlertTitle>
                   <AlertDescription>{statusInfo.message}</AlertDescription>
                 </Alert>
               )}
 
-              {/* حقول الإدخال */}
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem className="space-y-1.5">
                   <FormLabel className="text-sm font-semibold text-gray-700">الاسم الكامل</FormLabel>
