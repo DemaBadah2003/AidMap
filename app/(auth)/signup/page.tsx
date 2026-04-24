@@ -100,17 +100,25 @@ export default function Page() {
                   <span className="bg-white px-3 text-gray-400">أو عبر البريد</span>
                 </div>
               </div>
-
-              {/* تنبيهات النجاح والفشل */}
-              {statusInfo && (
-                <Alert variant={statusInfo.type === 'error' ? "destructive" : undefined} className={statusInfo.type === 'success' ? "border-green-500 bg-green-50 text-green-700" : ""}>
-                  {statusInfo.type === 'error' ? <AlertCircle className="size-4" /> : <CheckCircle2 className="size-4 text-green-600" />}
-                  <AlertTitle>{statusInfo.type === 'error' ? 'تنبيه' : 'تم بنجاح'}</AlertTitle>
-                  <AlertDescription>{statusInfo.message}</AlertDescription>
-                </Alert>
-              )}
-
-              <FormField control={form.control} name="name" render={({ field }) => (
+{/* تنبيهات النجاح والفشل */}
+{statusInfo && (
+  <Alert 
+    variant={statusInfo.type === 'error' ? "destructive" : "secondary"} 
+    className={statusInfo.type === 'error' ? "border-destructive text-destructive" : "border-muted-foreground"}
+  >
+    {statusInfo.type === 'error' ? (
+      <AlertCircle className="size-4" />
+    ) : (
+      <CheckCircle2 className="size-4" />
+    )}
+    <AlertTitle>
+      {statusInfo.type === 'error' ? 'تنبيه' : 'تم بنجاح'}
+    </AlertTitle>
+    <AlertDescription>
+      {statusInfo.message}
+    </AlertDescription>
+  </Alert>
+)}              <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem className="space-y-1.5">
                   <FormLabel className="text-sm font-semibold text-gray-700">الاسم الكامل</FormLabel>
                   <FormControl><Input placeholder="أحمد محمد" className="h-12" {...field} /></FormControl>

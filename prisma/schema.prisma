@@ -6,24 +6,20 @@ datasource db {
   provider = "postgresql"
 }
 
-// --- قسم المستخدمين والصلاحيات ---
-
 model User {
-  id        String     @id @default(uuid())
-  email     String     @unique
-  password  String?
-  name      String?
-  roleId    String
-  status    UserStatus @default(INACTIVE)
-  isTrashed Boolean    @default(false)
-  role      UserRole   @relation(fields: [roleId], references: [id])
-
+  id              String      @id @default(uuid())
+  email           String      @unique
+  password        String?
   country         String?
   timezone        String?
+  name            String?
+  roleId          String
+  status          UserStatus  @default(INACTIVE)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   lastSignInAt    DateTime?
   emailVerifiedAt DateTime?
+  isTrashed       Boolean     @default(false)
   avatar          String?
   invitedByUserId String?
   isProtected     Boolean     @default(false)
@@ -32,6 +28,7 @@ model User {
   accounts        Account[]
   Session         Session[]
   systemLog       SystemLog[]
+  role            UserRole    @relation(fields: [roleId], references: [id])
 
   @@index([invitedByUserId])
   @@index([roleId])
@@ -91,25 +88,22 @@ model Account {
   @@unique([provider, providerAccountId], name: "provider_providerAccountId")
 }
 
-// --- قسم الإيواء والمخيمات ---
-
 model Shelter {
   id            String         @id @default(uuid())
-  name          String
-  area          String
-  phone         String
-  familiesCount Int            @default(0)
-  capacity      Int            @default(0)
-  fillStatus    CampFillStatus @default(NOT_FULL)
   supervisorId  String
-  placeId       String?        @unique
+  name          String
+  capacity      Int            @default(0)
+  area          String
   createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  isTrashed     Boolean        @default(false)
+  familiesCount Int            @default(0)
+  fillStatus    CampFillStatus @default(NOT_FULL)
   isProtected   Boolean        @default(false)
-
-  supervisor Supervisor @relation(fields: [supervisorId], references: [id])
-  place      Place?     @relation("ShelterPlace", fields: [placeId], references: [id])
+  isTrashed     Boolean        @default(false)
+  phone         String
+  placeId       String?        @unique
+  updatedAt     DateTime       @updatedAt
+  place         Place?         @relation("ShelterPlace", fields: [placeId], references: [id])
+  supervisor    Supervisor     @relation(fields: [supervisorId], references: [id])
 
   @@index([supervisorId])
   @@index([fillStatus])
@@ -126,23 +120,19 @@ model Camps {
   capacity             Int            @default(0)
   currentFamiliesCount Int            @default(0)
   status               CampFillStatus @default(NOT_FULL)
-
-  latitude  Decimal? @db.Decimal(10, 7)
-  longitude Decimal? @db.Decimal(10, 7)
-
-  supervisorId String?
-  placeId      String? @unique
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  isTrashed   Boolean  @default(false)
-  isProtected Boolean  @default(false)
-
-  addresses     Address[]
-  beneficiaries Beneficiary[]
-  place         Place?        @relation("CampPlace", fields: [placeId], references: [id])
-  supervisor    Supervisor?   @relation(fields: [supervisorId], references: [id])
-  emergencies   Emergency[]
+  latitude             Decimal?       @db.Decimal(10, 7)
+  longitude            Decimal?       @db.Decimal(10, 7)
+  supervisorId         String?
+  placeId              String?        @unique
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  isTrashed            Boolean        @default(false)
+  isProtected          Boolean        @default(false)
+  addresses            Address[]
+  beneficiaries        Beneficiary[]
+  place                Place?         @relation("CampPlace", fields: [placeId], references: [id])
+  supervisor           Supervisor?    @relation(fields: [supervisorId], references: [id])
+  emergencies          Emergency[]
 
   @@index([supervisorId])
   @@index([status])
@@ -152,146 +142,122 @@ model Supervisor {
   id          String        @id @default(uuid())
   name        String
   phone       String?
-  status      GeneralStatus @default(ACTIVE)
   createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  isTrashed   Boolean       @default(false)
   isProtected Boolean       @default(false)
+  isTrashed   Boolean       @default(false)
+  status      GeneralStatus @default(ACTIVE)
+  updatedAt   DateTime      @updatedAt
   camps       Camps[]
-  shelters    Shelter[]
   emergencies Emergency[]
+  shelters    Shelter[]
 
   @@index([status])
 }
 
-// --- قسم المستشفيات والخدمات الطبية المحدث ---
-
 model Hospital {
-  id        String       @id @default(uuid())
-  type      HospitalType
-  name      String
-  region    Region
-  location  String
-  phone     String
-  latitude  Decimal?     @db.Decimal(10, 7)
-  longitude Decimal?     @db.Decimal(10, 7)
-
-  placeId String? @unique
-  place   Place?  @relation("HospitalPlace", fields: [placeId], references: [id])
-
-  departments Department[]
-  doctors     Doctor[]
-  patients    Patient[]
-  pharmacies  Pharmacy[]
-  addresses   Address[]
-
+  id            String         @id @default(uuid())
+  type          HospitalType
+  name          String
+  region        Region
+  location      String
+  phone         String
+  latitude      Decimal?       @db.Decimal(10, 7)
+  longitude     Decimal?       @db.Decimal(10, 7)
+  placeId       String?        @unique
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  addresses     Address[]
+  departments   Department[]
   distributions Distribution[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  doctors       Doctor[]
+  place         Place?         @relation("HospitalPlace", fields: [placeId], references: [id])
+  patients      Patient[]
+  pharmacies    Pharmacy[]
 
   @@index([type])
   @@index([region])
 }
 
 model Department {
-  id   String @id @default(uuid())
-  name String
-
+  id         String    @id @default(uuid())
+  name       String
   hospitalId String
-  hospital   Hospital @relation(fields: [hospitalId], references: [id])
-
-  services Service[]
-  doctors  Doctor[]
-
-  createdAt DateTime @default(now())
+  createdAt  DateTime  @default(now())
+  hospital   Hospital  @relation(fields: [hospitalId], references: [id])
+  doctors    Doctor[]
+  services   Service[]
 }
 
 model Service {
-  id          String  @id @default(uuid())
-  name        String
-  price       Float   @default(0.0)
-  isAvailable Boolean @default(true)
-
-  departmentId String
-  department   Department @relation(fields: [departmentId], references: [id])
-
+  id                  String               @id @default(uuid())
+  createdAt           DateTime             @default(now())
+  departmentId        String
+  isAvailable         Boolean              @default(true)
+  name                String
+  price               Float                @default(0.0)
   institutionServices InstitutionService[]
-
-  createdAt DateTime @default(now())
+  department          Department           @relation(fields: [departmentId], references: [id])
 }
 
 model Doctor {
-  id          String  @id @default(uuid())
-  name        String
-  phone       String
-  specialty   String
-  description String? @db.Text
-
+  id           String      @id @default(uuid())
+  name         String
+  phone        String
+  specialty    String
+  description  String?
   hospitalId   String
-  hospital     Hospital    @relation(fields: [hospitalId], references: [id])
   departmentId String?
+  createdAt    DateTime    @default(now())
   department   Department? @relation(fields: [departmentId], references: [id])
-
-  createdAt DateTime @default(now())
+  hospital     Hospital    @relation(fields: [hospitalId], references: [id])
 }
 
 model Patient {
-  id          String @id @default(uuid())
+  id          String   @id @default(uuid())
   name        String
   phone       String
   diseaseType String
-
-  hospitalId String
-  hospital   Hospital @relation(fields: [hospitalId], references: [id])
-
-  createdAt DateTime @default(now())
+  hospitalId  String
+  createdAt   DateTime @default(now())
+  hospital    Hospital @relation(fields: [hospitalId], references: [id])
 }
 
 model Pharmacy {
-  id              String  @id @default(uuid())
+  id              String   @id @default(uuid())
   name            String
   phone           String
-  availableMeds   String? @db.Text
-  unavailableMeds String? @db.Text
-
-  hospitalId String
-  hospital   Hospital @relation(fields: [hospitalId], references: [id])
-
-  createdAt DateTime @default(now())
+  availableMeds   String?
+  unavailableMeds String?
+  hospitalId      String
+  createdAt       DateTime @default(now())
+  hospital        Hospital @relation(fields: [hospitalId], references: [id])
 }
 
 model Address {
-  id          String  @id @default(uuid())
-  title       String
+  id          String    @id @default(uuid())
+  campId      String?
+  createdAt   DateTime  @default(now())
   description String?
-
-  hospitalId String?
-  hospital   Hospital? @relation(fields: [hospitalId], references: [id])
-
-  campId String?
-  camp   Camps?  @relation(fields: [campId], references: [id])
-
-  createdAt DateTime @default(now())
+  hospitalId  String?
+  title       String
+  camp        Camps?    @relation(fields: [campId], references: [id])
+  hospital    Hospital? @relation(fields: [hospitalId], references: [id])
 }
 
-// --- قسم المؤسسات والمنتجات ---
-
 model Institution {
-  id          String         @id @default(uuid())
-  name        String
-  email       String?
-  serviceType String?
-  presence    PresenceStatus @default(AVAILABLE)
-  status      GeneralStatus  @default(ACTIVE)
-  latitude    Decimal?       @db.Decimal(10, 7)
-  longitude   Decimal?       @db.Decimal(10, 7)
-  placeId     String?        @unique
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  isTrashed   Boolean        @default(false)
-  isProtected Boolean        @default(false)
-
+  id                  String               @id @default(uuid())
+  name                String
+  email               String?
+  createdAt           DateTime             @default(now())
+  isProtected         Boolean              @default(false)
+  isTrashed           Boolean              @default(false)
+  latitude            Decimal?             @db.Decimal(10, 7)
+  longitude           Decimal?             @db.Decimal(10, 7)
+  placeId             String?              @unique
+  presence            PresenceStatus       @default(AVAILABLE)
+  serviceType         String?
+  status              GeneralStatus        @default(ACTIVE)
+  updatedAt           DateTime             @updatedAt
   contacts            Contact[]
   distributions       Distribution[]
   enterpriseProducts  EnterpriseProduct[]
@@ -345,14 +311,14 @@ model Aid {
 
 model Distribution {
   id            String             @id @default(uuid())
-  beneficiaryId String?
   institutionId String
-  productId     String?
   quantity      Int                @default(0)
-  status        DistributionStatus @default(PENDING)
   aidId         String?
+  beneficiaryId String?
   hospitalId    String?
   placeId       String?
+  productId     String?
+  status        DistributionStatus @default(PENDING)
   aid           Aid?               @relation(fields: [aidId], references: [id])
   beneficiary   Beneficiary?       @relation(fields: [beneficiaryId], references: [id])
   hospital      Hospital?          @relation(fields: [hospitalId], references: [id])
@@ -362,12 +328,11 @@ model Distribution {
 }
 
 model Product {
-  id       String        @id @default(uuid())
-  nameAr   String
-  price    Float         @default(0)
-  quantity Int           @default(0)
-  status   ProductStatus @default(GHAIR_MOJOUD)
-
+  id                  String               @id @default(uuid())
+  nameAr              String
+  price               Float                @default(0)
+  quantity            Int                  @default(0)
+  status              ProductStatus        @default(GHAIR_MOJOUD)
   distributions       Distribution[]
   enterpriseProducts  EnterpriseProduct[]
   institutionProducts InstitutionProduct[]
@@ -395,30 +360,28 @@ model InstitutionProduct {
 }
 
 model Place {
-  id            String      @id @default(uuid())
+  id            String         @id @default(uuid())
   name          String
   type          PlaceType
   description   String?
-  latitude      Decimal     @db.Decimal(10, 7)
-  longitude     Decimal     @db.Decimal(10, 7)
-  status        PlaceStatus @default(AVAILABLE)
-  isActive      Boolean     @default(true)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  isTrashed     Boolean     @default(false)
-  isProtected   Boolean     @default(false)
+  latitude      Decimal        @db.Decimal(10, 7)
+  longitude     Decimal        @db.Decimal(10, 7)
+  status        PlaceStatus    @default(AVAILABLE)
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  isTrashed     Boolean        @default(false)
+  isProtected   Boolean        @default(false)
   operator      String?
   capacity      Int?
   occupancy     Int?
   availableBeds Int?
   statusText    String?
-
-  camp        Camps?       @relation("CampPlace")
-  hospital    Hospital?    @relation("HospitalPlace")
-  shelter     Shelter?     @relation("ShelterPlace")
-  institution Institution? @relation("InstitutionPlace")
-
+  camp          Camps?         @relation("CampPlace")
   distributions Distribution[] @relation("PlaceDistribution")
+  hospital      Hospital?      @relation("HospitalPlace")
+  institution   Institution?   @relation("InstitutionPlace")
+  shelter       Shelter?       @relation("ShelterPlace")
 
   @@index([type])
   @@index([status])
@@ -452,15 +415,14 @@ model SystemLog {
 
 model Contact {
   id            String        @id @default(uuid())
-  beneficiaryId String
   institutionId String
   type          String?
+  beneficiaryId String
   date          DateTime      @default(now())
-  notes         String?       @db.Text
+  notes         String?
   status        ContactStatus @default(NOT_DONE)
-
-  beneficiary Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
-  institution Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  beneficiary   Beneficiary   @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  institution   Institution   @relation(fields: [institutionId], references: [id], onDelete: Cascade)
 
   @@index([beneficiaryId])
   @@index([institutionId])
@@ -468,12 +430,12 @@ model Contact {
 
 model Emergency {
   id            String          @id @default(uuid())
-  emergencyType String
   description   String?
-  status        EmergencyStatus @default(NEW)
-  level         EmergencyLevel  @default(MEDIUM)
   campId        String
+  emergencyType String
+  level         EmergencyLevel  @default(MEDIUM)
   supervisorId  String
+  status        EmergencyStatus @default(NEW)
   camp          Camps           @relation(fields: [campId], references: [id], onDelete: Cascade)
   supervisor    Supervisor      @relation(fields: [supervisorId], references: [id])
 }
@@ -499,38 +461,38 @@ model VerificationToken {
 model SystemSetting {
   id                             String   @id @default(uuid())
   name                           String   @default("AidMap")
-  logo                           String?
-  active                         Boolean  @default(true)
-  address                        String?
-  websiteURL                     String?
-  supportEmail                   String?
-  supportPhone                   String?
   language                       String   @default("ar")
   timezone                       String   @default("Asia/Gaza")
+  active                         Boolean  @default(true)
+  address                        String?
   currency                       String   @default("ILS")
   currencyFormat                 String   @default("₪ {value}")
+  logo                           String?
+  notifyNewOrderEmail            Boolean  @default(true)
+  notifyNewOrderRoleIds          String[]
+  notifyNewOrderWeb              Boolean  @default(true)
+  notifyOrderStatusUpdateEmail   Boolean  @default(true)
+  notifyOrderStatusUpdateRoleIds String[]
+  notifyOrderStatusUpdateWeb     Boolean  @default(true)
+  notifyPaymentFailureEmail      Boolean  @default(true)
+  notifyPaymentFailureRoleIds    String[]
+  notifyPaymentFailureWeb        Boolean  @default(true)
+  notifyStockEmail               Boolean  @default(true)
+  notifyStockRoleIds             String[]
+  notifyStockThreshold           Int      @default(10)
+  notifyStockWeb                 Boolean  @default(true)
+  notifySystemErrorFailureEmail  Boolean  @default(true)
+  notifySystemErrorRoleIds       String[]
+  notifySystemErrorWeb           Boolean  @default(true)
   socialFacebook                 String?
-  socialTwitter                  String?
   socialInstagram                String?
   socialLinkedIn                 String?
   socialPinterest                String?
+  socialTwitter                  String?
   socialYoutube                  String?
-  notifyStockEmail               Boolean  @default(true)
-  notifyStockWeb                 Boolean  @default(true)
-  notifyStockThreshold           Int      @default(10)
-  notifyStockRoleIds             String[]
-  notifyNewOrderEmail            Boolean  @default(true)
-  notifyNewOrderWeb              Boolean  @default(true)
-  notifyNewOrderRoleIds          String[]
-  notifyOrderStatusUpdateEmail   Boolean  @default(true)
-  notifyOrderStatusUpdateWeb     Boolean  @default(true)
-  notifyOrderStatusUpdateRoleIds String[]
-  notifyPaymentFailureEmail      Boolean  @default(true)
-  notifyPaymentFailureWeb        Boolean  @default(true)
-  notifyPaymentFailureRoleIds    String[]
-  notifySystemErrorFailureEmail  Boolean  @default(true)
-  notifySystemErrorWeb           Boolean  @default(true)
-  notifySystemErrorRoleIds       String[]
+  supportEmail                   String?
+  supportPhone                   String?
+  websiteURL                     String?
 }
 
 model DistributeAidForm {
@@ -564,8 +526,6 @@ model RequestAid {
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 }
-
-// --- Enums ---
 
 enum UserStatus {
   INACTIVE

@@ -11,176 +11,115 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Pencil, Plus, Search, Loader2, MapPin, Map, Check, X, Compass, Navigation, Building2 } from 'lucide-react'
+import { Pencil, Plus, Search, Loader2, AlertCircle } from 'lucide-react'
 
-// توزيع المناطق حسب الموقع الجغرافي (سنبقيها للاستخدام في الموقع فقط)
-const REGIONS_BY_LOCATION: Record<string, string[]> = {
+const REGIONS_DATA: Record<string, string[]> = {
   'شمال': ['جباليا', 'بيت لاهيا', 'بيت حانون'],
   'جنوب': ['رفح', 'خانيونس', 'القرارة'],
-  'شرق': ['الشجاعية', 'الزيتون', 'التفاح', 'الدرج'],
-  'غرب': ['الشيخ رضوان', 'الرمال', 'النصر', 'تل الهوى', 'مخيم الشاطئ']
-}
-
-type AddressData = {
-  id: string
-  location: string 
-  region: string    
+  'وسط': ['دير البلح', 'النصيرات', 'البريج'],
+  'شرق': ['الشجاعية', 'الزيتون', 'التفاح'],
+  'غرب': ['الشيخ رضوان', 'النصر', 'الرمال']
 }
 
 const BASE_URL = '/api/project/Medical-Services/Address'
 
-export default function AddressesPage() {
-  const [items, setItems] = useState<AddressData[]>([])
-  const [loading, setLoading] = useState(true)
+export default function AddressPage() {
   const [q, setQ] = useState('')
+  const [items, setItems] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
+  
+  // مطابق للسكيما: title هو الموقع العام، description هو التفصيلي
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({
-    location: '',
-    region: ''
-  })
-
-  const fetchData = async () => {
+  const fetchItems = async () => {
     setLoading(true)
     try {
       const res = await fetch(BASE_URL)
       const data = await res.json()
-      setItems(data.addresses || [])
-    } catch (err) { console.error(err) }
-    finally { setLoading(false) }
+      setItems(Array.isArray(data) ? data : [])
+    } catch (err) { 
+      console.error(err)
+    } finally { setLoading(false) }
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchItems() }, [])
 
-  const filteredItems = useMemo(() => {
-    return items.filter(item => {
-      const search = q.toLowerCase();
-      return (
-        (item.location?.toLowerCase() || "").includes(search) ||
-        (item.region?.toLowerCase() || "").includes(search)
-      )
-    })
-  }, [items, q])
+  const isAddValid = title !== '' && description !== ''
 
-  const isFormValid = useMemo(() => {
-    return form.location && form.region
-  }, [form])
-
-  const onSave = async (id?: string) => {
-    if (!isFormValid) return
+  const onAdd = async () => {
+    if (!isAddValid) return
     setSubmitting(true)
     try {
-      const isEdit = !!id
-      const url = isEdit ? `${BASE_URL}?id=${id}` : BASE_URL
-      const method = isEdit ? 'PATCH' : 'POST'
-
-      const res = await fetch(url, {
-        method: method,
+      const res = await fetch(BASE_URL, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(isEdit ? { id, ...form } : form)
+        body: JSON.stringify({ title, description }) // إرسال مطابق للسكيما
       })
-
+      
       if (res.ok) {
-        await fetchData()
+        await fetchItems()
         setAddOpen(false)
-        setEditingId(null)
-        resetForm()
+        setTitle(''); setDescription('');
       }
     } finally { setSubmitting(false) }
   }
 
-  const startEdit = (item: AddressData) => {
-    setEditingId(item.id)
-    setForm({
-      location: item.location,
-      region: item.region
-    })
-  }
-
-  const resetForm = () => {
-    setForm({ location: '', region: '' })
-  }
+  const filtered = useMemo(() => {
+    return items.filter(item => 
+      !q || item.title?.includes(q) || item.description?.includes(q)
+    )
+  }, [q, items])
 
   return (
-    <div className="w-full px-4 py-8 sm:px-10" dir="rtl">
-      <div className="mb-8 text-right px-2 font-arabic">
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">إدارة المواقع والجهات</h1>
-        <p className="text-sm text-muted-foreground mt-1 text-blue-600 font-medium">مشروع AidMap - تنظيم النطاق الجغرافي</p>
+    <div className="w-full px-4 py-6" dir="rtl">
+      <div className="mb-6 text-right">
+        <h1 className="text-2xl font-bold text-slate-900">إدارة المواقع</h1>
+        <p className="text-sm text-slate-500 mt-1 font-normal">الرئيسية &gt; العناوين والمواقع</p>
       </div>
 
-      <Card className="border shadow-md bg-white rounded-xl overflow-hidden font-arabic">
+      <Card className="overflow-hidden border-slate-200 shadow-sm rounded-xl bg-white">
         <CardContent className="p-0">
-          <div className="p-5 border-b flex flex-col sm:flex-row items-center justify-between gap-6 bg-slate-50/50">
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث..." className="pr-9 text-right bg-white border-slate-200 rounded-lg" />
+          <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b">
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="ابحث..."
+                className="w-full pr-10 bg-slate-50 border-none h-10 rounded-lg text-sm"
+              />
             </div>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white font-bold gap-2 w-full sm:w-auto px-6 rounded-lg shadow-sm" 
-                    onClick={() => { setEditingId(null); resetForm(); setAddOpen(true); }}>
-              <Plus className="h-5 w-5" /> إضافة سجل جديد
+            <Button onClick={() => setAddOpen(true)} className="bg-blue-600 hover:bg-blue-700 mr-auto h-10 px-4 rounded-lg">
+              <Plus className="h-4 w-4 ml-2" /> إضافة موقع
             </Button>
           </div>
 
-          <div className="overflow-x-auto p-4">
-            <table className="w-full text-sm text-right border-separate border-spacing-y-2">
-              <thead>
-                <tr className="text-slate-500">
-                  <th className="px-4 py-3 font-semibold">الموقع</th>
-                  <th className="px-4 py-3 font-semibold">المنطقة</th>
-                  <th className="px-4 py-3 font-semibold text-center">إجراء</th>
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-sm">
+              <thead className="bg-slate-50/80 border-b border-slate-100">
+                <tr>
+                  <th className="p-4 text-slate-500 font-bold">الموقع العام (Title)</th>
+                  <th className="p-4 text-slate-500 font-bold">المنطقة (Description)</th>
+                  <th className="p-4 text-center text-slate-500 font-bold">الإجراءات</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {loading ? (
-                   <tr><td colSpan={3} className="p-10 text-center"><Loader2 className="animate-spin mx-auto text-blue-500" /></td></tr>
-                ) : filteredItems.map((item) => (
-                  <tr key={item.id} className={`transition-all border shadow-sm ${editingId === item.id ? 'bg-blue-50/40 ring-1 ring-blue-200' : 'bg-white hover:bg-slate-50'}`}>
-                    {editingId === item.id ? (
-                      <>
-                        <td className="px-4 py-2 rounded-r-xl">
-                          <select className="w-full h-9 border rounded text-xs bg-white" value={form.location} onChange={e => setForm({...form, location: e.target.value})}>
-                            <option value="">اختر الموقع</option>
-                            {Object.keys(REGIONS_BY_LOCATION).map(l => <option key={l} value={l}>{l}</option>)}
-                          </select>
-                        </td>
-                        <td className="px-4 py-2">
-                          <Input 
-                            className="h-9 text-xs bg-white border-slate-200" 
-                            value={form.region} 
-                            onChange={e => setForm({...form, region: e.target.value})}
-                            placeholder="اكتب اسم المنطقة..."
-                          />
-                        </td>
-                        <td className="px-4 py-2 text-center rounded-l-xl">
-                          <div className="flex gap-2 justify-center">
-                            <Button size="sm" onClick={() => onSave(item.id)} disabled={!isFormValid} className="bg-green-600 hover:bg-green-700 h-8 w-8 p-0 rounded-full shadow-sm">
-                               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 text-white" />}
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="h-8 w-8 p-0 text-red-500 hover:bg-red-50 rounded-full"><X className="h-4 w-4" /></Button>
-                          </div>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="px-4 py-4 rounded-r-xl font-bold text-slate-800">
-                          <div className="flex items-center gap-2">
-                            <Compass className="w-4 h-4 text-blue-600" /> {item.location}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 text-blue-700 font-bold">
-                           <div className="flex items-center gap-1">
-                             <Navigation className="w-3.5 h-3.5" /> {item.region}
-                           </div>
-                        </td>
-                        <td className="px-4 py-4 text-center rounded-l-xl">
-                           <Button variant="ghost" size="sm" onClick={() => startEdit(item)} className="h-9 w-9 p-0 text-blue-500 hover:bg-blue-50 rounded-full transition-all">
-                              <Pencil className="h-4 w-4" />
-                           </Button>
-                        </td>
-                      </>
-                    )}
+                  <tr><td colSpan={3} className="p-20 text-center text-slate-400"><Loader2 className="animate-spin mx-auto mb-2" />جاري التحميل...</td></tr>
+                ) : filtered.length === 0 ? (
+                  <tr><td colSpan={3} className="p-20 text-center text-slate-400">لا توجد بيانات حالياً.</td></tr>
+                ) : filtered.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-4 font-medium text-slate-700">{item.title}</td>
+                    <td className="p-4 text-slate-600">{item.description}</td>
+                    <td className="p-4 text-center">
+                      <button className="p-2 border border-slate-100 rounded-md hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-all">
+                        <Pencil className="w-4 h-4"/>
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -189,36 +128,40 @@ export default function AddressesPage() {
         </CardContent>
       </Card>
 
+      {/* نافذة الإضافة */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="text-right sm:max-w-[450px] rounded-2xl font-arabic">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-               <Building2 className="text-blue-600" /> إضافة سجل جديد
-            </DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-              <div className="grid gap-1">
-                  <label className="text-xs font-bold text-slate-600">الموقع</label>
-                  <select className="h-11 border border-slate-200 rounded-xl px-2 bg-slate-50" value={form.location} onChange={e => setForm({...form, location: e.target.value})}>
-                      <option value="">اختر الموقع</option>
-                      {Object.keys(REGIONS_BY_LOCATION).map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-              </div>
-              <div className="grid gap-1">
-                  <label className="text-xs font-bold text-slate-600">اسم المنطقة</label>
-                  <Input 
-                    className="h-11 border border-slate-200 rounded-xl px-4 bg-slate-50" 
-                    value={form.region} 
-                    onChange={e => setForm({...form, region: e.target.value})}
-                    placeholder="اكتب اسم المنطقة هنا..."
-                  />
-              </div>
+        <DialogContent dir="rtl" className="max-w-md rounded-2xl">
+          <DialogHeader><DialogTitle className="text-right text-lg font-bold">إضافة موقع جديد</DialogTitle></DialogHeader>
+          <div className="flex flex-col gap-4 py-4 text-right">
+            <div className="space-y-1.5">
+               <label className="text-xs font-bold text-slate-700">الموقع العام</label>
+               <select 
+                className="w-full border border-slate-200 rounded-lg h-11 px-3 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-100" 
+                value={title} 
+                onChange={e => {setTitle(e.target.value); setDescription('')}}
+               >
+                  <option value="">اختر المنطقة الكبرى..</option>
+                  {Object.keys(REGIONS_DATA).map(l => <option key={l} value={l}>{l}</option>)}
+               </select>
+            </div>
+            <div className="space-y-1.5">
+               <label className="text-xs font-bold text-slate-700">المنطقة التفصيلية</label>
+               <select 
+                className="w-full border border-slate-200 rounded-lg h-11 px-3 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-50" 
+                value={description} 
+                onChange={e => setDescription(e.target.value)} 
+                disabled={!title}
+               >
+                  <option value="">اختر الموقع التفصيلي..</option>
+                  {title && REGIONS_DATA[title].map(r => <option key={r} value={r}>{r}</option>)}
+               </select>
+            </div>
           </div>
-          <DialogFooter className="flex gap-2">
-            <Button onClick={() => onSave()} disabled={!isFormValid || submitting} className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 flex-1 rounded-xl order-first">
-               {submitting ? <Loader2 className="animate-spin" /> : 'حفظ البيانات'}
+          <DialogFooter className="flex flex-row gap-3">
+            <Button onClick={onAdd} disabled={submitting || !isAddValid} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-11 rounded-xl">
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null} حفظ الموقع
             </Button>
-            <Button variant="outline" onClick={() => setAddOpen(false)} className="h-12 flex-1 rounded-xl border-slate-200 text-slate-600 order-last">إلغاء</Button>
+            <Button variant="outline" onClick={() => setAddOpen(false)} className="flex-1 h-11 rounded-xl border-slate-200">إلغاء</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
