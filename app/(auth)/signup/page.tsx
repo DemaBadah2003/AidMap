@@ -105,7 +105,7 @@ export default function Page() {
 
               {/* تنبيهات النجاح والفشل */}
               {statusInfo && (
-                <Alert variant={statusInfo.type === 'error' ? "destructive" : "default"} className={statusInfo.type === 'success' ? "border-green-500 bg-green-50 text-green-700" : ""}>
+                <Alert variant={statusInfo.type === 'error' ? "destructive" : "success"} className={statusInfo.type === 'success' ? "border-green-500 bg-green-50 text-green-700" : ""}>
                   {statusInfo.type === 'error' ? <AlertCircle className="size-4" /> : <CheckCircle2 className="size-4 text-green-600" />}
                   <AlertTitle>{statusInfo.type === 'error' ? 'تنبيه' : 'تم بنجاح'}</AlertTitle>
                   <AlertDescription>{statusInfo.message}</AlertDescription>
