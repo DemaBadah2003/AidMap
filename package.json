@@ -98,5 +98,8 @@
     "prisma": "^7.6.0",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "@auth/core": "0.34.3"
   }
 }
