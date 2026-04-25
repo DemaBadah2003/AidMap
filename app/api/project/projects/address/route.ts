@@ -51,8 +51,9 @@ export async function POST(req: NextRequest) {
     const created = await prisma.address.create({
       data: {
         campId: body.campId,
-        area: body.city,         // تخزين city في حقل area
-        location: body.governorate, // تخزين governorate في حقل location
+        title: body.title,
+        description: body.description,
+        hospitalId: body.hospitalId,
       },
       include: { 
         camp: { select: { id: true, name: true } } 
@@ -124,3 +125,15 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ message: "فشل في حذف السجل" }, { status: 500 })
   }
 }
+
+// --- 7. مثال على استخدام الدالة ---
+fetch('/api/project/Medical-Services/Address', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    title: 'شمال',
+    description: 'جباليا',
+    campId: '...',
+    hospitalId: '...'
+  })
+})
