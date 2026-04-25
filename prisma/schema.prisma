@@ -153,39 +153,46 @@ model Supervisor {
 
   @@index([status])
 }
-
 model Hospital {
   id            String         @id @default(uuid())
-  type          HospitalType
-  name          String
-  region        Region
-  location      String
+  type          HospitalType   // حكومي، وكالة، خاص
+  name          String         // اسم المستشفى
+  region        Region         // الموقع العام (للفلترة السريعة)
   phone         String
   latitude      Decimal?       @db.Decimal(10, 7)
   longitude     Decimal?       @db.Decimal(10, 7)
-  placeId       String?        @unique
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-  addresses     Address[]
+
+  // الربط الجديد والمهم: المستشفى يتبع لعنوان/منطقة محددة
+  addressId     String
+  address       Address        @relation(fields: [addressId], references: [id])
+
+  // باقي علاقاتك كما هي دون تغيير
   departments   Department[]
   distributions Distribution[]
   doctors       Doctor[]
-  place         Place?         @relation("HospitalPlace", fields: [placeId], references: [id])
   patients      Patient[]
   pharmacies    Pharmacy[]
+  
+  // علاقة المكان (Place)
+  placeId       String?        @unique
+  place         Place?         @relation("HospitalPlace", fields: [placeId], references: [id])
 
   @@index([type])
   @@index([region])
 }
-
 model Department {
-  id         String    @id @default(uuid())
-  name       String
-  hospitalId String
-  createdAt  DateTime  @default(now())
-  hospital   Hospital  @relation(fields: [hospitalId], references: [id])
-  doctors    Doctor[]
-  services   Service[]
+  id          String    @id @default(uuid())
+  name        String    // اسم القسم (مثل: غرفة العمليات)
+  deptType    String    // نوع التخصص (مثل: الجراحة العامة)
+  status      String    @default("يعمل بكفاءة") // الحالة التشغيلية
+  description String?   // ملاحظات / وصف
+  hospitalId  String
+  createdAt   DateTime  @default(now())
+  hospital    Hospital  @relation(fields: [hospitalId], references: [id])
+  doctors     Doctor[]
+  services    Service[]
 }
 
 model Service {
@@ -235,14 +242,19 @@ model Pharmacy {
 
 model Address {
   id          String    @id @default(uuid())
-  campId      String?
-  createdAt   DateTime  @default(now())
+  title       String    // اسم المنطقة (مثل: البريج، النصيرات، الرمال)
+  region      Region    // الموقع العام (NORTH, SOUTH, WEST, EAST, CENTRAL)
   description String?
-  hospitalId  String?
-  title       String
+  createdAt   DateTime  @default(now())
+  
+  // علاقة: العنوان الواحد (المنطقة) يمكن أن يحتوي على عدة مستشفيات
+  hospitals   Hospital[] 
+
+  // الإبقاء على علاقتك القديمة مع المخيمات إذا كانت مطلوبة
+  campId      String?
   camp        Camps?    @relation(fields: [campId], references: [id])
-  hospital    Hospital? @relation(fields: [hospitalId], references: [id])
 }
+
 
 model Institution {
   id                  String               @id @default(uuid())

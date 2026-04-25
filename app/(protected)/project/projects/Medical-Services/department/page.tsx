@@ -45,7 +45,7 @@ type DepartmentRecord = {
   description: string
 }
 
-const BASE_URL = '/api/project/projects/departments'
+const BASE_URL = '/api/project/Medical-Services/department';
 const selectBaseClass = 'w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-right text-xs sm:text-sm outline-none focus:ring-2 focus:ring-slate-100 font-normal'
 
 export default function DepartmentsPage() {

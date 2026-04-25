@@ -1,211 +1,252 @@
-'use client'
+'use client';
 
-import { useEffect, useMemo, useState } from 'react'
-import { Card, CardContent } from '../../../../../../components/ui/card'
-import { Button } from '../../../../../../components/ui/button'
-import { Input } from '../../../../../../components/ui/input'
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '../../../../../../components/ui/dialog'
-import { 
-  Pencil, 
-  Plus, 
-  Search, 
-  Loader2, 
-  AlertCircle
-} from 'lucide-react'
+} from '@/components/ui/dialog';
+import { Plus, Search, Loader2, Pencil, Check, X, ChevronRight, ChevronLeft } from 'lucide-react';
+import { toast } from 'sonner';
 
-type HospitalRecord = {
-  id: string
-  hospitalType: string
-  hospitalName: string
-  phone: string
-  status: string // حقل الحالة الجديد
-  description: string
-}
+const HOSPITAL_TYPES = ['حكومي', 'وكالة', 'خاص'];
 
-const BASE_URL = '/api/project/projects/doctors'
-const selectBaseClass = 'w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-right text-xs sm:text-sm outline-none focus:ring-2 focus:ring-slate-100 font-normal'
+const MASTER_DATA: Record<string, string[]> = {
+  حكومي: ['مجمع الشفاء الطبي', 'مستشفى النصر', 'مستشفى الإندونيسي', 'مجمع ناصر الطبي', 'مستشفى شهداء الأقصى', 'مستشفى كمال عدوان', 'مستشفى غزة الأوروبي'],
+  وكالة: ['مركز الرمال الصحي', 'مركز جباليا الصحي', 'مركز النصيرات الصحي', 'مركز خان يونس الصحي', 'مركز السويدي الصحي', 'مركز البريج الصحي'],
+  خاص: ['مستشفى القدس', 'مستشفى أصدقاء المريض', 'مستشفى العودة', 'مستشفى دار السلام', 'مستشفى الهلال الإماراتي', 'مستشفى الخدمة العامة'],
+};
+
+const BASE_URL = '/api/project/Medical-Services/hospitals';
 
 export default function HospitalsPage() {
-  const [q, setQ] = useState('')
-  const [items, setItems] = useState<HospitalRecord[]>([])
-  const [loading, setLoading] = useState(true)
-
-  // States للإضافة
-  const [addOpen, setAddOpen] = useState(false)
-  const [hospitalType, setHospitalType] = useState('')
-  const [hospitalName, setHospitalName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [status, setStatus] = useState('') // حالة المستشفى
-  const [description, setDescription] = useState('')
+  const [q, setQ] = useState('');
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [addOpen, setAddOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   
-  const [submitting, setSubmitting] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+  const [errors, setErrors] = useState<{add?: string, edit?: string}>({});
 
-  const fetchData = async () => {
-    setLoading(true)
+  const [hospitalType, setHospitalType] = useState('');
+  const [hospitalName, setHospitalName] = useState('');
+  const [phone, setPhone] = useState('');
+
+  const fetchItems = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await fetch(BASE_URL)
-      const data = await res.json()
-      setItems(data)
-    } catch (err) { console.error('Fetch error:', err) } 
-    finally { setLoading(false) }
-  }
+      const res = await fetch(BASE_URL);
+      const data = await res.json();
+      setItems(data.hospitals || []);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  }, []);
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchItems(); }, [fetchItems]);
 
-  const isAddValid = useMemo(() => {
-    return hospitalName.trim() !== '' && hospitalType !== '' && phone.trim() !== '' && status !== ''
-  }, [hospitalName, hospitalType, phone, status])
+  const validatePhone = (num: string) => /^(056|059)\d{7}$/.test(num);
+
+  const filtered = useMemo(() => {
+    if (!q.trim()) return items;
+    const searchLower = q.toLowerCase();
+    return items.filter(i => 
+      Object.values(i).some(v => String(v).toLowerCase().includes(searchLower))
+    );
+  }, [items, q]);
+
+  const totalPages = Math.ceil(filtered.length / pageSize);
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage, pageSize]);
 
   const onAdd = async () => {
-    if (!isAddValid) return
-    setSubmitting(true)
+    setErrors({});
+    if (!hospitalType || !hospitalName || !phone) {
+      setErrors({ add: 'يرجى إكمال جميع الحقول' });
+      return;
+    }
+    if (!validatePhone(phone)) {
+      setErrors({ add: 'الرقم يجب أن يبدأ بـ 056 أو 059 ويتكون من 10 أرقام' });
+      return;
+    }
+
+    setSubmitting(true);
     try {
       const res = await fetch(BASE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hospitalType, hospitalName, phone, status, description })
-      })
+        body: JSON.stringify({ hospitalType, hospitalName, phone, region: 'عام' })
+      });
       if (res.ok) {
-        await fetchData()
-        setAddOpen(false)
-        resetAddForm()
+        setAddOpen(false);
+        fetchItems();
+        setPhone(''); setHospitalType(''); setHospitalName('');
+        toast.success('تمت الإضافة بنجاح');
       }
-    } finally { setSubmitting(false) }
-  }
+    } finally { setSubmitting(false); }
+  };
 
-  const resetAddForm = () => {
-    setHospitalType(''); setHospitalName(''); setPhone(''); setStatus(''); setDescription('');
-  }
+  const onSaveEdit = async () => {
+    setErrors({});
+    if (!validatePhone(editForm.phone)) {
+      setErrors({ edit: 'رقم غير صحيح' });
+      return;
+    }
 
-  const filteredItems = items.filter(item => 
-    item.hospitalName?.toLowerCase().includes(q.toLowerCase()) ||
-    item.hospitalType?.toLowerCase().includes(q.toLowerCase())
-  )
+    setSubmitting(true);
+    try {
+      const res = await fetch(BASE_URL, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm)
+      });
+      if (res.ok) {
+        setEditingId(null);
+        fetchItems();
+        toast.success('تم التحديث بنجاح');
+      }
+    } finally { setSubmitting(false); }
+  };
 
   return (
-    <div className="w-full px-4 py-6" dir="rtl">
-      <div className="mb-6 text-right font-arabic">
-        <h1 className="text-2xl font-bold text-slate-900">إدارة سجل المستشفيات</h1>
-      </div>
+    <div className="w-full px-4 py-6 bg-white" dir="rtl">
+      <h1 className="text-2xl font-bold text-slate-700 mb-6"> النقاط الطبية </h1>
 
-      <Card className="overflow-hidden border-slate-200 shadow-sm rounded-xl bg-white font-arabic">
-        <CardContent className="p-0">
-          <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b">
-            <div className="relative w-full max-w-xs">
-              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="ابحث..."
-                className="w-full pr-10 bg-slate-50 border-none h-10 rounded-lg text-sm"
-              />
+      <Card className="border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <CardContent className="p-0 flex flex-col">
+          <div className="p-4 border-b bg-slate-50/50 flex justify-between items-center gap-4">
+            <div className="relative max-w-xs flex-1">
+              <Search className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Input placeholder="بحث..." className="pr-9 border-slate-200 bg-white" value={q} onChange={e => {setQ(e.target.value); setCurrentPage(1);}} />
             </div>
-            <Button onClick={() => setAddOpen(true)} className="bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 rounded-lg mr-auto font-bold shadow-sm">
-              <Plus className="h-4 w-4 ml-2" /> إضافة سجل جديد
+            <Button onClick={() => {setErrors({}); setAddOpen(true);}} className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Plus className="ml-2 h-4 w-4" /> إضافة منشأة طبية 
             </Button>
           </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse text-sm">
-              <thead className="bg-slate-50 border-b border-slate-100 font-bold text-slate-600">
+          
+          <div className="overflow-auto max-h-[400px]">
+            <table className="w-full text-right border-collapse min-w-[700px]">
+              <thead className="bg-slate-50 text-slate-500 border-b sticky top-0 z-10">
                 <tr>
-                  <th className="p-4">نوع المستشفى</th>
-                  <th className="p-4">اسم المستشفى</th>
-                  <th className="p-4">رقم الهاتف</th>
-                  <th className="p-4">الحالة</th>
-                  <th className="p-4">ملاحظات</th>
-                  <th className="p-4 text-center">الإجراءات</th>
+                  <th className="p-4 text-xs font-bold uppercase w-[20%]">النوع</th>
+                  <th className="p-4 text-xs font-bold uppercase w-[40%]">الاسم</th>
+                  <th className="p-4 text-xs font-bold uppercase w-[25%]">رقم التواصل</th>
+                  <th className="p-4 text-xs font-bold uppercase w-[15%] text-center">الإجراءات</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
+              <tbody className="divide-y divide-slate-100 bg-white text-slate-600">
                 {loading ? (
-                  <tr><td colSpan={6} className="p-10 text-center"><Loader2 className="animate-spin mx-auto w-6 h-6 text-slate-300" /></td></tr>
-                ) : filteredItems.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4 font-medium text-blue-600">{item.hospitalType}</td>
-                    <td className="p-4 font-bold text-slate-700">{item.hospitalName}</td>
-                    <td className="p-4">{item.phone}</td>
-                    <td className="p-4">
-                      <span className={`px-2 py-1 rounded-full text-xs ${item.status === 'بيشتغل' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {item.status}
-                      </span>
-                    </td>
-                    <td className="p-4 max-w-[150px] truncate text-slate-500">{item.description || '-'}</td>
-                    <td className="p-4 text-center">
-                        <Pencil className="w-4 h-4 mx-auto text-slate-400 cursor-pointer hover:text-blue-600" />
-                    </td>
+                  <tr><td colSpan={4} className="p-12 text-center text-slate-400"><Loader2 className="animate-spin mx-auto h-6 w-6" /></td></tr>
+                ) : paginatedItems.map(item => (
+                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                    {editingId === item.id ? (
+                      <>
+                        <td className="p-2">
+                            <select value={editForm.hospitalType} onChange={e => setEditForm({...editForm, hospitalType: e.target.value, hospitalName: ''})} className="w-full border rounded p-1.5 text-sm outline-none">
+                              {HOSPITAL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                        </td>
+                        <td className="p-2">
+                            <select value={editForm.hospitalName} onChange={e => setEditForm({...editForm, hospitalName: e.target.value})} className="w-full border rounded p-1.5 text-sm outline-none">
+                                <option value="">اختر الاسم..</option>
+                                {(MASTER_DATA[editForm.hospitalType] || []).map(n => <option key={n} value={n}>{n}</option>)}
+                            </select>
+                        </td>
+                        <td className="p-2">
+                            <Input className={`h-9 font-mono text-sm ${errors.edit ? 'border-red-400' : ''}`} value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} maxLength={10} />
+                        </td>
+                        <td className="p-2 text-center flex justify-center gap-2">
+                          <Button size="sm" onClick={onSaveEdit} disabled={submitting} className="bg-blue-600 hover:bg-blue-700 h-8 w-8 p-0">
+                            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 text-white" />}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setEditingId(null)} className="h-8 w-8 p-0 text-slate-400">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="p-4 text-sm">
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${item.hospitalType === 'حكومي' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}>
+                              {item.hospitalType}
+                            </span>
+                        </td>
+                        <td className="p-4 text-sm font-medium">{item.hospitalName}</td>
+                        <td className="p-4 text-sm font-mono">{item.phone}</td>
+                        <td className="p-4 text-center">
+                          <Button variant="ghost" size="sm" onClick={() => { setEditingId(item.id); setEditForm({...item}); setErrors({}); }} className="text-slate-400 hover:text-blue-600 p-2">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
+          <div className="p-4 border-t bg-slate-50/50 flex justify-between items-center shrink-0">
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <span>عرض</span>
+              <select value={pageSize} onChange={(e) => {setPageSize(Number(e.target.value)); setCurrentPage(1);}} className="border rounded px-1 py-1 outline-none">
+                {[5, 10, 15, 20].map(size => <option key={size} value={size}>{size}</option>)}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)} className="h-8 px-2"><ChevronRight className="h-4 w-4" /></Button>
+              <span className="text-xs font-medium text-slate-600">{currentPage} / {totalPages || 1}</span>
+              <Button variant="outline" size="sm" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(prev => prev + 1)} className="h-8 px-2"><ChevronLeft className="h-4 w-4" /></Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="max-w-md font-arabic rounded-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="text-right text-lg font-bold">إضافة بيانات جديدة</DialogTitle></DialogHeader>
-          <div className="flex flex-col gap-4 py-4 text-right">
-            
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">نوع المستشفى</label>
-              <select className={selectBaseClass + " h-11 bg-slate-50"} value={hospitalType} onChange={e => setHospitalType(e.target.value)}>
-                <option value="">اختر النوع</option>
-                <option value="حكومى">حكومى</option>
-                <option value="وكالة">وكالة</option>
-                <option value="خاص">خاص</option>
-              </select>
+        <DialogContent dir="rtl" className="sm:max-w-[420px]">
+          <DialogHeader><DialogTitle className="text-blue-700 text-center text-xl font-bold">إضافة منشأة طبية</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-400 mr-1">نوع المنشأة</label>
+                <select value={hospitalType} onChange={e => {setHospitalType(e.target.value); setHospitalName(''); setErrors({});}} className="w-full border border-slate-200 rounded-md p-2 text-sm outline-none">
+                  <option value="">اختر النوع..</option>
+                  {HOSPITAL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
             </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">اسم المستشفى</label>
-              <Input 
-                className="h-11 bg-slate-50" 
-                placeholder="ادخل اسم المستشفى" 
-                value={hospitalName} 
-                onChange={e => setHospitalName(e.target.value)} 
-              />
+            <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-400 mr-1">الاسم</label>
+                <select value={hospitalName} onChange={e => {setHospitalName(e.target.value); setErrors({});}} disabled={!hospitalType} className="w-full border border-slate-200 rounded-md p-2 text-sm outline-none disabled:bg-slate-50">
+                  <option value="">اختر الاسم..</option>
+                  {(MASTER_DATA[hospitalType] || []).map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
             </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">رقم الهاتف</label>
-              <Input className="h-11 bg-slate-50" placeholder="05XXXXXXXX" value={phone} onChange={e => setPhone(e.target.value)} />
+            <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-400 mr-1">رقم التواصل</label>
+                <Input placeholder="05xxxxxxxx" value={phone} onChange={e => {setPhone(e.target.value); setErrors({});}} maxLength={10} className={`border-slate-200 ${errors.add ? 'border-red-400 focus:ring-red-50' : ''}`} />
+                {errors.add && <p className="text-[11px] text-red-500 font-bold mt-1 px-1">{errors.add}</p>}
             </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">حالة المستشفى</label>
-              <select className={selectBaseClass + " h-11 bg-slate-50"} value={status} onChange={e => setStatus(e.target.value)}>
-                <option value="">اختر الحالة</option>
-                <option value="بيشتغل">بيشتغل</option>
-                <option value="خارج االخدمة">خارج االخدمة</option>
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">ملاحظات / وصف</label>
-              <textarea className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm outline-none min-h-[60px]" value={description} onChange={e => setDescription(e.target.value)} />
-            </div>
-
-            {!isAddValid && (
-              <div className="text-[11px] text-amber-600 flex items-center gap-2 bg-amber-50 p-2 rounded-lg border border-amber-100">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0"/> يرجى تعبئة الحقول الأساسية للحفظ.
-              </div>
-            )}
           </div>
-          <DialogFooter className="flex flex-row gap-3">
-            <Button onClick={onAdd} disabled={!isAddValid || submitting} className="flex-1 bg-blue-600 text-white font-bold h-11 rounded-xl shadow-lg">
-              {submitting ? <Loader2 className="animate-spin ml-2" /> : null} حفظ البيانات
+          
+          <DialogFooter className="flex flex-row gap-3 sm:justify-start">
+            <Button onClick={onAdd} disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 transition-all">
+              {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : 'حفظ'}
             </Button>
-            <Button variant="outline" onClick={() => {setAddOpen(false); resetAddForm();}} className="flex-1 h-11 rounded-xl">إلغاء</Button>
+            <Button variant="outline" onClick={() => setAddOpen(false)} className="flex-1 border-slate-200 text-slate-600 font-bold h-11 hover:bg-slate-50 transition-all">
+              إلغاء
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

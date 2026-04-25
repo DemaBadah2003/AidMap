@@ -11,7 +11,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Pencil, Plus, Search, Loader2, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Search, Loader2, ChevronRight, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 const REGIONS_DATA: Record<string, string[]> = {
@@ -29,11 +29,12 @@ export default function AddressPage() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<any>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // مطابق للسكيما: title هو الموقع العام، description هو التفصيلي
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [editTitle, setEditTitle] = useState('');
@@ -61,7 +62,6 @@ export default function AddressPage() {
   const resetForm = () => {
     setTitle('');
     setDescription('');
-    setSelectedItem(null);
   };
 
   const openAddDialog = () => {
@@ -79,11 +79,6 @@ export default function AddressPage() {
     setEditingId(null);
     setEditTitle('');
     setEditDescription('');
-  };
-
-  const openDeleteDialog = (item: any) => {
-    setSelectedItem(item);
-    setDeleteOpen(true);
   };
 
   const onAdd = async () => {
@@ -137,45 +132,32 @@ export default function AddressPage() {
     }
   };
 
-  const onDelete = async () => {
-    if (!selectedItem) return;
-    setSubmitting(true);
-    try {
-      const res = await fetch(`${BASE_URL}?id=${selectedItem.id}`, {
-        method: 'DELETE',
-      });
-
-      if (res.ok) {
-        await fetchItems();
-        setDeleteOpen(false);
-        resetForm();
-        toast.success('تم حذف الموقع بنجاح');
-      } else {
-        const data = await res.json();
-        toast.error(data.error || 'فشل في حذف الموقع');
-      }
-    } catch (err) {
-      toast.error('حدث خطأ أثناء الحذف');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
+  // Filter and Paginate logic
   const filtered = useMemo(() => {
     return items.filter(item =>
       !q || item.title?.includes(q) || item.description?.includes(q)
     );
   }, [q, items]);
 
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filtered.slice(startIndex, startIndex + itemsPerPage);
+  }, [filtered, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+
+  // Reset page to 1 when searching or changing limit
+  useEffect(() => { setCurrentPage(1); }, [q, itemsPerPage]);
+
   return (
-    <div className="w-full px-4 py-6" dir="rtl">
+    <div className="w-full px-4 py-6 overflow-y-auto" dir="rtl">
       <div className="mb-6 text-right">
         <h1 className="text-2xl font-bold text-slate-900">إدارة المواقع</h1>
         <p className="text-sm text-slate-500 mt-1 font-normal">الرئيسية &gt; العناوين والمواقع</p>
       </div>
 
-      <Card className="overflow-hidden border-slate-200 shadow-sm rounded-xl bg-white">
-        <CardContent className="p-0">
+      <Card className="overflow-hidden border-slate-200 shadow-sm rounded-xl bg-white h-[calc(100vh-220px)] min-h-[420px] flex flex-col">
+        <CardContent className="p-0 flex-1 min-h-0 flex flex-col">
           <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b">
             <div className="relative w-full max-w-xs">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -191,13 +173,14 @@ export default function AddressPage() {
             </Button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-sm">
-              <thead className="bg-slate-50/80 border-b border-slate-100">
+          {/* Table Container with Scroll */}
+          <div className="overflow-x-auto overflow-y-auto custom-scrollbar flex-1 min-h-0">
+            <table className="w-full text-right text-sm border-collapse">
+              <thead className="bg-slate-50/80 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
-                  <th className="p-4 text-slate-500 font-bold">الموقع العام </th>
-                  <th className="p-4 text-slate-500 font-bold">المنطقة </th>
-                  <th className="p-4 text-center text-slate-500 font-bold">الإجراءات</th>
+                  <th className="p-4 text-slate-500 font-bold bg-slate-50">الموقع العام</th>
+                  <th className="p-4 text-slate-500 font-bold bg-slate-50">المنطقة</th>
+                  <th className="p-4 text-center text-slate-500 font-bold bg-slate-50">الإجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -205,7 +188,7 @@ export default function AddressPage() {
                   <tr><td colSpan={3} className="p-20 text-center text-slate-400"><Loader2 className="animate-spin mx-auto mb-2" />جاري التحميل...</td></tr>
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={3} className="p-20 text-center text-slate-400">لا توجد بيانات حالياً.</td></tr>
-                ) : filtered.map((item) => (
+                ) : paginatedItems.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="p-4 font-medium text-slate-700">
                       {editingId === item.id ? (
@@ -255,20 +238,12 @@ export default function AddressPage() {
                             </button>
                           </>
                         ) : (
-                          <>
-                            <button
-                              onClick={() => startInlineEdit(item)}
-                              className="p-2 border border-slate-100 rounded-md hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-all"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => openDeleteDialog(item)}
-                              className="p-2 border border-slate-100 rounded-md hover:bg-red-50 text-slate-400 hover:text-red-600 transition-all"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
+                          <button
+                            onClick={() => startInlineEdit(item)}
+                            className="p-2 border border-slate-100 rounded-md hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-all"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
                         )}
                       </div>
                     </td>
@@ -277,6 +252,53 @@ export default function AddressPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Footer */}
+          {!loading && filtered.length > 0 && (
+            <div className="p-4 border-t flex items-center justify-between bg-slate-50/30">
+              {/* Pagination (Left Side - Buttons) */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0 rounded-md border-slate-200"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                
+                <span className="text-xs font-medium text-slate-600 px-2">
+                  صفحة {currentPage} من {totalPages}
+                </span>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0 rounded-md border-slate-200"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Items Per Page (Right Side) */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">إظهار:</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                  className="h-8 border border-slate-200 rounded-md bg-white text-xs px-2 outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  {[5, 10, 15, 20].map(val => (
+                    <option key={val} value={val}>{val}</option>
+                  ))}
+                </select>
+                <span className="text-xs text-slate-500 font-medium">عناصر</span>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -314,26 +336,6 @@ export default function AddressPage() {
               {submitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null} حفظ الموقع
             </Button>
             <Button variant="outline" onClick={() => { setAddOpen(false); resetForm() }} className="flex-1 h-11 rounded-xl border-slate-200">إلغاء</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* نافذة الحذف */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent dir="rtl" className="max-w-md rounded-2xl">
-          <DialogHeader><DialogTitle className="text-right text-lg font-bold">تأكيد الحذف</DialogTitle></DialogHeader>
-          <div className="py-4 text-right">
-            <p className="text-slate-600">
-              هل أنت متأكد من حذف الموقع <span className="font-bold text-slate-900">{selectedItem?.title}</span>؟
-              <br />
-              <span className="text-sm text-red-500">لا يمكن التراجع عن هذا الإجراء.</span>
-            </p>
-          </div>
-          <DialogFooter className="flex flex-row gap-3">
-            <Button onClick={onDelete} disabled={submitting} className="flex-1 bg-red-600 hover:bg-red-700 text-white h-11 rounded-xl">
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null} حذف
-            </Button>
-            <Button variant="outline" onClick={() => { setDeleteOpen(false); resetForm() }} className="flex-1 h-11 rounded-xl border-slate-200">إلغاء</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
