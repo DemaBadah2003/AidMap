@@ -205,12 +205,12 @@ model Service {
   institutionServices InstitutionService[]
   department          Department           @relation(fields: [departmentId], references: [id])
 }
-
 model Doctor {
   id           String      @id @default(uuid())
   name         String
   phone        String
-  specialty    String
+  specialty    String      // التخصص
+  workSchedule String      // <--- هذا الحقل الذي يجب إضافته (مواعيد العمل)
   description  String?
   hospitalId   String
   departmentId String?
@@ -218,7 +218,6 @@ model Doctor {
   department   Department? @relation(fields: [departmentId], references: [id])
   hospital     Hospital    @relation(fields: [hospitalId], references: [id])
 }
-
 model Patient {
   id          String   @id @default(uuid())
   name        String

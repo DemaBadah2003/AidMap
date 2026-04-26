@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// خرائط التحويل من العربية للإنجليزية (لقاعدة البيانات)
+// 1. خرائط التحويل (Mapping)
 const typeMap: Record<string, any> = { 
   'خاص': 'PRIVATE', 
   'وكالة': 'UNRWA', 
   'حكومي': 'GOVERNMENT',
-  'حكومية': 'GOVERNMENT' 
 };
 
 const regionMap: Record<string, any> = { 
@@ -14,10 +13,10 @@ const regionMap: Record<string, any> = {
   'جنوب': 'SOUTH', 
   'شرق': 'EAST', 
   'غرب': 'WEST', 
-  'وسطى': 'CENTRAL' 
+  'وسطى': 'CENTRAL',
+  'عام': 'NORTH' 
 };
 
-// خرائط التحويل العكسي من الإنجليزية للعربية (للعرض في الجدول)
 const typeRevMap: Record<string, string> = {
   'PRIVATE': 'خاص',
   'UNRWA': 'وكالة',
@@ -32,39 +31,42 @@ const regionRevMap: Record<string, string> = {
   'CENTRAL': 'وسطى'
 };
 
-// 1. دالة جلب البيانات (GET) - هي سبب المشكلة الأساسي في الصور
+// GET: جلب البيانات
 export async function GET() {
   try {
     const hospitals = await prisma.hospital.findMany({
       orderBy: { createdAt: 'desc' },
+      include: { address: true }
     });
 
-    // تحويل البيانات للعربية قبل إرسالها للفرونت إند
     const formattedHospitals = hospitals.map(h => ({
       id: h.id,
       hospitalName: h.name,
-      hospitalType: typeRevMap[h.type] || h.type,
-      region: regionRevMap[h.region] || h.region,
-      location: h.location,
+      hospitalType: typeRevMap[h.type as string] || h.type,
+      region: regionRevMap[h.region as string] || h.region,
       phone: h.phone,
+      addressTitle: h.address?.title || 'غير محدد'
     }));
 
     return NextResponse.json({ hospitals: formattedHospitals });
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch hospitals' }, { status: 500 });
   }
 }
 
-// 2. دالة الإضافة (POST)
+// POST: إضافة مستشفى جديد
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    
     const dbType = typeMap[body.hospitalType] || 'GOVERNMENT';
     const dbRegion = regionMap[body.region] || 'NORTH';
 
-    if (!body.hospitalName) {
-      return NextResponse.json({ error: 'اسم المنشأة مطلوب' }, { status: 400 });
+    let address = await prisma.address.findFirst({ where: { region: dbRegion } });
+
+    if (!address) {
+        address = await prisma.address.findFirst() || await prisma.address.create({
+            data: { title: 'المركز الرئيسي', region: dbRegion }
+        });
     }
 
     const newHospital = await prisma.hospital.create({
@@ -72,23 +74,27 @@ export async function POST(req: NextRequest) {
         name: body.hospitalName,
         type: dbType,
         region: dbRegion,
-        location: body.location || body.region || 'غير محدد',
-        phone: String(body.phone || ''), 
+        phone: String(body.phone || ''),
+        addressId: address.id,
       }
     });
 
     return NextResponse.json(newHospital, { status: 201 });
   } catch (error: any) {
-    console.error("PRISMA ERROR:", error);
-    return NextResponse.json({ error: 'فشل في قاعدة البيانات', details: error.message }, { status: 500 });
+    console.error("POST ERROR:", error);
+    return NextResponse.json({ error: 'فشل في الحفظ' }, { status: 500 });
   }
 }
 
-// 3. دالة التعديل (PATCH)
+// PATCH: تعديل مستشفى موجود
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, hospitalName, hospitalType, region, location, phone } = body;
+    const { id, hospitalName, hospitalType, region, phone } = body;
+
+    if (!id || !hospitalName || !hospitalType || !phone) {
+        return NextResponse.json({ error: 'بيانات غير مكتملة' }, { status: 400 });
+    }
 
     const updated = await prisma.hospital.update({
       where: { id },
@@ -96,13 +102,13 @@ export async function PATCH(req: NextRequest) {
         name: hospitalName,
         type: typeMap[hospitalType] || 'GOVERNMENT',
         region: regionMap[region] || 'NORTH',
-        location: location,
         phone: String(phone || ''),
       }
     });
 
     return NextResponse.json(updated);
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to update' }, { status: 400 });
+    console.error("PATCH ERROR:", error);
+    return NextResponse.json({ error: 'فشل في التعديل' }, { status: 400 });
   }
 }

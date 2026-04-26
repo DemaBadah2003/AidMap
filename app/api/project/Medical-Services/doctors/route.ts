@@ -1,116 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// دالة جلب البيانات (GET)
 export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const type = searchParams.get('type');
+
+    // جلب قائمة المستشفيات للقائمة المنسدلة
+    if (type === 'hospitals') {
+      const hospitals = await prisma.hospital.findMany({ select: { id: true, name: true } });
+      return NextResponse.json(hospitals);
+    }
+
+    // جلب قائمة الأقسام لاستخدامها في التخصصات
+    if (type === 'departments') {
+      const departments = await prisma.department.findMany({ select: { id: true, name: true } });
+      return NextResponse.json(departments);
+    }
+
+    // جلب جميع الأطباء مع بيانات المستشفى المرتبط بهم
     const doctors = await prisma.doctor.findMany({
-      include: {
-        hospital: true, // جلب بيانات المستشفى المرتبط
-      },
+      include: { hospital: true },
       orderBy: { createdAt: 'desc' },
     });
-
-    // تنسيق البيانات لتناسب أسماء الحقول في الفرونت إند (Frontend)
-    const formattedDoctors = doctors.map(doc => ({
-      id: doc.id,
-      name: doc.name,
-      specialization: doc.specialty, // مطابقة specialty في السكيما مع specialization في الواجهة
-      hospitalName: doc.hospital?.name || "غير محدد",
-      hospitalId: doc.hospitalId,
-      phone: doc.phone,
-      workSchedule: doc.schedule, // مطابقة schedule في السكيما مع workSchedule في الواجهة
-      description: doc.description,
-    }));
-
-    return NextResponse.json({ doctors: formattedDoctors });
+    return NextResponse.json({ doctors });
   } catch (error) {
-    console.error("Fetch Doctors Error:", error);
-    return NextResponse.json({ message: 'خطأ في جلب بيانات الأطباء' }, { status: 500 });
+    return NextResponse.json({ message: 'خطأ في جلب البيانات من السيرفر' }, { status: 500 });
   }
 }
 
-// دالة إضافة طبيب جديد (POST)
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // التحقق من الحقول المطلوبة لضمان عدم حدوث خطأ 400
-    if (!body.name || !body.hospitalId || !body.phone) {
-      return NextResponse.json(
-        { message: 'الاسم، المستشفى، ورقم الهاتف حقول مطلوبة' }, 
-        { status: 400 }
-      );
+    // التحقق الصارم من وجود الحقول لمنع خطأ 400
+    if (!body.name || !body.hospitalId || !body.specialty || !body.phone || !body.workSchedule) {
+      return NextResponse.json({ message: 'يرجى ملء جميع الحقول الإجبارية' }, { status: 400 });
     }
 
-    // إنشاء السجل في قاعدة البيانات باستخدام أسماء حقول السكيما
     const newDoctor = await prisma.doctor.create({
       data: {
         name: body.name,
-        specialty: body.specialization || "عام",
+        specialty: body.specialty,
         phone: body.phone,
-        schedule: body.workSchedule || "غير محدد",
+        workSchedule: body.workSchedule, //
         description: body.description || "",
-        hospitalId: body.hospitalId, // يجب أن يكون معرف UUID صحيح لمستشفى موجود
-      },
-      include: {
-        hospital: true
-      }
-    });
-
-    return NextResponse.json(newDoctor, { status: 201 });
-  } catch (error: any) {
-    console.error("Prisma POST Error:", error);
-    // رسالة الخطأ التي تظهر عند فشل الربط أو وجود بيانات غير صحيحة
-    return NextResponse.json(
-      { message: 'فشل إضافة الطبيب: تأكد من صحة البيانات وجودة الربط بالمستشفى' }, 
-      { status: 400 }
-    );
-  }
-}
-
-// دالة تحديث بيانات طبيب (PATCH)
-export async function PATCH(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get('id');
-    const body = await req.json();
-
-    if (!id) return NextResponse.json({ message: 'ID مفقود' }, { status: 400 });
-
-    const updated = await prisma.doctor.update({
-      where: { id },
-      data: {
-        name: body.name,
-        specialty: body.specialization,
-        phone: body.phone,
-        schedule: body.workSchedule,
-        description: body.description,
         hospitalId: body.hospitalId,
       },
+      include: { hospital: true }
     });
-
-    return NextResponse.json(updated);
+    return NextResponse.json(newDoctor, { status: 201 });
   } catch (error) {
-    console.error("Update Error:", error);
-    return NextResponse.json({ message: 'فشل تعديل بيانات الطبيب' }, { status: 400 });
-  }
-}
-
-// دالة حذف طبيب (DELETE)
-export async function DELETE(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get('id');
-
-    if (!id) return NextResponse.json({ message: 'ID مفقود' }, { status: 400 });
-
-    await prisma.doctor.delete({
-      where: { id },
-    });
-
-    return NextResponse.json({ message: 'تم حذف الطبيب بنجاح' });
-  } catch (error) {
-    return NextResponse.json({ message: 'فشل عملية الحذف' }, { status: 500 });
+    console.error("Prisma POST Error:", error);
+    return NextResponse.json({ message: 'فشل في حفظ بيانات الطبيب في القاعدة' }, { status: 400 });
   }
 }

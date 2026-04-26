@@ -2,181 +2,230 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
-import { Building2, Stethoscope, Users, Activity, MapPin, Compass, Loader2, Hospital } from 'lucide-react'
+import { Building2, Stethoscope, Users, Activity, MapPin, Compass, Briefcase } from 'lucide-react'
 
-// 1. تعريف قاعدة البيانات الثابتة بناءً على طلبك
-const HOSPITAL_DATABASE: Record<string, Record<string, string[]>> = {
-  "غرب": {
-    "حكومي": ["مجمع الشفاء الطبي", "مستشفى النصر", "مستشفى عبد العزيز الرنتيسي", "مستشفى العيون", "مستشفى الأمراض النفسية"],
-    "وكالة": ["مركز الرمال الصحي", "مركز السويدي الصحي", "مركز الشاطئ الصحي"],
-    "خاص": ["مستشفى القدس", "مستشفى أصدقاء المريض", "مستشفى الخدمة العامة", "مستشفى سانت جون للعيون", "مستشفى العودة"]
-  },
-  "شرق": {
-    "حكومي": ["مستشفى الشهيد محمد الدرة للأطفال", "مستشفى الوفاء للتأهيل الطبي والجراحة التخصصية"],
-    "خاص": ["مستشفى حيفا الطبي", "مستشفى الكرامة التخصصي", "مستشفى الخدمة العامة"],
-    "وكالة": ["مركز الشجاعية الصحي", "مركز الزيتون الصحي"]
-  },
-  "شمال": {
-    "حكومي": ["مستشفى الإندونيسي", "مستشفى كمال عدوان", "مستشفى بيت حانون"],
-    "خاص": ["مستشفى العودة", "مستشفى اليمني السعيد", "مستشفى الشهيد باسل الهيبي"],
-    "وكالة": ["مركز جباليا الصحي", "مركز الصفطاوي الصحي", "مركز بيت حانون الصحي"]
-  },
-  "وسطى": {
-    "حكومي": ["مستشفى شهداء الأقصى", "مستشفى يافا الحكومي"],
-    "خاص": ["مستشفى العودة", "مستشفى يافا الطبي", "مستشفى وفاء للتأهيل الطبي", "مستشفى المركز العربي الطبي"],
-    "وكالة": ["مركز النصيرات الصحي", "مركز البريج الصحي", "مركز المغازي الصحي", "مركز دير البلح الصحي"]
-  },
-  "جنوب": {
-    "حكومي": ["مجمع ناصر الطبي", "مستشفى غزة الأوروبي", "مستشفى الشهيد محمد يوسف النجار"],
-    "خاص": ["مستشفى الأمل", "مستشفى دار السلام", "مستشفى الهلال الإماراتي", "مستشفى الكويتي", "مستشفى يافا"],
-    "وكالة": ["مركز خان يونس الصحي", "مركز تل السلطان الصحي", "مركز الشابورة الصحي", "مركز بني سهيلا الصحي"]
-  }
+// كائن الترجمة لتحويل قيم الـ Enum من قاعدة البيانات إلى اللغة العربية
+const translate: Record<string, string> = {
+  // المناطق
+  NORTH: 'شمال',
+  SOUTH: 'جنوب',
+  EAST: 'شرق',
+  WEST: 'غرب',
+  CENTRAL: 'وسط',
+  // أنواع المنشآت
+  GOVERNMENT: 'حكومي',
+  PRIVATE: 'خاص',
+  UNRWA: 'وكالة'
 };
 
 export default function AdvancedReliefSystem() {
+  // حالات الاختيار (Selection States)
   const [selectedLoc, setSelectedLoc] = useState('')
-  const [selectedType, setSelectedType] = useState('')
+  const [selectedOrgType, setSelectedOrgType] = useState('')
   const [selectedHosp, setSelectedHosp] = useState('')
-  const [selectedDeptId, setSelectedDeptId] = useState('')
-  
-  const [dbDepartments, setDbDepartments] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
+  const [selectedSpecialty, setSelectedSpecialty] = useState('') 
+  const [selectedDept, setSelectedDept] = useState<any>(null)
 
-  const API_BASE = '/api/project/Medical-Services/home';
+  // حالات البيانات (Data States)
+  const [locations, setLocations] = useState<string[]>([])
+  const [orgTypes, setOrgTypes] = useState<string[]>([])
+  const [hospitals, setHospitals] = useState<any[]>([])
+  const [allDepartments, setAllDepartments] = useState<any[]>([])
 
-  // استخراج المواقع المتاحة من قاعدة البيانات
-  const availableLocations = Object.keys(HOSPITAL_DATABASE);
-
-  // استخراج الأنواع المتاحة بناءً على الموقع المختار
-  const availableTypes = useMemo(() => {
-    return selectedLoc ? Object.keys(HOSPITAL_DATABASE[selectedLoc] || {}) : [];
-  }, [selectedLoc]);
-
-  // استخراج أسماء المستشفيات بناءً على الموقع والنوع
-  const availableHospitals = useMemo(() => {
-    return (selectedLoc && selectedType) ? HOSPITAL_DATABASE[selectedLoc][selectedType] || [] : [];
-  }, [selectedLoc, selectedType]);
-
-  // جلب الأقسام من السيرفر عند اختيار المستشفى (بما أن الأقسام والخدمات متغيرة وديناميكية)
+  // 1. جلب المناطق وأنواع المنشآت عند تحميل الصفحة أول مرة
   useEffect(() => {
-    if (selectedHosp) {
-      setLoading(true)
-      // ملاحظة: هنا نرسل اسم المستشفى للسيرفر لجلب أقسامه المسجلة في DB
-      fetch(`${API_BASE}?type=details&hospitalName=${encodeURIComponent(selectedHosp)}`)
+    fetch('/api/relief?type=locations').then(res => res.json()).then(setLocations)
+    fetch('/api/relief?type=orgTypes').then(res => res.json()).then(setOrgTypes)
+  }, [])
+
+  // 2. جلب المستشفيات بناءً على اختيار "المنطقة" و "النوع"
+  useEffect(() => {
+    if (selectedLoc && selectedOrgType) {
+      fetch(`/api/relief?type=hospitals&region=${selectedLoc}&orgType=${selectedOrgType}`)
         .then(res => res.json())
         .then(data => {
-          setDbDepartments(data.departments || [])
-          setLoading(false)
+          setHospitals(data)
+          // تصفير الاختيارات اللاحقة عند تغيير الفلاتر الأساسية
+          setSelectedHosp('')
+          setAllDepartments([])
+          setSelectedSpecialty('')
+          setSelectedDept(null)
         })
-        .catch(() => setLoading(false))
     } else {
-      setDbDepartments([]);
+      setHospitals([]);
     }
-  }, [selectedHosp])
+  }, [selectedLoc, selectedOrgType])
 
-  const selectedDeptData = dbDepartments.find(d => d.id === selectedDeptId);
+  // 3. جلب الأقسام والخدمات عند اختيار مستشفى معين
+  const handleHospChange = async (hospId: string) => {
+    setSelectedHosp(hospId);
+    setSelectedSpecialty('');
+    setSelectedDept(null);
+    if (!hospId) return;
+
+    const res = await fetch(`/api/relief?type=details&hospitalId=${hospId}`);
+    const data = await res.json();
+    setAllDepartments(data); 
+  }
+
+  // استخراج التخصصات (deptType) الفريدة من الأقسام المجلوبة
+  const specialties = useMemo(() => {
+    const types = allDepartments.map(d => d.deptType); 
+    return Array.from(new Set(types.filter(Boolean)));
+  }, [allDepartments]);
+
+  // فلترة الأقسام بناءً على التخصص المختار
+  const filteredDepts = useMemo(() => {
+    return allDepartments.filter(d => d.deptType === selectedSpecialty);
+  }, [selectedSpecialty, allDepartments]);
 
   return (
     <div className="w-full px-4 py-8 sm:px-10 font-arabic" dir="rtl">
+      {/* الرأس */}
       <div className="mb-8 text-center">
-        <h1 className="text-3xl font-black text-blue-900 tracking-tight">نظام استعلام AidMap المتكامل</h1>
-        <p className="text-blue-600 font-medium mt-2">بيانات دقيقة بناءً على الموقع والنوع</p>
+        <h1 className="text-3xl font-black text-blue-900 flex items-center justify-center gap-3">
+          نظام استعلام AidMap المتكامل
+        </h1>
+        <p className="text-blue-600 font-medium mt-2">بيانات دقيقة مستخرجة من قاعدة بيانات المستشفيات</p>
       </div>
 
+      {/* لوحة التحكم والاختيار */}
       <Card className="border-none shadow-xl bg-white rounded-3xl overflow-hidden mb-10">
         <CardContent className="p-8 bg-slate-50/30">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             
-            {/* 1. اختيار الموقع */}
+            {/* 1. المنطقة (شمال، جنوب...) */}
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><Compass className="w-4 h-4 text-blue-500" /> الموقع</label>
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                <Compass className="w-3 h-3 text-blue-500" /> المنطقة
+              </label>
               <select 
-                className="w-full h-12 border-2 border-white shadow-sm rounded-2xl px-4 bg-white outline-none focus:border-blue-300"
-                value={selectedLoc}
-                onChange={(e) => { 
-                  setSelectedLoc(e.target.value); 
-                  setSelectedType(''); setSelectedHosp(''); setSelectedDeptId('');
-                }}
+                className="w-full h-11 border shadow-sm rounded-xl px-3 bg-white focus:ring-2 focus:ring-blue-500 outline-none" 
+                value={selectedLoc} 
+                onChange={(e) => setSelectedLoc(e.target.value)}
               >
                 <option value="">اختر المنطقة..</option>
-                {availableLocations.map(l => <option key={l} value={l}>{l}</option>)}
+                {locations.map((loc) => (
+                  <option key={loc} value={loc}>{translate[loc] || loc}</option>
+                ))}
               </select>
             </div>
 
-            {/* 2. اختيار النوع (حكومي/وكالة/خاص) بناءً على الموقع */}
+            {/* 2. نوع المنشأة (حكومي، وكالة...) */}
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><Activity className="w-4 h-4 text-blue-500" /> نوع المنشأة</label>
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                <Building2 className="w-3 h-3 text-blue-500" /> نوع المنشأة
+              </label>
               <select 
-                className="w-full h-12 border-2 border-white shadow-sm rounded-2xl px-4 bg-white disabled:opacity-50"
-                disabled={!selectedLoc}
-                value={selectedType}
-                onChange={(e) => { 
-                  setSelectedType(e.target.value); 
-                  setSelectedHosp(''); setSelectedDeptId('');
-                }}
+                className="w-full h-11 border shadow-sm rounded-xl px-3 bg-white focus:ring-2 focus:ring-blue-500 outline-none" 
+                value={selectedOrgType} 
+                onChange={(e) => setSelectedOrgType(e.target.value)}
               >
                 <option value="">اختر النوع..</option>
-                {availableTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                {orgTypes.map((type) => (
+                  <option key={type} value={type}>{translate[type] || type}</option>
+                ))}
               </select>
             </div>
 
-            {/* 3. اختيار اسم المستشفى بناءً على النوع والموقع */}
+            {/* 3. اسم المستشفى */}
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><Hospital className="w-4 h-4 text-blue-500" /> اسم المستشفى</label>
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-blue-500" /> اسم المستشفى
+              </label>
               <select 
-                className="w-full h-12 border-2 border-white shadow-sm rounded-2xl px-4 bg-white disabled:opacity-50"
-                disabled={!selectedType}
-                value={selectedHosp}
-                onChange={(e) => { 
-                  setSelectedHosp(e.target.value); 
-                  setSelectedDeptId('');
-                }}
+                className="w-full h-11 border shadow-sm rounded-xl px-3 bg-white disabled:opacity-50" 
+                disabled={!hospitals.length} 
+                value={selectedHosp} 
+                onChange={(e) => handleHospChange(e.target.value)}
               >
                 <option value="">اختر المستشفى..</option>
-                {availableHospitals.map(h => <option key={h} value={h}>{h}</option>)}
+                {hospitals.map((h: any) => (
+                  <option key={h.id} value={h.id}>{h.name}</option>
+                ))}
               </select>
             </div>
 
-            {/* 4. اختيار القسم (يظهر بعد جلب البيانات من السيرفر) */}
+            {/* 4. نوع التخصص (يظهر بعد اختيار المستشفى) */}
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><Stethoscope className="w-4 h-4 text-blue-500" /> القسم</label>
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                <Briefcase className="w-3 h-3 text-blue-500" /> نوع التخصص
+              </label>
               <select 
-                className="w-full h-12 border-2 border-white shadow-sm rounded-2xl px-4 bg-white disabled:opacity-50"
-                disabled={!selectedHosp || loading}
-                value={selectedDeptId}
-                onChange={(e) => setSelectedDeptId(e.target.value)}
+                className="w-full h-11 border shadow-sm rounded-xl px-3 bg-white disabled:opacity-50" 
+                disabled={!specialties.length} 
+                value={selectedSpecialty} 
+                onChange={(e) => { setSelectedSpecialty(e.target.value); setSelectedDept(null); }}
               >
-                <option value="">{loading ? 'جاري التحميل..' : 'اختر القسم..'}</option>
-                {dbDepartments.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                <option value="">اختر التخصص..</option>
+                {specialties.map((s: any) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
               </select>
             </div>
+
+            {/* 5. اسم القسم (يظهر بعد اختيار التخصص) */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                <Stethoscope className="w-3 h-3 text-blue-500" /> اسم القسم
+              </label>
+              <select 
+                className="w-full h-11 border shadow-sm rounded-xl px-3 bg-white disabled:opacity-50" 
+                disabled={!filteredDepts.length} 
+                onChange={(e) => {
+                  const dept = filteredDepts.find(d => d.id === e.target.value);
+                  setSelectedDept(dept);
+                }}
+              >
+                <option value="">اختر القسم..</option>
+                {filteredDepts.map((d: any) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+
           </div>
         </CardContent>
       </Card>
 
-      {/* باقى الكود كما هو لعرض الخدمات والاطباء */}
-      {loading && <div className="flex justify-center p-10"><Loader2 className="animate-spin text-blue-600 w-10 h-10" /></div>}
-
-      {!loading && selectedDeptData && (
+      {/* عرض البيانات التفصيلية للقسم المختار */}
+      {selectedDept && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          
+          {/* كرت الخدمات */}
           <Card className="border-none shadow-lg bg-white rounded-3xl p-6">
-            <h3 className="text-xl font-bold text-blue-900 mb-4 border-b pb-3 flex items-center gap-2"><Activity className="text-blue-500" /> الخدمات المتوفرة</h3>
+            <h3 className="text-xl font-bold text-blue-900 mb-4 flex items-center gap-2 border-b pb-3">
+              <Activity className="text-blue-500" /> الخدمات في {selectedDept.name}
+            </h3>
             <div className="grid grid-cols-2 gap-3">
-              {selectedDeptData.services?.map((s: any) => (
-                <div key={s.id} className="bg-blue-50 text-blue-700 p-3 rounded-xl text-center font-bold border border-blue-100 text-sm">{s.name}</div>
-              ))}
+              {selectedDept.services?.length > 0 ? (
+                selectedDept.services.map((s: any) => (
+                  <div key={s.id} className="bg-blue-50 text-blue-700 p-3 rounded-xl text-center font-bold border border-blue-100 hover:bg-blue-100 transition-colors">
+                    {s.name}
+                  </div>
+                ))
+              ) : (
+                <p className="col-span-2 text-center text-slate-400 py-4">لا توجد خدمات متاحة حالياً</p>
+              )}
             </div>
           </Card>
 
+          {/* كرت الكادر الطبي */}
           <Card className="border-none shadow-lg bg-white rounded-3xl p-6">
-            <h3 className="text-xl font-bold text-blue-900 mb-4 border-b pb-3 flex items-center gap-2"><Users className="text-emerald-500" /> الطاقم الطبي</h3>
+            <h3 className="text-xl font-bold text-blue-900 mb-4 flex items-center gap-2 border-b pb-3">
+              <Users className="text-emerald-500" /> الكادر الطبي المناوب
+            </h3>
             <div className="space-y-3">
-              {selectedDeptData.doctors?.map((d: any) => (
-                <div key={d.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <span className="font-bold text-slate-700">{d.name}</span>
-                  <span className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full font-bold">{d.specialty}</span>
-                </div>
-              ))}
+              {selectedDept.doctors?.length > 0 ? (
+                selectedDept.doctors.map((d: any) => (
+                  <div key={d.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 hover:shadow-sm transition-all">
+                    <span className="font-bold text-slate-700">{d.name}</span>
+                    <span className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full font-medium">متوفر</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-slate-400 py-4">لا يوجد أطباء مسجلين في هذا القسم</p>
+              )}
             </div>
           </Card>
         </div>

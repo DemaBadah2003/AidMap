@@ -35,7 +35,9 @@ export default function HospitalsPage() {
   const [editForm, setEditForm] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
-  const [errors, setErrors] = useState<{add?: string, edit?: string}>({});
+  
+  // تعديل: تخزين اسم الحقل الذي يحتوي على الخطأ
+  const [errors, setErrors] = useState<{add?: string, editField?: string}>({});
 
   const [hospitalType, setHospitalType] = useState('');
   const [hospitalName, setHospitalName] = useState('');
@@ -98,9 +100,27 @@ export default function HospitalsPage() {
 
   const onSaveEdit = async () => {
     setErrors({});
+    
+    // فحص دقيق للحقول وتحديد الحقل المخطئ لتلوينه بالأحمر
+    if (!editForm.hospitalType) {
+        setErrors({ editField: 'hospitalType' });
+        toast.error('يرجى اختيار نوع المنشأة');
+        return;
+    }
+    if (!editForm.hospitalName) {
+        setErrors({ editField: 'hospitalName' });
+        toast.error('يرجى اختيار اسم المنشأة');
+        return;
+    }
+    if (!editForm.phone) {
+        setErrors({ editField: 'phone' });
+        toast.error('يرجى إدخال رقم التواصل');
+        return;
+    }
     if (!validatePhone(editForm.phone)) {
-      setErrors({ edit: 'رقم غير صحيح' });
-      return;
+        setErrors({ editField: 'phone' });
+        toast.error('صيغة رقم التواصل غير صحيحة');
+        return;
     }
 
     setSubmitting(true);
@@ -152,24 +172,37 @@ export default function HospitalsPage() {
                     {editingId === item.id ? (
                       <>
                         <td className="p-2">
-                            <select value={editForm.hospitalType} onChange={e => setEditForm({...editForm, hospitalType: e.target.value, hospitalName: ''})} className="w-full border rounded p-1.5 text-sm outline-none">
+                            <select 
+                                value={editForm.hospitalType} 
+                                onChange={e => {setEditForm({...editForm, hospitalType: e.target.value, hospitalName: ''}); setErrors({});}} 
+                                className={`w-full border rounded p-1.5 text-sm outline-none ${errors.editField === 'hospitalType' ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200'}`}
+                            >
                               {HOSPITAL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                         </td>
                         <td className="p-2">
-                            <select value={editForm.hospitalName} onChange={e => setEditForm({...editForm, hospitalName: e.target.value})} className="w-full border rounded p-1.5 text-sm outline-none">
+                            <select 
+                                value={editForm.hospitalName} 
+                                onChange={e => {setEditForm({...editForm, hospitalName: e.target.value}); setErrors({});}} 
+                                className={`w-full border rounded p-1.5 text-sm outline-none ${errors.editField === 'hospitalName' ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200'}`}
+                            >
                                 <option value="">اختر الاسم..</option>
                                 {(MASTER_DATA[editForm.hospitalType] || []).map(n => <option key={n} value={n}>{n}</option>)}
                             </select>
                         </td>
                         <td className="p-2">
-                            <Input className={`h-9 font-mono text-sm ${errors.edit ? 'border-red-400' : ''}`} value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} maxLength={10} />
+                            <Input 
+                                className={`h-9 font-mono text-sm ${errors.editField === 'phone' ? 'border-red-500 focus-visible:ring-red-500' : 'border-slate-200'}`} 
+                                value={editForm.phone} 
+                                onChange={e => {setEditForm({...editForm, phone: e.target.value}); setErrors({});}} 
+                                maxLength={10} 
+                            />
                         </td>
                         <td className="p-2 text-center flex justify-center gap-2">
                           <Button size="sm" onClick={onSaveEdit} disabled={submitting} className="bg-blue-600 hover:bg-blue-700 h-8 w-8 p-0">
                             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 text-white" />}
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => setEditingId(null)} className="h-8 w-8 p-0 text-slate-400">
+                          <Button size="sm" variant="outline" onClick={() => {setEditingId(null); setErrors({});}} className="h-8 w-8 p-0 text-slate-400">
                             <X className="h-4 w-4" />
                           </Button>
                         </td>

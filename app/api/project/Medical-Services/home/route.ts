@@ -2,65 +2,56 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const type = searchParams.get('type');
+  const { searchParams } = new URL(req.url);
+  const type = searchParams.get('type');
 
-    // 1. جلب المواقع العامة (المحافظات) من جدول العناوين
+  try {
+    // 1. جلب المناطق (شمال، جنوب، شرق، غرب) الموجودة في جدول Address
     if (type === 'locations') {
       const locations = await prisma.address.findMany({
-        distinct: ['title'],
-        select: { title: true },
-        where: { title: { not: "" } }
+        select: { region: true },
+        distinct: ['region'],
       });
-      return NextResponse.json(locations.map(l => l.title));
+      // نرسل الـ Enum كما هو (NORTH, SOUTH, etc.) والفرونت سيقوم بالترجمة
+      return NextResponse.json(locations.map(l => l.region));
     }
 
-    // 2. جلب المناطق التفصيلية بناءً على الموقع العام المختار
-    if (type === 'regions') {
-      const locationTitle = searchParams.get('location');
-      const regions = await prisma.address.findMany({
-        where: { 
-          title: locationTitle as string,
-          description: { not: "" } 
-        },
-        distinct: ['description'],
-        select: { description: true }
+    // 2. جلب أنواع المنشآت (حكومي، خاص، وكالة) الموجودة فعلياً في جدول Hospital
+    if (type === 'orgTypes') {
+      const types = await prisma.hospital.findMany({
+        select: { type: true },
+        distinct: ['type'],
       });
-      return NextResponse.json(regions.map(r => r.description));
+      return NextResponse.json(types.map(t => t.type));
     }
 
-    // 3. جلب المستشفيات المرتبطة بالمنطقة المختارة
+    // 3. جلب المستشفيات بناءً على "المنطقة" و "النوع" المختارين
     if (type === 'hospitals') {
-      const regionName = searchParams.get('region');
+      const region = searchParams.get('region'); // NORTH, SOUTH...
+      const orgType = searchParams.get('orgType'); // PRIVATE, GOVERNMENT...
+
       const hospitals = await prisma.hospital.findMany({
-        where: { 
-          // هنا السر: لازم حقل location في جدول Hospital يكون مخزن فيه قيمة 
-          // تطابق الـ description اللي جاي من جدول Address
-          location: regionName as string 
+        where: {
+          type: orgType as any,
+          address: { region: region as any }
         },
         select: { id: true, name: true }
       });
       return NextResponse.json(hospitals);
     }
 
-    // 4. جلب تفاصيل المستشفى (أقسام، أطباء، خدمات)
+    // 4. جلب الأقسام (نفس الكود السابق)
     if (type === 'details') {
       const hospitalId = searchParams.get('hospitalId');
-      const data = await prisma.hospital.findUnique({
-        where: { id: hospitalId as string },
-        include: {
-          departments: {
-            include: { services: true, doctors: true }
-          }
-        }
+      const departments = await prisma.department.findMany({
+        where: { hospitalId: hospitalId as string },
+        include: { services: true, doctors: true }
       });
-      return NextResponse.json(data);
+      return NextResponse.json(departments);
     }
 
-    return NextResponse.json([]);
-  } catch (error) {
-    console.error("API ERROR:", error);
-    return NextResponse.json({ error: 'Database Error' }, { status: 500 });
+    return NextResponse.json({ error: "Invalid type" }, { status: 400 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

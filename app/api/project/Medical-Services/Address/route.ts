@@ -1,6 +1,19 @@
 import prisma from "@/lib/prisma"; 
 import { NextResponse } from "next/server";
 
+// دالة مساعدة لتحويل العنوان المكتوب بالعربي إلى Enum المنطقة
+// تأكد أن القيم (NORTH, SOUTH, etc) تطابق تماماً ما هو موجود في schema.prisma
+const mapTitleToRegion = (title: string) => {
+  const map: Record<string, any> = {
+    'شمال': 'NORTH',
+    'جنوب': 'SOUTH',
+    'وسط': 'CENTRAL',
+    'شرق': 'EAST',
+    'غرب': 'WEST'
+  };
+  return map[title] || 'NORTH'; // قيمة افتراضية في حال لم يجد تطابق
+};
+
 // جلب العناوين
 export async function GET() {
   try {
@@ -18,15 +31,16 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     
-    // التحقق من وجود البيانات المطلوبة حسب السكيما
+    // التحقق من وجود البيانات المطلوبة
     if (!body.title || !body.description) {
       return NextResponse.json({ error: "الحقول مطلوبة" }, { status: 400 });
     }
 
     const newItem = await prisma.address.create({
       data: {
-        title: body.title,        // الموقع العام
-        description: body.description, // الموقع التفصيلي
+        title: body.title,           // مثل: جباليا
+        description: body.description, // وصف إضافي
+        region: mapTitleToRegion(body.title), // هنا حل المشكلة: إرسال الـ region المطلوب
       },
     });
     
@@ -57,6 +71,7 @@ export async function PUT(req: Request) {
       data: {
         title: body.title,
         description: body.description,
+        region: mapTitleToRegion(body.title), // تحديث المنطقة أيضاً عند التعديل
       },
     });
 
