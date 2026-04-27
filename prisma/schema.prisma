@@ -153,35 +153,34 @@ model Supervisor {
 
   @@index([status])
 }
+
 model Hospital {
-  id            String         @id @default(uuid())
-  type          HospitalType   // حكومي، وكالة، خاص
-  name          String         // اسم المستشفى
-  region        Region         // الموقع العام (للفلترة السريعة)
-  phone         String
-  latitude      Decimal?       @db.Decimal(10, 7)
-  longitude     Decimal?       @db.Decimal(10, 7)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id          String         @id @default(uuid())
+  type        HospitalType   // حكومي، وكالة، خاص
+  name        String         // اسم المستشفى
+  region      Region         // الموقع العام (للفلترة السريعة)
+  phone       String
+  latitude    Decimal?       @db.Decimal(10, 7)
+  longitude   Decimal?       @db.Decimal(10, 7)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
-  // الربط الجديد والمهم: المستشفى يتبع لعنوان/منطقة محددة
-  addressId     String
-  address       Address        @relation(fields: [addressId], references: [id])
+  addressId   String
+  address     Address        @relation(fields: [addressId], references: [id])
 
-  // باقي علاقاتك كما هي دون تغيير
   departments   Department[]
   distributions Distribution[]
   doctors       Doctor[]
   patients      Patient[]
-  pharmacies    Pharmacy[]
+  // تم حذف علاقة الصيدليات (pharmacies) من هنا
   
-  // علاقة المكان (Place)
-  placeId       String?        @unique
-  place         Place?         @relation("HospitalPlace", fields: [placeId], references: [id])
+  placeId     String?        @unique
+  place       Place?         @relation("HospitalPlace", fields: [placeId], references: [id])
 
   @@index([type])
   @@index([region])
 }
+
 model Department {
   id          String    @id @default(uuid())
   name        String    // اسم القسم (مثل: غرفة العمليات)
@@ -205,12 +204,13 @@ model Service {
   institutionServices InstitutionService[]
   department          Department           @relation(fields: [departmentId], references: [id])
 }
+
 model Doctor {
   id           String      @id @default(uuid())
   name         String
   phone        String
   specialty    String      // التخصص
-  workSchedule String      // <--- هذا الحقل الذي يجب إضافته (مواعيد العمل)
+  workSchedule String      // مواعيد العمل
   description  String?
   hospitalId   String
   departmentId String?
@@ -218,25 +218,18 @@ model Doctor {
   department   Department? @relation(fields: [departmentId], references: [id])
   hospital     Hospital    @relation(fields: [hospitalId], references: [id])
 }
+
 model Patient {
   id          String   @id @default(uuid())
   name        String
+  nationalId  String   @unique 
+  age         String
+  address     String
   phone       String
-  diseaseType String
+  diseaseType String?
   hospitalId  String
   createdAt   DateTime @default(now())
   hospital    Hospital @relation(fields: [hospitalId], references: [id])
-}
-
-model Pharmacy {
-  id              String   @id @default(uuid())
-  name            String
-  phone           String
-  availableMeds   String?
-  unavailableMeds String?
-  hospitalId      String
-  createdAt       DateTime @default(now())
-  hospital        Hospital @relation(fields: [hospitalId], references: [id])
 }
 
 model Address {
@@ -246,14 +239,11 @@ model Address {
   description String?
   createdAt   DateTime  @default(now())
   
-  // علاقة: العنوان الواحد (المنطقة) يمكن أن يحتوي على عدة مستشفيات
   hospitals   Hospital[] 
 
-  // الإبقاء على علاقتك القديمة مع المخيمات إذا كانت مطلوبة
   campId      String?
   camp        Camps?    @relation(fields: [campId], references: [id])
 }
-
 
 model Institution {
   id                  String               @id @default(uuid())
@@ -537,6 +527,8 @@ model RequestAid {
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 }
+
+// --- Enums ---
 
 enum UserStatus {
   INACTIVE

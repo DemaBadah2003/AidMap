@@ -1,57 +1,91 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { Region, HospitalType } from '@prisma/client';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const type = searchParams.get('type');
+  
+  // الفلاتر القادمة من الطلب
+  const region = searchParams.get('region') as Region;
+  const orgType = searchParams.get('orgType') as HospitalType;
+  const hospitalId = searchParams.get('hospitalId');
+  const deptType = searchParams.get('deptType'); // التخصص المختار
 
   try {
-    // 1. جلب المناطق (شمال، جنوب، شرق، غرب) الموجودة في جدول Address
+    // 1. جلب المواقع (المناطق) الفريدة من جدول العناوين
     if (type === 'locations') {
-      const locations = await prisma.address.findMany({
+      const data = await prisma.address.findMany({
         select: { region: true },
         distinct: ['region'],
       });
-      // نرسل الـ Enum كما هو (NORTH, SOUTH, etc.) والفرونت سيقوم بالترجمة
-      return NextResponse.json(locations.map(l => l.region));
+      return NextResponse.json(data.map(item => item.region).filter(Boolean));
     }
 
-    // 2. جلب أنواع المنشآت (حكومي، خاص، وكالة) الموجودة فعلياً في جدول Hospital
+    // 2. جلب أنواع المستشفيات الفريدة (GOVERNMENT, PRIVATE, UNRWA)
     if (type === 'orgTypes') {
-      const types = await prisma.hospital.findMany({
+      const data = await prisma.hospital.findMany({
         select: { type: true },
         distinct: ['type'],
       });
-      return NextResponse.json(types.map(t => t.type));
+      return NextResponse.json(data.map(item => item.type).filter(Boolean));
     }
 
-    // 3. جلب المستشفيات بناءً على "المنطقة" و "النوع" المختارين
+    // 3. جلب المستشفيات بناءً على المنطقة والنوع
     if (type === 'hospitals') {
-      const region = searchParams.get('region'); // NORTH, SOUTH...
-      const orgType = searchParams.get('orgType'); // PRIVATE, GOVERNMENT...
-
-      const hospitals = await prisma.hospital.findMany({
+      const data = await prisma.hospital.findMany({
         where: {
-          type: orgType as any,
-          address: { region: region as any }
+          ...(region && { region }),
+          ...(orgType && { type: orgType }),
         },
-        select: { id: true, name: true }
+        select: { id: true, name: true },
       });
-      return NextResponse.json(hospitals);
+      return NextResponse.json(data);
     }
 
-    // 4. جلب الأقسام (نفس الكود السابق)
-    if (type === 'details') {
-      const hospitalId = searchParams.get('hospitalId');
-      const departments = await prisma.department.findMany({
-        where: { hospitalId: hospitalId as string },
-        include: { services: true, doctors: true }
+    // 4. جلب التخصصات (deptType) المتاحة في مستشفى معين (للقائمة المنسدلة الرابعة)
+    if (type === 'specialties' && hospitalId) {
+      const data = await prisma.department.findMany({
+        where: { hospitalId },
+        select: { deptType: true },
+        distinct: ['deptType'],
       });
-      return NextResponse.json(departments);
+      return NextResponse.json(data.map(item => item.deptType).filter(Boolean));
     }
 
-    return NextResponse.json({ error: "Invalid type" }, { status: 400 });
+    // 5. جلب الأقسام مع (الخدمات + الأطباء) بناءً على التخصص المختار في المستشفى
+    if (type === 'details' && hospitalId && deptType) {
+      const data = await prisma.department.findMany({
+        where: { 
+          hospitalId: hospitalId,
+          deptType: deptType 
+        },
+        include: { 
+          services: {
+            select: {
+              id: true,
+              name: true,
+              isAvailable: true,
+              price: true
+            }
+          }, 
+          doctors: {
+            select: {
+              id: true,
+              name: true,
+              specialty: true,
+              workSchedule: true,
+              phone: true
+            }
+          } 
+        },
+      });
+      return NextResponse.json(data);
+    }
+
+    return NextResponse.json([]);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Database Error:", error);
+    return NextResponse.json({ error: "حدث خطأ في الاتصال بقاعدة البيانات" }, { status: 500 });
   }
 }
