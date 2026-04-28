@@ -36,8 +36,7 @@ export default function HospitalsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
   
-  // تعديل: تخزين اسم الحقل الذي يحتوي على الخطأ
-  const [errors, setErrors] = useState<{add?: string, editField?: string}>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [hospitalType, setHospitalType] = useState('');
   const [hospitalName, setHospitalName] = useState('');
@@ -55,7 +54,7 @@ export default function HospitalsPage() {
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
-  const validatePhone = (num: string) => /^(056|059)\d{7}$/.test(num);
+  const validatePhoneFormat = (num: string) => /^(056|059)\d{7}$/.test(num);
 
   const filtered = useMemo(() => {
     if (!q.trim()) return items;
@@ -71,14 +70,28 @@ export default function HospitalsPage() {
     return filtered.slice(start, start + pageSize);
   }, [filtered, currentPage, pageSize]);
 
-  const onAdd = async () => {
-    setErrors({});
-    if (!hospitalType || !hospitalName || !phone) {
-      setErrors({ add: 'يرجى إكمال جميع الحقول' });
-      return;
+  const performValidation = (data: { hospitalType: string, hospitalName: string, phone: string }, currentId?: string) => {
+    const newErrors: Record<string, string> = {};
+    if (!data.hospitalType) newErrors.hospitalType = 'يرجى اختيار نوع المنشأة';
+    if (!data.hospitalName) newErrors.hospitalName = 'يرجى اختيار اسم المنشأة';
+    
+    if (!data.phone) {
+      newErrors.phone = 'يجب ان يبدا ب 056او059وبعده 7 ارقام';
+    } else if (!validatePhoneFormat(data.phone)) {
+      newErrors.phone = 'يجب ان يبدا ب 056او059وبعده 7 ارقام';
+    } else {
+      const isDuplicate = items.some(item => item.phone === data.phone && item.id !== currentId);
+      if (isDuplicate) {
+        newErrors.phone = 'رقم الهاتف موجود مسبقاً';
+      }
     }
-    if (!validatePhone(phone)) {
-      setErrors({ add: 'الرقم يجب أن يبدأ بـ 056 أو 059 ويتكون من 10 أرقام' });
+    return newErrors;
+  };
+
+  const onAdd = async () => {
+    const formErrors = performValidation({ hospitalType, hospitalName, phone });
+    if (Object.keys(formErrors).length > 0) {
+      setErrors(formErrors);
       return;
     }
 
@@ -93,34 +106,17 @@ export default function HospitalsPage() {
         setAddOpen(false);
         fetchItems();
         setPhone(''); setHospitalType(''); setHospitalName('');
+        setErrors({});
         toast.success('تمت الإضافة بنجاح');
       }
     } finally { setSubmitting(false); }
   };
 
   const onSaveEdit = async () => {
-    setErrors({});
-    
-    // فحص دقيق للحقول وتحديد الحقل المخطئ لتلوينه بالأحمر
-    if (!editForm.hospitalType) {
-        setErrors({ editField: 'hospitalType' });
-        toast.error('يرجى اختيار نوع المنشأة');
-        return;
-    }
-    if (!editForm.hospitalName) {
-        setErrors({ editField: 'hospitalName' });
-        toast.error('يرجى اختيار اسم المنشأة');
-        return;
-    }
-    if (!editForm.phone) {
-        setErrors({ editField: 'phone' });
-        toast.error('يرجى إدخال رقم التواصل');
-        return;
-    }
-    if (!validatePhone(editForm.phone)) {
-        setErrors({ editField: 'phone' });
-        toast.error('صيغة رقم التواصل غير صحيحة');
-        return;
+    const formErrors = performValidation(editForm, editingId!);
+    if (Object.keys(formErrors).length > 0) {
+      setErrors(formErrors);
+      return;
     }
 
     setSubmitting(true);
@@ -132,6 +128,7 @@ export default function HospitalsPage() {
       });
       if (res.ok) {
         setEditingId(null);
+        setErrors({});
         fetchItems();
         toast.success('تم التحديث بنجاح');
       }
@@ -154,7 +151,7 @@ export default function HospitalsPage() {
             </Button>
           </div>
           
-          <div className="overflow-auto max-h-[400px]">
+          <div className="overflow-auto max-h-[450px]">
             <table className="w-full text-right border-collapse min-w-[700px]">
               <thead className="bg-slate-50 text-slate-500 border-b sticky top-0 z-10">
                 <tr>
@@ -171,32 +168,33 @@ export default function HospitalsPage() {
                   <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
                     {editingId === item.id ? (
                       <>
-                        <td className="p-2">
+                        <td className="p-2 align-top">
                             <select 
                                 value={editForm.hospitalType} 
                                 onChange={e => {setEditForm({...editForm, hospitalType: e.target.value, hospitalName: ''}); setErrors({});}} 
-                                className={`w-full border rounded p-1.5 text-sm outline-none ${errors.editField === 'hospitalType' ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200'}`}
+                                className={`w-full border rounded p-1.5 text-sm outline-none ${errors.hospitalType ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200'}`}
                             >
                               {HOSPITAL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                         </td>
-                        <td className="p-2">
+                        <td className="p-2 align-top">
                             <select 
                                 value={editForm.hospitalName} 
                                 onChange={e => {setEditForm({...editForm, hospitalName: e.target.value}); setErrors({});}} 
-                                className={`w-full border rounded p-1.5 text-sm outline-none ${errors.editField === 'hospitalName' ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200'}`}
+                                className={`w-full border rounded p-1.5 text-sm outline-none ${errors.hospitalName ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200'}`}
                             >
                                 <option value="">اختر الاسم..</option>
                                 {(MASTER_DATA[editForm.hospitalType] || []).map(n => <option key={n} value={n}>{n}</option>)}
                             </select>
                         </td>
-                        <td className="p-2">
+                        <td className="p-2 align-top">
                             <Input 
-                                className={`h-9 font-mono text-sm ${errors.editField === 'phone' ? 'border-red-500 focus-visible:ring-red-500' : 'border-slate-200'}`} 
+                                className={`h-9 font-mono text-sm ${errors.phone ? 'border-red-500 focus-visible:ring-red-500' : 'border-slate-200'}`} 
                                 value={editForm.phone} 
                                 onChange={e => {setEditForm({...editForm, phone: e.target.value}); setErrors({});}} 
                                 maxLength={10} 
                             />
+                            {errors.phone && <p className="text-[10px] text-red-500 mt-1 font-bold leading-tight">{errors.phone}</p>}
                         </td>
                         <td className="p-2 text-center flex justify-center gap-2">
                           <Button size="sm" onClick={onSaveEdit} disabled={submitting} className="bg-blue-600 hover:bg-blue-700 h-8 w-8 p-0">
@@ -251,22 +249,24 @@ export default function HospitalsPage() {
           <div className="grid gap-4 py-4">
             <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-400 mr-1">نوع المنشأة</label>
-                <select value={hospitalType} onChange={e => {setHospitalType(e.target.value); setHospitalName(''); setErrors({});}} className="w-full border border-slate-200 rounded-md p-2 text-sm outline-none">
+                <select value={hospitalType} onChange={e => {setHospitalType(e.target.value); setHospitalName(''); setErrors({});}} className={`w-full border rounded-md p-2 text-sm outline-none ${errors.hospitalType ? 'border-red-500' : 'border-slate-200'}`}>
                   <option value="">اختر النوع..</option>
                   {HOSPITAL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
+                {errors.hospitalType && <p className="text-[11px] text-red-500 font-bold mt-1 px-1">{errors.hospitalType}</p>}
             </div>
             <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-400 mr-1">الاسم</label>
-                <select value={hospitalName} onChange={e => {setHospitalName(e.target.value); setErrors({});}} disabled={!hospitalType} className="w-full border border-slate-200 rounded-md p-2 text-sm outline-none disabled:bg-slate-50">
+                <select value={hospitalName} onChange={e => {setHospitalName(e.target.value); setErrors({});}} disabled={!hospitalType} className={`w-full border rounded-md p-2 text-sm outline-none disabled:bg-slate-50 ${errors.hospitalName ? 'border-red-500' : 'border-slate-200'}`}>
                   <option value="">اختر الاسم..</option>
                   {(MASTER_DATA[hospitalType] || []).map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
+                {errors.hospitalName && <p className="text-[11px] text-red-500 font-bold mt-1 px-1">{errors.hospitalName}</p>}
             </div>
             <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-400 mr-1">رقم التواصل</label>
-                <Input placeholder="05xxxxxxxx" value={phone} onChange={e => {setPhone(e.target.value); setErrors({});}} maxLength={10} className={`border-slate-200 ${errors.add ? 'border-red-400 focus:ring-red-50' : ''}`} />
-                {errors.add && <p className="text-[11px] text-red-500 font-bold mt-1 px-1">{errors.add}</p>}
+                <Input placeholder="05xxxxxxxx" value={phone} onChange={e => {setPhone(e.target.value); setErrors({});}} maxLength={10} className={`border-slate-200 ${errors.phone ? 'border-red-400 focus:ring-red-50' : ''}`} />
+                {errors.phone && <p className="text-[11px] text-red-500 font-bold mt-1 px-1 leading-tight">{errors.phone}</p>}
             </div>
           </div>
           
@@ -274,7 +274,7 @@ export default function HospitalsPage() {
             <Button onClick={onAdd} disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 transition-all">
               {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : 'حفظ'}
             </Button>
-            <Button variant="outline" onClick={() => setAddOpen(false)} className="flex-1 border-slate-200 text-slate-600 font-bold h-11 hover:bg-slate-50 transition-all">
+            <Button variant="outline" onClick={() => {setAddOpen(false); setErrors({});}} className="flex-1 border-slate-200 text-slate-600 font-bold h-11 hover:bg-slate-50 transition-all">
               إلغاء
             </Button>
           </DialogFooter>

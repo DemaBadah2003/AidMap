@@ -40,7 +40,6 @@ export const MENU_SIDEBAR: MenuConfig = [
             title: 'الخدمات التعليمية والطلاب',
             path: '/project/projects/education',
             children: [
-              { title: 'أماكن خيام التعليم', path: '/project/projects/education/camps' },
               { title: 'مراكز الدعم النفسي', path: '/project/projects/education/psychological' },
               { title: 'نقاط الإنترنت للدراسة', path: '/project/projects/education/internet' },
               { title: 'قضايا الطلاب والتعليم', path: '/project/projects/education/student-issues' },
@@ -72,6 +71,8 @@ export const MENU_SIDEBAR: MenuConfig = [
             path: '/project/projects/camp',
             children: [
               { title: 'جدول مركز الايواء', path: '/project/projects/camp/shelters' },
+              { title: 'جدول المخيمات', path: '/project/projects/camp/camps' },
+
               { title: 'جدول المشرفين', path: '/project/projects/camp/supervisior' },
               { title: 'جدول الطوارئ', path: '/project/projects/camp/Emergency' },
             ],

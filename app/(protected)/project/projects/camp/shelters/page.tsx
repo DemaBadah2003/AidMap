@@ -2,90 +2,66 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { z } from 'zod'
-import { Card, CardContent } from '../../../../../../components/ui/card'
-import { Button } from '../../../../../../components/ui/button'
-import { Input } from '../../../../../../components/ui/input'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '../../../../../../components/ui/dialog'
+} from '@/components/ui/dialog'
 import { 
-  Pencil, Save, X, Plus, Search, 
-  ChevronRight, ChevronLeft, Loader2
+  Pencil, Plus, Search, MapPin, AlertCircle, Check, X, Loader2, ChevronRight, ChevronLeft
 } from 'lucide-react'
 
-// --- 1. الثوابت ---
-const REGIONS_OPTIONS = ['شرق', 'غرب', 'شمال', 'جنوب'] as const;
-const STATUS_OPTIONS = ['ممتلئ', 'غير ممتلئ'] as const;
-
-// --- 2. مخطط التحقق Zod ---
+// --- شروط التحقق الصارمة (Zod Schema) ---
 const shelterSchema = z.object({
-  nameAr: z.string().trim().min(1, 'اسم المركز مطلوب'),
-  areaAr: z.enum([...REGIONS_OPTIONS], { 
-    errorMap: () => ({ message: 'المنطقة مطلوبة' }) 
-  }),
-  supervisorAr: z.string().trim().min(1, 'اسم المشرف مطلوب'),
-  phone: z
-    .string()
+  name: z.string()
     .trim()
-    .min(1, 'رقم الهاتف مطلوب')
-    .regex(/^(056|059)\d{7}$/, 'يجب أن يبدأ بـ 056 أو 059 ويتكون من 10 أرقام'),
-  capacity: z.coerce.number().gt(0, 'السعة يجب أن تكون أكبر من صفر'),
-  fillStatus: z.enum([...STATUS_OPTIONS], { 
-    errorMap: () => ({ message: 'الحالة مطلوبة' }) 
-  }),
+    .min(1, 'اسم المركز مطلوب')
+    .refine((val) => val.split(/\s+/).filter(Boolean).length >= 4, { 
+      message: 'يجب أن يكون الاسم رباعياً على الأقل' 
+    }),
+  area: z.string().min(1, 'المنطقة مطلوبة'),
+  phone: z.string()
+    .trim()
+    .regex(/^(056|059)\d{7}$/, 'يجب أن يبدأ بـ 056 أو 059 ويتبعه 7 أرقام'),
+  capacity: z.coerce.number()
+    .int()
+    .min(1, 'السعة يجب أن تكون أكبر من 0'),
+  familiesCount: z.coerce.number()
+    .int()
+    .nonnegative('عدد العائلات لا يمكن أن يكون سالباً'),
 })
 
-type Region = (typeof REGIONS_OPTIONS)[number]
-type FillStatus = (typeof STATUS_OPTIONS)[number]
-
-type Shelter = {
-  id: string
-  nameAr: string
-  areaAr: Region
-  supervisorAr: string
-  phone: string
-  familiesCount: number
-  capacity: number
-  fillStatus: FillStatus
-}
-
-const BASE_URL = '/api/project/projects/shelter'
+const REGIONS_OPTIONS = ['شرق', 'غرب', 'شمال', 'جنوب'] as const;
+const statusDisplay = { 'FULL': 'ممتلئ', 'NOT_FULL': 'غير ممتلئ' }
+const BASE_URL = '/api/project/camp/shelter'
 
 export default function SheltersPage() {
   const [q, setQ] = useState('')
-  const [items, setItems] = useState<Shelter[]>([])
+  const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<'الكل' | FillStatus>('الكل')
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [responseError, setResponseError] = useState('')
   
-  // --- حالات الـ Pagination المحدثة ---
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(5)
+  const [pageSize, setPageSize] = useState(5)
 
-  const [addOpen, setAddOpen] = useState(false)
-  const [formData, setFormData] = useState({
-    nameAr: '',
-    areaAr: 'شمال' as Region,
-    supervisorAr: '',
-    phone: '',
-    capacity: 0,
-    fillStatus: 'غير ممتلئ' as FillStatus,
-  })
-  const [submitting, setSubmitting] = useState(false)
-
+  // In-line Edit States
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editDraft, setEditDraft] = useState<Omit<Shelter, 'id' | 'familiesCount'>>({
-    nameAr: '',
-    areaAr: 'شمال',
-    supervisorAr: '',
-    phone: '',
-    capacity: 0,
-    fillStatus: 'غير ممتلئ',
-  })
+  const [editFormData, setEditFormData] = useState({ name: '', area: '', phone: '', capacity: 0, familiesCount: 0 })
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({})
+  const [savingId, setSavingId] = useState<string | null>(null)
+
+  // Add States
+  const [addOpen, setAddOpen] = useState(false)
+  const [addFormData, setAddFormData] = useState({ name: '', area: 'شمال', phone: '', capacity: 1, familiesCount: 0 })
+  const [addErrors, setAddErrors] = useState<Record<string, string>>({})
+  const [adding, setAdding] = useState(false)
 
   const fetchShelters = async () => {
     setLoading(true)
@@ -93,319 +69,226 @@ export default function SheltersPage() {
       const res = await fetch(BASE_URL)
       const data = await res.json()
       setItems(Array.isArray(data) ? data : [])
-    } catch (err) { console.error(err) }
+    } catch (err) { setResponseError('فشل تحميل البيانات') }
     finally { setLoading(false) }
   }
 
-  useEffect(() => {
-    fetchShelters()
-  }, [])
+  useEffect(() => { fetchShelters() }, [])
 
-  const filteredItems = useMemo(() => {
-    return items.filter(sh => {
-      const name = sh.nameAr || ''
-      const area = sh.areaAr || ''
-      const phone = sh.phone || ''
-      const matchSearch = name.includes(q) || area.includes(q) || phone.includes(q)
-      const matchStatus = statusFilter === 'الكل' || sh.fillStatus === statusFilter
-      return matchSearch && matchStatus
-    })
-  }, [q, items, statusFilter])
-
-  // --- منطق الـ Pagination الجديد ---
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / itemsPerPage))
-  
-  const currentTableData = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage
-    return filteredItems.slice(start, start + itemsPerPage)
-  }, [currentPage, filteredItems, itemsPerPage])
-
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [q, statusFilter, itemsPerPage])
-
-  const rangeStart = filteredItems.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1
-  const rangeEnd = Math.min(currentPage * itemsPerPage, filteredItems.length)
-
-  const validate = (data: any) => {
-    const result = shelterSchema.safeParse(data)
+  // --- دالة حفظ التعديل المباشر ---
+  const onInLineSave = async (id: string) => {
+    const result = shelterSchema.safeParse(editFormData)
     if (!result.success) {
       const errors: Record<string, string> = {}
-      result.error.issues.forEach((issue) => {
-        const fieldName = issue.path[0].toString()
-        errors[fieldName] = issue.message
-      })
-      setFormErrors(errors)
-      return false
+      result.error.issues.forEach(i => { errors[i.path[0].toString()] = i.message })
+      setEditErrors(errors); return
     }
-    setFormErrors({})
-    return true
-  }
-
-  const onAdd = async () => {
-    if (!validate(formData)) return
-    setSubmitting(true)
-    try {
-      const res = await fetch(BASE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      })
-      if (!res.ok) throw new Error('فشل الحفظ')
-      const created = await res.json()
-      setItems(prev => [created, ...prev])
-      setAddOpen(false)
-      setFormData({ nameAr: '', areaAr: 'شمال', supervisorAr: '', phone: '', capacity: 0, fillStatus: 'غير ممتلئ' })
-      setCurrentPage(1)
-    } catch (err: any) { alert(err.message) }
-    finally { setSubmitting(false) }
-  }
-
-  const saveEditRow = async (id: string) => {
-    if (!validate(editDraft)) return
+    
+    setSavingId(id); setResponseError(''); setEditErrors({})
     try {
       const res = await fetch(`${BASE_URL}?id=${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editDraft)
+        body: JSON.stringify(result.data)
       })
-      if (!res.ok) throw new Error('فشل التعديل')
-      const updated = await res.json()
-      setItems(prev => prev.map(sh => sh.id === id ? { ...sh, ...updated } : sh))
-      setEditingId(null)
-    } catch (err) { alert('حدث خطأ أثناء التعديل') }
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || 'فشل التحديث')
+      await fetchShelters(); setEditingId(null)
+    } catch (err: any) { setResponseError(err.message) }
+    finally { setSavingId(null) }
   }
 
+  // --- دالة إضافة مركز جديد ---
+  const onAdd = async () => {
+    const result = shelterSchema.safeParse(addFormData)
+    if (!result.success) {
+      const errors: Record<string, string> = {}
+      result.error.issues.forEach(i => { errors[i.path[0].toString()] = i.message })
+      setAddErrors(errors); return
+    }
+
+    setAdding(true); setResponseError(''); setAddErrors({})
+    try {
+      const res = await fetch(BASE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(result.data)
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || 'فشل الإضافة (ربما البيانات مكررة)')
+      await fetchShelters(); setAddOpen(false)
+      setAddFormData({ name: '', area: 'شمال', phone: '', capacity: 1, familiesCount: 0 })
+    } catch (err: any) { setResponseError(err.message) }
+    finally { setAdding(false) }
+  }
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item: any) => {
+      const matchesSearch = item.name.toLowerCase().includes(q.toLowerCase()) || item.phone.includes(q);
+      const matchesStatus = statusFilter === 'ALL' || item.fillStatus === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [items, q, statusFilter]);
+
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredItems.slice(start, start + pageSize);
+  }, [filteredItems, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(filteredItems.length / pageSize);
+
   return (
-    <div className="w-full px-4 py-5" dir="rtl">
+    <div className="w-full px-4 py-8 font-sans" dir="rtl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800 text-right font-sans">إدارة مراكز الإيواء</h1>
+        <h1 className="text-3xl font-bold text-slate-900">إدارة مراكز الإيواء</h1>
+        <p className="text-slate-500 mt-1 text-sm">تتبع سعة مراكز النزوح والمناطق مع التدقيق في البيانات</p>
       </div>
 
-      <Card className="border-slate-200 shadow-sm overflow-hidden">
-        <CardContent className="p-0">
-          <div className="p-4 flex flex-col lg:flex-row gap-4 justify-between bg-white border-b">
-            <div className="flex gap-2">
-              <div className="relative w-64">
-                <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث..." className="pr-9 h-10 border-slate-200" />
-              </div>
-              <select 
-                className="border border-slate-200 rounded-lg px-3 text-sm bg-white h-10 outline-none focus:ring-2 focus:ring-blue-500"
-                value={statusFilter} 
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-              >
-                <option value="الكل">كل الحالات</option>
-                {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            
-            <Button onClick={() => { setFormErrors({}); setAddOpen(true); }} className="bg-blue-600 hover:bg-blue-700 h-10 px-5 font-bold">
-                إضافة مركز إيواء <Plus className="mr-2 h-4 w-4" />
-            </Button>
-          </div>
+      {responseError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg flex items-center gap-3 text-sm mb-6">
+          <AlertCircle size={20} /> <p className="font-bold">{responseError}</p>
+        </div>
+      )}
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-sm">
-              <thead className="bg-slate-50 border-b">
+      <Card className="border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-4 bg-slate-50/50 border-b flex flex-col md:flex-row items-center justify-between gap-4">
+           <div className="flex flex-1 items-center gap-3 w-full">
+              <div className="relative w-full max-w-sm">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <Input placeholder="بحث باسم المركز أو الهاتف..." className="pr-10 bg-white" value={q} onChange={(e) => {setQ(e.target.value); setCurrentPage(1);}} />
+              </div>
+              <select className="border rounded-md px-3 h-10 text-sm bg-white" value={statusFilter} onChange={(e) => {setStatusFilter(e.target.value); setCurrentPage(1);}}>
+                <option value="ALL">كل الحالات</option>
+                <option value="NOT_FULL">غير ممتلئ</option>
+                <option value="FULL">ممتلئ</option>
+              </select>
+           </div>
+           <Button onClick={() => setAddOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-10">
+             <Plus size={18} /> إضافة مركز جديد
+           </Button>
+        </div>
+
+        <CardContent className="p-0">
+          <div className="overflow-x-auto overflow-y-auto max-h-[450px]">
+            <table className="w-full text-right border-collapse sticky top-0">
+              <thead className="bg-slate-100/80 text-slate-600 text-sm border-b sticky top-0 z-10">
                 <tr>
-                  <th className="p-4 font-bold text-slate-600">اسم المركز</th>
-                  <th className="p-4 font-bold text-slate-600">المنطقة</th>
-                  <th className="p-4 font-bold text-slate-600">المشرف</th>
-                  <th className="p-4 font-bold text-slate-600">الهاتف</th>
-                  <th className="p-4 font-bold text-slate-600">السعة</th>
-                  <th className="p-4 text-center font-bold text-slate-600">الحالة</th>
-                  <th className="p-4 text-center font-bold text-slate-600">الإجراءات</th>
+                  <th className="p-4 font-bold text-right min-w-[220px]">اسم المركز</th>
+                  <th className="p-4 font-bold text-right min-w-[120px]">المنطقة</th>
+                  <th className="p-4 font-bold text-center">السعة</th>
+                  <th className="p-4 font-bold text-center">العائلات</th>
+                  <th className="p-4 font-bold text-right">الحالة</th>
+                  <th className="p-4 font-bold text-center">تعديل</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 bg-white">
                 {loading ? (
-                  <tr><td colSpan={7} className="p-10 text-center text-slate-500"><Loader2 className="animate-spin inline-block mr-2" /> جاري التحميل...</td></tr>
-                ) : currentTableData.length === 0 ? (
-                  <tr><td colSpan={7} className="p-10 text-center text-slate-500 italic">لا توجد بيانات تطابق البحث</td></tr>
-                ) : currentTableData.map((sh) => (
-                  <tr key={sh.id} className="hover:bg-slate-50/50 transition-colors">
-                    {editingId === sh.id ? (
-                      <>
-                        <td className="p-2 align-top">
-                            <Input value={editDraft.nameAr} onChange={(e)=>setEditDraft({...editDraft, nameAr: e.target.value})} className={formErrors.nameAr ? 'border-red-500' : ''} />
-                            {formErrors.nameAr && <p className="text-[10px] text-red-500 mt-1">{formErrors.nameAr}</p>}
-                        </td>
-                        <td className="p-2 align-top">
-                          <select className="border rounded p-2 w-full h-10 bg-white outline-none" value={editDraft.areaAr} onChange={(e)=>setEditDraft({...editDraft, areaAr: e.target.value as Region})}>
-                            {REGIONS_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                  <tr><td colSpan={6} className="p-10 text-center text-slate-400">جاري التحميل...</td></tr>
+                ) : paginatedItems.map((item: any) => {
+                  const isEditing = editingId === item.id;
+                  const isSaving = savingId === item.id;
+                  return (
+                    <tr key={item.id} className={`${isEditing ? 'bg-blue-50/50' : 'hover:bg-blue-50/10'}`}>
+                      <td className="p-3">
+                        {isEditing ? (
+                          <div className="space-y-1">
+                            <Input value={editFormData.name} onChange={(e) => setEditFormData({...editFormData, name: e.target.value})} className={`h-9 ${editErrors.name ? 'border-red-500' : ''}`} />
+                            {editErrors.name && <p className="text-[10px] text-red-600 font-bold">{editErrors.name}</p>}
+                          </div>
+                        ) : <span className="font-bold text-slate-800">{item.name}</span>}
+                      </td>
+                      <td className="p-3">
+                        {isEditing ? (
+                          <select className="w-full border h-9 rounded-md text-sm bg-white" value={editFormData.area} onChange={(e) => setEditFormData({...editFormData, area: e.target.value})}>
+                            {REGIONS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                           </select>
-                        </td>
-                        <td className="p-2 align-top">
-                            <Input value={editDraft.supervisorAr} onChange={(e)=>setEditDraft({...editDraft, supervisorAr: e.target.value})} className={formErrors.supervisorAr ? 'border-red-500' : ''} />
-                            {formErrors.supervisorAr && <p className="text-[10px] text-red-500 mt-1">{formErrors.supervisorAr}</p>}
-                        </td>
-                        <td className="p-2 align-top">
-                            <Input value={editDraft.phone} onChange={(e)=>setEditDraft({...editDraft, phone: e.target.value})} className={formErrors.phone ? 'border-red-500' : ''} />
-                            {formErrors.phone && <p className="text-[10px] text-red-500 mt-1" dir="rtl">{formErrors.phone}</p>}
-                        </td>
-                        <td className="p-2 align-top">
-                            <Input type="number" value={editDraft.capacity} onChange={(e)=>setEditDraft({...editDraft, capacity: +e.target.value})} className={formErrors.capacity ? 'border-red-500' : ''} />
-                            {formErrors.capacity && <p className="text-[10px] text-red-500 mt-1">{formErrors.capacity}</p>}
-                        </td>
-                        <td className="p-2 text-center align-top">
-                          <select className="border rounded p-1 h-9 bg-white outline-none" value={editDraft.fillStatus} onChange={(e)=>setEditDraft({...editDraft, fillStatus: e.target.value as FillStatus})}>
-                             {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-2 flex justify-center gap-1 align-top pt-3">
-                          <Button size="sm" className="bg-green-600 hover:bg-green-700 h-9" onClick={() => saveEditRow(sh.id)}><Save className="h-4 w-4"/></Button>
-                          <Button size="sm" variant="ghost" className="h-9" onClick={() => {setEditingId(null); setFormErrors({});}}><X className="h-4 w-4 text-red-500"/></Button>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="p-4 font-medium text-slate-700">{sh.nameAr}</td>
-                        <td className="p-4 text-slate-600">{sh.areaAr}</td>
-                        <td className="p-4 text-slate-600">{sh.supervisorAr}</td>
-                        <td className="p-4 text-slate-600" dir="ltr">{sh.phone}</td>
-                        <td className="p-4 text-slate-600">{sh.capacity}</td>
-                        <td className="p-4 text-center">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${sh.fillStatus === 'ممتلئ' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                            {sh.fillStatus}
-                          </span>
-                        </td>
-                        <td className="p-4 text-center">
-                          <button onClick={() => {setEditingId(sh.id); setEditDraft(sh); setFormErrors({});}} className="p-2 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-slate-200">
-                            <Pencil className="h-4 w-4 text-slate-500" />
-                          </button>
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                ))}
+                        ) : <span className="text-slate-600 flex items-center gap-1.5"><MapPin size={14} className="text-blue-500" /> {item.area}</span>}
+                      </td>
+                      <td className="p-3 text-center">{isEditing ? <Input type="number" value={editFormData.capacity} onChange={(e) => setEditFormData({...editFormData, capacity: e.target.value as any})} className="h-9 w-20 text-center mx-auto" /> : item.capacity}</td>
+                      <td className="p-3 text-center">{isEditing ? <Input type="number" value={editFormData.familiesCount} onChange={(e) => setEditFormData({...editFormData, familiesCount: e.target.value as any})} className="h-9 w-20 text-center mx-auto" /> : item.familiesCount}</td>
+                      <td className="p-3">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${item.fillStatus === 'FULL' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {statusDisplay[item.fillStatus as keyof typeof statusDisplay]}
+                        </span>
+                      </td>
+                      <td className="p-3 text-center">
+                        {isEditing ? (
+                          <div className="flex justify-center gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => onInLineSave(item.id)} disabled={isSaving}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 text-emerald-600" />}</Button>
+                            <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}><X className="h-4 w-4 text-red-600" /></Button>
+                          </div>
+                        ) : <Button variant="ghost" size="sm" onClick={() => {setEditingId(item.id); setEditFormData({name:item.name, area:item.area, phone:item.phone, capacity:item.capacity, familiesCount:item.familiesCount}); setEditErrors({})}} disabled={editingId !== null}><Pencil className="h-4 w-4 text-blue-600" /></Button>}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* --- الـ Pagination بنفس التنسيق الموحد المطلوب --- */}
-          <div className="p-4 flex items-center justify-between border-t bg-slate-50/30">
-            <div className="flex items-center gap-2 text-sm text-slate-500">
-              <span>عرض صفوف:</span>
-              <select 
-                value={itemsPerPage} 
-                onChange={(e) => setItemsPerPage(Number(e.target.value))} 
-                className="border rounded-md h-8 px-1 bg-white outline-none cursor-pointer"
-              >
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={15}>15</option>
+          <div className="p-4 bg-slate-50 border-t flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 font-bold">عرض:</span>
+              <select className="border rounded h-8 text-xs bg-white" value={pageSize} onChange={(e) => {setPageSize(Number(e.target.value)); setCurrentPage(1);}}>
+                {[5, 10, 15, 20].map(size => <option key={size} value={size}>{size}</option>)}
               </select>
             </div>
-
-            <div className="flex items-center gap-4 text-sm">
-              <span className="text-slate-500 font-medium font-sans">
-                {rangeStart} - {rangeEnd} <span className="mx-1 text-slate-300">|</span> من {filteredItems.length}
-              </span>
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 px-3 border-slate-200 hover:bg-white font-normal" 
-                  disabled={currentPage <= 1} 
-                  onClick={() => setCurrentPage(p => p - 1)}
-                >
-                  السابق
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 px-3 border-slate-200 hover:bg-white font-normal" 
-                  disabled={currentPage >= totalPages} 
-                  onClick={() => setCurrentPage(p => p + 1)}
-                >
-                  التالي
-                </Button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500">صفحة {currentPage} من {totalPages || 1}</span>
+              <div className="flex gap-1">
+                <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}><ChevronRight size={16} /></Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(p => p + 1)}><ChevronLeft size={16} /></Button>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* --- Dialog الإضافة --- */}
+      {/* نافذة الإضافة المحدثة (كل حقل في سطر) */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="max-w-md rounded-2xl border-none shadow-2xl">
-          <DialogHeader><DialogTitle className="text-xl font-bold text-right text-slate-800">إضافة مركز إيواء جديد</DialogTitle></DialogHeader>
-          <div className="grid gap-4 py-4 text-right">
-            <div className="grid gap-1.5">
-              <label className="text-sm font-bold text-slate-700">اسم المركز</label>
-              <Input 
-                value={formData.nameAr} 
-                onChange={(e)=>setFormData({...formData, nameAr: e.target.value})} 
-                className={formErrors.nameAr ? 'border-red-500 bg-slate-50' : 'border-slate-200 bg-slate-50'}
-                placeholder="أدخل اسم المركز..."
-              />
-              {formErrors.nameAr && <span className="text-xs text-red-500">{formErrors.nameAr}</span>}
+        <DialogContent className="max-w-md text-right" dir="rtl">
+          <DialogHeader><DialogTitle className="text-xl font-bold">إضافة مركز إيواء جديد</DialogTitle></DialogHeader>
+          <div className="flex flex-col gap-5 py-4">
+            
+            {/* الاسم */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-slate-700">اسم المركز (يجب أن يكون رباعياً) <span className="text-red-500">*</span></label>
+              <Input value={addFormData.name} onChange={(e) => setAddFormData({...addFormData, name: e.target.value})} className={addErrors.name ? 'border-red-500 shadow-sm' : ''} placeholder="أدخل الاسم رباعياً..." />
+              {addErrors.name && <p className="text-[11px] text-red-600 font-bold">{addErrors.name}</p>}
             </div>
 
-            <div className="grid gap-1.5">
+            {/* المنطقة */}
+            <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-700">المنطقة</label>
-              <select 
-                className="w-full border border-slate-200 rounded-md p-2 text-sm h-11 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-100"
-                value={formData.areaAr} 
-                onChange={(e)=>setFormData({...formData, areaAr: e.target.value as Region})}
-              >
-                {REGIONS_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+              <select className="w-full border h-10 rounded-md px-2 bg-white" value={addFormData.area} onChange={(e) => setAddFormData({...addFormData, area: e.target.value})}>
+                {REGIONS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
 
-            <div className="grid gap-1.5">
-              <label className="text-sm font-bold text-slate-700">اسم المشرف</label>
-              <Input 
-                value={formData.supervisorAr} 
-                onChange={(e)=>setFormData({...formData, supervisorAr: e.target.value})} 
-                className={formErrors.supervisorAr ? 'border-red-500 bg-slate-50' : 'border-slate-200 bg-slate-50'}
-                placeholder="أدخل اسم المشرف..."
-              />
-              {formErrors.supervisorAr && <span className="text-xs text-red-500">{formErrors.supervisorAr}</span>}
+            {/* الهاتف */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-slate-700">رقم الهاتف (يبدأ بـ 056 أو 059) <span className="text-red-500">*</span></label>
+              <Input value={addFormData.phone} onChange={(e) => setAddFormData({...addFormData, phone: e.target.value})} className={addErrors.phone ? 'border-red-500' : ''} placeholder="059xxxxxxx" />
+              {addErrors.phone && <p className="text-[11px] text-red-600 font-bold">{addErrors.phone}</p>}
             </div>
 
-            <div className="grid gap-1.5">
-              <label className="text-sm font-bold text-slate-700">رقم الهاتف</label>
-              <Input 
-                value={formData.phone} 
-                onChange={(e)=>setFormData({...formData, phone: e.target.value})} 
-                placeholder="059XXXXXXX" 
-                className={formErrors.phone ? 'border-red-500 bg-slate-50' : 'border-slate-200 bg-slate-50'}
-              />
-              {formErrors.phone && <span className="text-xs text-red-500">{formErrors.phone}</span>}
+            {/* السعة */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-slate-700">السعة القصوى (أكبر من 0) <span className="text-red-500">*</span></label>
+              <Input type="number" value={addFormData.capacity} onChange={(e) => setAddFormData({...addFormData, capacity: e.target.value as any})} className={addErrors.capacity ? 'border-red-500' : ''} />
+              {addErrors.capacity && <p className="text-[11px] text-red-600 font-bold">{addErrors.capacity}</p>}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-1.5">
-                <label className="text-sm font-bold text-slate-700">السعة</label>
-                <Input 
-                  type="number" 
-                  value={formData.capacity} 
-                  onChange={(e)=>setFormData({...formData, capacity: +e.target.value})} 
-                  className={formErrors.capacity ? 'border-red-500 bg-slate-50' : 'border-slate-200 bg-slate-50'}
-                />
-                {formErrors.capacity && <span className="text-xs text-red-500">{formErrors.capacity}</span>}
-              </div>
-
-              <div className="grid gap-1.5">
-                <label className="text-sm font-bold text-slate-700">الحالة</label>
-                <select 
-                  className="w-full border border-slate-200 rounded-md p-2 text-sm h-11 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-100"
-                  value={formData.fillStatus} 
-                  onChange={(e)=>setFormData({...formData, fillStatus: e.target.value as FillStatus})}
-                >
-                  {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
+            {/* العائلات */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-slate-700">عدد العائلات الحالية</label>
+              <Input type="number" value={addFormData.familiesCount} onChange={(e) => setAddFormData({...addFormData, familiesCount: e.target.value as any})} />
             </div>
+
           </div>
-
-          <DialogFooter className="flex flex-row-reverse gap-2 w-full mt-2">
-            <Button onClick={onAdd} disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700 h-11 font-bold rounded-xl">
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : 'حفظ البيانات'}
-            </Button>
-            <Button variant="outline" onClick={() => setAddOpen(false)} className="flex-1 h-11 border-slate-200 rounded-xl">إلغاء</Button>
+          <DialogFooter className="flex-row-reverse gap-2">
+            <Button className="bg-blue-600 text-white flex-1 h-11" onClick={onAdd} disabled={adding}>{adding ? <Loader2 className="animate-spin ml-2" size={18} /> : 'حفظ البيانات'}</Button>
+            <Button variant="outline" className="flex-1 h-11" onClick={() => setAddOpen(false)}>إلغاء</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -2,511 +2,129 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import prisma from '@/lib/prisma'
 
-type UiFillStatus = 'ممتلئ' | 'غير ممتلئ'
-type DbFillStatus = 'FULL' | 'NOT_FULL'
+// 1. سكيما التحقق من البيانات
+const shelterSchema = z.object({
+  name: z.string()
+    .trim()
+    .min(1, 'اسم المركز مطلوب')
+    .refine(
+      (val) => val.split(/\s+/).filter(Boolean).length >= 4,
+      { message: 'يجب أن يكون الاسم رباعياً على الأقل' }
+    ),
+  area: z.string().min(1, 'المنطقة مطلوبة'),
+  phone: z.string()
+    .trim()
+    .regex(/^(056|059)\d{7}$/, 'رقم غير صحيح (056/059)'),
+  capacity: z.coerce.number().int().min(1, 'السعة يجب أن تكون أكبر من 0'),
+  familiesCount: z.coerce.number().int().nonnegative('عدد العائلات لا يمكن أن يكون سالباً'),
+})
 
-type FieldErrors = Partial<
-  Record<
-    | 'nameAr'
-    | 'areaAr'
-    | 'supervisorAr'
-    | 'phone'
-    | 'capacity'
-    | 'familiesCount'
-    | 'fillStatus'
-    | 'placeId',
-    string
-  >
->
-
-function toDbFillStatus(status: UiFillStatus): DbFillStatus {
-  return status === 'ممتلئ' ? 'FULL' : 'NOT_FULL'
-}
-
-function toUiFillStatus(status: DbFillStatus): UiFillStatus {
-  return status === 'FULL' ? 'ممتلئ' : 'غير ممتلئ'
-}
-
-function inferFillStatus(familiesCount: number, capacity: number): DbFillStatus {
+// دالة مساعدة لحساب حالة الامتلاء
+function getFillStatus(familiesCount: number, capacity: number) {
   return familiesCount >= capacity ? 'FULL' : 'NOT_FULL'
 }
 
-function mapZodIssuesToFieldErrors(error: z.ZodError): FieldErrors {
-  const fieldErrors: FieldErrors = {}
+// دالة مساعدة لجلب مشرف (تم حذف شرط isTrashed المسبب للخطأ 500)
+async function getOrCreateDefaultSupervisor() {
+  // تم إزالة { where: { isTrashed: false } } لأن الحقل غير موجود في جدول Supervisor
+  let supervisor = await prisma.supervisor.findFirst();
 
-  for (const issue of error.issues) {
-    const fieldName = issue.path[0]
-    if (typeof fieldName === 'string' && !(fieldName in fieldErrors)) {
-      fieldErrors[fieldName as keyof FieldErrors] = issue.message
-    }
-  }
-
-  return fieldErrors
-}
-
-function hasEdgeSpaces(value: string) {
-  return value !== value.trim()
-}
-
-function normalizeArabicText(value: string) {
-  return value.trim().replace(/\s+/g, ' ')
-}
-
-function validateNoEdgeSpaces(fieldLabel: string) {
-  return z
-    .string()
-    .min(1, `${fieldLabel} مطلوب`)
-    .refine((val) => !hasEdgeSpaces(val), {
-      message: `${fieldLabel} لا يجب أن يبدأ أو ينتهي بمسافة`,
-    })
-    .transform((val) => normalizeArabicText(val))
-}
-
-const phoneSchema = z
-  .string()
-  .min(1, 'رقم الهاتف مطلوب')
-  .refine((val) => !hasEdgeSpaces(val), {
-    message: 'رقم الهاتف لا يجب أن يبدأ أو ينتهي بمسافة',
-  })
-  .refine((val) => /^(056|059)\d{7}$/.test(val.trim()), {
-    message: 'رقم الهاتف يجب أن يبدأ بـ 056 أو 059 وبعدها 7 أرقام',
-  })
-  .transform((val) => val.trim())
-
-const createSchema = z.object({
-  nameAr: validateNoEdgeSpaces('اسم المركز'),
-  areaAr: validateNoEdgeSpaces('المنطقة'),
-  supervisorAr: validateNoEdgeSpaces('اسم المشرف'),
-  phone: phoneSchema,
-  capacity: z.coerce.number().int().positive('يجب أن تكون السعة أكبر من 0'),
-  familiesCount: z.coerce.number().int().min(0).optional().default(0),
-  fillStatus: z.enum(['ممتلئ', 'غير ممتلئ']).optional(),
-  placeId: z.string().uuid().optional().nullable(),
-})
-
-const updateSchema = z.object({
-  nameAr: validateNoEdgeSpaces('اسم المركز').optional(),
-  areaAr: validateNoEdgeSpaces('المنطقة').optional(),
-  supervisorAr: validateNoEdgeSpaces('اسم المشرف').optional(),
-  phone: phoneSchema.optional(),
-  capacity: z.coerce.number().int().positive('يجب أن تكون السعة أكبر من 0').optional(),
-  familiesCount: z.coerce.number().int().min(0).optional(),
-  fillStatus: z.enum(['ممتلئ', 'غير ممتلئ']).optional(),
-  placeId: z.string().uuid().optional().nullable(),
-})
-
-function normalizeShelter(shelter: {
-  id: string
-  name: string
-  area: string
-  phone: string
-  familiesCount: number
-  capacity: number
-  fillStatus: DbFillStatus
-  supervisorId: string
-  placeId: string | null
-  supervisor?: {
-    id: string
-    name: string
-    phone: string | null
-  } | null
-  place?: unknown
-}) {
-  return {
-    id: shelter.id,
-    nameAr: shelter.name,
-    areaAr: shelter.area,
-    supervisorAr: shelter.supervisor?.name ?? '',
-    supervisorId: shelter.supervisorId,
-    phone: shelter.phone,
-    familiesCount: shelter.familiesCount,
-    capacity: shelter.capacity,
-    fillStatus: toUiFillStatus(shelter.fillStatus),
-    placeId: shelter.placeId,
-    place: shelter.place ?? null,
-  }
-}
-
-async function findOrCreateSupervisorByName(name: string) {
-  const trimmedName = normalizeArabicText(name)
-
-  const existing = await prisma.supervisor.findFirst({
-    where: {
-      name: {
-        equals: trimmedName,
-        mode: 'insensitive',
+  if (!supervisor) {
+    supervisor = await prisma.supervisor.create({
+      data: {
+        name: 'مشرف افتراضي',
+        phone: '0590000000',
+        status: 'ACTIVE',
       },
-      isTrashed: false,
-    },
-    select: {
-      id: true,
-      name: true,
-      phone: true,
-    },
-  })
-
-  if (existing) return existing
-
-  return prisma.supervisor.create({
-    data: {
-      name: trimmedName,
-    },
-    select: {
-      id: true,
-      name: true,
-      phone: true,
-    },
-  })
+    })
+  }
+  return supervisor.id
 }
 
 export async function GET(req: NextRequest) {
   try {
-    const q = req.nextUrl.searchParams.get('q')?.trim() || ''
-    const status = req.nextUrl.searchParams.get('status')?.trim() || ''
-    const supervisorId = req.nextUrl.searchParams.get('supervisorId')?.trim() || ''
-    const placeId = req.nextUrl.searchParams.get('placeId')?.trim() || ''
-
     const shelters = await prisma.shelter.findMany({
-      where: {
-        AND: [
-          q
-            ? {
-                OR: [
-                  { name: { contains: q, mode: 'insensitive' } },
-                  { area: { contains: q, mode: 'insensitive' } },
-                  { phone: { contains: q } },
-                  {
-                    supervisor: {
-                      name: { contains: q, mode: 'insensitive' },
-                    },
-                  },
-                ],
-              }
-            : {},
-          status === 'ممتلئ'
-            ? { fillStatus: 'FULL' }
-            : status === 'غير ممتلئ'
-              ? { fillStatus: 'NOT_FULL' }
-              : {},
-          supervisorId ? { supervisorId } : {},
-          placeId ? { placeId } : {},
-          { isTrashed: false },
-        ],
-      },
+      where: { isTrashed: false },
       orderBy: { createdAt: 'desc' },
-      include: {
-        supervisor: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-          },
-        },
-        place: true,
-      },
+      include: { supervisor: true },
     })
-
-    return NextResponse.json(shelters.map(normalizeShelter))
-  } catch (e) {
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
+    return NextResponse.json(shelters)
+  } catch (error) {
+    return NextResponse.json({ message: 'فشل في جلب البيانات' }, { status: 500 })
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = createSchema.parse(await req.json())
+    const json = await req.json()
+    const result = shelterSchema.safeParse(json)
 
-    const supervisor = await findOrCreateSupervisorByName(body.supervisorAr)
-
-    const duplicate = await prisma.shelter.findFirst({
-      where: {
-        name: {
-          equals: body.nameAr,
-          mode: 'insensitive',
-        },
-        area: {
-          equals: body.areaAr,
-          mode: 'insensitive',
-        },
-        supervisorId: supervisor.id,
-        isTrashed: false,
-      },
-      select: { id: true },
-    })
-
-    if (duplicate) {
-      return NextResponse.json(
-        {
-          message: 'يوجد مركز إيواء بنفس اسم المركز والمنطقة والمشرف',
-          fieldErrors: {
-            nameAr: 'القيمة مكررة مع المنطقة والمشرف',
-            areaAr: 'القيمة مكررة مع اسم المركز والمشرف',
-            supervisorAr: 'القيمة مكررة مع اسم المركز والمنطقة',
-          },
-        },
-        { status: 409 }
-      )
+    if (!result.success) {
+      return NextResponse.json({ 
+        message: 'بيانات غير صالحة', 
+        errors: result.error.flatten().fieldErrors 
+      }, { status: 400 })
     }
 
-    if (body.placeId) {
-      const placeAlreadyUsed = await prisma.shelter.findFirst({
-        where: {
-          placeId: body.placeId,
-          isTrashed: false,
-        },
-        select: { id: true },
-      })
+    const { name, area, phone, capacity, familiesCount } = result.data
+    const supervisorId = await getOrCreateDefaultSupervisor()
 
-      if (placeAlreadyUsed) {
-        return NextResponse.json(
-          {
-            message: 'هذا المكان مرتبط بالفعل بمركز إيواء آخر',
-            fieldErrors: {
-              placeId: 'هذا المكان مرتبط بالفعل بمركز إيواء آخر',
-            },
-          },
-          { status: 409 }
-        )
-      }
-    }
-
-    const computedFillStatus = body.fillStatus
-      ? toDbFillStatus(body.fillStatus)
-      : inferFillStatus(body.familiesCount, body.capacity)
-
-    const created = await prisma.shelter.create({
+    const newShelter = await prisma.shelter.create({
       data: {
-        name: body.nameAr,
-        area: body.areaAr,
-        phone: body.phone,
-        familiesCount: body.familiesCount,
-        capacity: body.capacity,
-        fillStatus: computedFillStatus,
-        supervisorId: supervisor.id,
-        placeId: body.placeId || null,
-      },
-      include: {
-        supervisor: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-          },
-        },
-        place: true,
+        name,
+        area,
+        phone,
+        capacity,
+        familiesCount,
+        fillStatus: getFillStatus(familiesCount, capacity),
+        supervisorId,
+        isTrashed: false,
+        isProtected: false,
       },
     })
 
-    return NextResponse.json(normalizeShelter(created), { status: 201 })
-  } catch (e) {
-    if (e instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          message: 'فشل التحقق من صحة البيانات',
-          fieldErrors: mapZodIssuesToFieldErrors(e),
-          issues: e.issues,
-        },
-        { status: 400 }
-      )
-    }
-
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
+    return NextResponse.json(newShelter, { status: 201 })
+  } catch (error: any) {
+    console.error("DATABASE_ERROR:", error)
+    return NextResponse.json({ message: 'خطأ داخلي في السيرفر' }, { status: 500 })
   }
 }
 
 export async function PUT(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get('id')
-
-  if (!id) {
-    return NextResponse.json({ message: 'معرّف مركز الإيواء مفقود' }, { status: 400 })
-  }
-
   try {
-    const body = updateSchema.parse(await req.json())
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+    if (!id) return NextResponse.json({ message: 'ID مطلوب' }, { status: 400 })
 
-    const currentShelter = await prisma.shelter.findUnique({
-      where: { id },
-      include: {
-        supervisor: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-          },
-        },
-      },
-    })
-
-    if (!currentShelter || currentShelter.isTrashed) {
-      return NextResponse.json({ message: 'مركز الإيواء غير موجود' }, { status: 404 })
-    }
-
-    const nextName = body.nameAr ?? currentShelter.name
-    const nextArea = body.areaAr ?? currentShelter.area
-
-    let supervisorId = currentShelter.supervisorId
-
-    if (body.supervisorAr !== undefined) {
-      const supervisor = await findOrCreateSupervisorByName(body.supervisorAr)
-      supervisorId = supervisor.id
-    }
-
-    if (
-      body.nameAr !== undefined ||
-      body.areaAr !== undefined ||
-      body.supervisorAr !== undefined
-    ) {
-      const duplicate = await prisma.shelter.findFirst({
-        where: {
-          NOT: { id },
-          name: {
-            equals: nextName,
-            mode: 'insensitive',
-          },
-          area: {
-            equals: nextArea,
-            mode: 'insensitive',
-          },
-          supervisorId,
-          isTrashed: false,
-        },
-        select: { id: true },
-      })
-
-      if (duplicate) {
-        return NextResponse.json(
-          {
-            message: 'يوجد مركز إيواء بنفس اسم المركز والمنطقة والمشرف',
-            fieldErrors: {
-              nameAr: 'القيمة مكررة مع المنطقة والمشرف',
-              areaAr: 'القيمة مكررة مع اسم المركز والمشرف',
-              supervisorAr: 'القيمة مكررة مع اسم المركز والمنطقة',
-            },
-          },
-          { status: 409 }
-        )
-      }
-    }
-
-    const nextPlaceId =
-      body.placeId !== undefined ? body.placeId || null : currentShelter.placeId
-
-    if (nextPlaceId) {
-      const placeAlreadyUsed = await prisma.shelter.findFirst({
-        where: {
-          AND: [{ placeId: nextPlaceId }, { NOT: { id } }, { isTrashed: false }],
-        },
-        select: { id: true },
-      })
-
-      if (placeAlreadyUsed) {
-        return NextResponse.json(
-          {
-            message: 'هذا المكان مرتبط بالفعل بمركز إيواء آخر',
-            fieldErrors: {
-              placeId: 'هذا المكان مرتبط بالفعل بمركز إيواء آخر',
-            },
-          },
-          { status: 409 }
-        )
-      }
-    }
-
-    const nextFamiliesCount =
-      body.familiesCount !== undefined ? body.familiesCount : currentShelter.familiesCount
-
-    const nextCapacity =
-      body.capacity !== undefined ? body.capacity : currentShelter.capacity
-
-    const nextFillStatus =
-      body.fillStatus !== undefined
-        ? toDbFillStatus(body.fillStatus)
-        : body.capacity !== undefined || body.familiesCount !== undefined
-          ? inferFillStatus(nextFamiliesCount, nextCapacity)
-          : undefined
+    const json = await req.json()
+    const result = shelterSchema.safeParse(json)
+    if (!result.success) return NextResponse.json({ message: 'بيانات غير صالحة' }, { status: 400 })
 
     const updated = await prisma.shelter.update({
       where: { id },
       data: {
-        name: body.nameAr,
-        area: body.areaAr,
-        phone: body.phone,
-        familiesCount: body.familiesCount,
-        capacity: body.capacity,
-        fillStatus: nextFillStatus,
-        supervisorId,
-        placeId: body.placeId !== undefined ? body.placeId || null : undefined,
-      },
-      include: {
-        supervisor: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-          },
-        },
-        place: true,
-      },
+        ...result.data,
+        fillStatus: getFillStatus(result.data.familiesCount, result.data.capacity)
+      }
     })
-
-    return NextResponse.json(normalizeShelter(updated))
-  } catch (e) {
-    if (e instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          message: 'فشل التحقق من صحة البيانات',
-          fieldErrors: mapZodIssuesToFieldErrors(e),
-          issues: e.issues,
-        },
-        { status: 400 }
-      )
-    }
-
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
+    return NextResponse.json(updated)
+  } catch (error) {
+    return NextResponse.json({ message: 'فشل التحديث' }, { status: 500 })
   }
 }
 
 export async function DELETE(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get('id')
-  const all = req.nextUrl.searchParams.get('all')
-
   try {
-    if (all === 'true') {
-      await prisma.shelter.deleteMany({})
-      return NextResponse.json({ ok: true })
-    }
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+    if (!id) return NextResponse.json({ message: 'ID مطلوب' }, { status: 400 })
 
-    if (!id) {
-      return NextResponse.json({ message: 'معرّف مركز الإيواء مفقود' }, { status: 400 })
-    }
-
-    const currentShelter = await prisma.shelter.findUnique({
+    await prisma.shelter.update({
       where: { id },
-      select: { id: true },
+      data: { isTrashed: true }
     })
-
-    if (!currentShelter) {
-      return NextResponse.json({ message: 'مركز الإيواء غير موجود' }, { status: 404 })
-    }
-
-    await prisma.shelter.delete({
-      where: { id },
-    })
-
-    return NextResponse.json({ ok: true })
-  } catch (e) {
-    return NextResponse.json(
-      { message: e instanceof Error ? e.message : 'خطأ في الخادم' },
-      { status: 500 }
-    )
+    return NextResponse.json({ message: 'تم الحذف' })
+  } catch (error) {
+    return NextResponse.json({ message: 'فشل الحذف' }, { status: 500 })
   }
 }

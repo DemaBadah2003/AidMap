@@ -36,7 +36,7 @@ type Camp = {
   status: 'FULL' | 'NOT_FULL'
 }
 
-const BASE_URL = '/api/project/projects/camps'
+const BASE_URL = '/api/project/camp/camps'
 const topControlHeight = 'h-10'
 const inputBaseClass = 'w-full min-w-0 rounded-lg border-slate-200 bg-white text-right text-xs sm:text-sm outline-none focus:!ring-2 focus:!ring-slate-100 font-normal'
 const selectBaseClass = 'w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-right text-xs sm:text-sm outline-none focus:ring-2 focus:ring-slate-100 font-normal'
@@ -47,7 +47,6 @@ export default function CampsPage() {
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<'all' | 'FULL' | 'NOT_FULL'>('all')
 
-  // Pagination States - تم تعديل القيمة الافتراضية إلى 5
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5) 
 
@@ -187,9 +186,10 @@ export default function CampsPage() {
             </Button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse text-sm">
-              <thead className="bg-slate-50/80 border-b border-slate-100">
+          {/* التعديل هنا: إضافة max-h-80 لعمل سكرول عند تجاوز 5 صفوف تقريباً وجعل الرأس ثابتاً */}
+          <div className="overflow-x-auto overflow-y-auto max-h-[420px] scrollbar-thin scrollbar-thumb-slate-200">
+            <table className="w-full text-right border-collapse text-sm relative">
+              <thead className="bg-slate-50/90 border-b border-slate-100 sticky top-0 z-10 backdrop-blur-sm">
                 <tr>
                   <th className="p-4 text-slate-500 font-bold">اسم المخيم</th>
                   <th className="p-4 text-slate-500 font-bold">المنطقة</th>
@@ -248,7 +248,6 @@ export default function CampsPage() {
             </table>
           </div>
 
-          {/* Pagination Area - تم تعديل الـ Droplist لتكون 5, 10, 15 */}
           <div className="p-4 flex items-center justify-between border-t bg-slate-50/30 font-arabic">
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <span>عرض صفوف:</span>
@@ -292,7 +291,6 @@ export default function CampsPage() {
         </CardContent>
       </Card>
 
-      {/* Add Modal */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent dir="rtl" className="max-w-md shadow-2xl border-none rounded-2xl font-arabic">
           <DialogHeader>

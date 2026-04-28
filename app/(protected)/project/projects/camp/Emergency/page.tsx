@@ -23,7 +23,7 @@ type Emergency = {
   status: EmergencyStatus
 }
 
-const BASE_URL = '/api/project/projects/Emergency'
+const BASE_URL = '/api/project/camp/Emergency'
 const EMERGENCY_TYPES = ["إخلاء طارئ", "تعليم طارئ", "نقص موارد", "حالة طبية حرجة", "أزمة مياه", "أخرى"]
 const EMERGENCY_LEVELS: EmergencyLevel[] = ["منخفض", "متوسط", "مرتفع"]
 const EMERGENCY_STATUSES: EmergencyStatus[] = ["جديدة", "قيد المعالجة", "مغلقة"]
@@ -34,19 +34,22 @@ export default function EmergencyPage() {
   const [q, setQ] = useState('')
   const [statusFilter, setStatusFilter] = useState('كل الحالات')
   
-  // --- حالات الـ Pagination ---
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
 
   const [addOpen, setAddOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  
+  // حالات التعديل
   const [editType, setEditType] = useState('')
-  const [editLevel, setEditLevel] = useState<EmergencyLevel>('متوسط')
-  const [editStatus, setEditStatus] = useState<EmergencyStatus>('جديدة')
+  const [editLevel, setEditLevel] = useState<EmergencyLevel | ''>('')
+  const [editStatus, setEditStatus] = useState<EmergencyStatus | ''>('')
 
-  const [newType, setNewType] = useState(EMERGENCY_TYPES[0])
-  const [newLevel, setNewLevel] = useState<EmergencyLevel>('متوسط')
-  const [newStatus, setNewStatus] = useState<EmergencyStatus>('جديدة')
+  // حالات الإضافة (جعل القيم الابتدائية فارغة للتحقق من الاختيار)
+  const [newType, setNewType] = useState('')
+  const [newLevel, setNewLevel] = useState<EmergencyLevel | ''>('')
+  const [newStatus, setNewStatus] = useState<EmergencyStatus | ''>('')
+  
   const [submitting, setSubmitting] = useState(false)
 
   const fetchEmergencies = async () => {
@@ -61,7 +64,11 @@ export default function EmergencyPage() {
 
   useEffect(() => { fetchEmergencies() }, [])
 
+  // التحقق من صحة البيانات للإضافة
+  const isAddValid = newType !== '' && newLevel !== '' && newStatus !== ''
+
   const onAdd = async () => {
+    if (!isAddValid) return; // منع الحفظ إذا كانت الحقول فارغة
     setSubmitting(true)
     try {
       const res = await fetch(BASE_URL, {
@@ -72,12 +79,19 @@ export default function EmergencyPage() {
       if (res.ok) {
         fetchEmergencies()
         setAddOpen(false)
-        setCurrentPage(1) // العودة للصفحة الأولى عند الإضافة
+        setNewType('')
+        setNewLevel('')
+        setNewStatus('')
+        setCurrentPage(1)
       }
     } finally { setSubmitting(false) }
   }
 
+  // التحقق من صحة البيانات للتعديل
+  const isEditValid = editType !== '' && editLevel !== '' && editStatus !== ''
+
   const onSaveEdit = async (id: string) => {
+    if (!isEditValid) return; // منع الحفظ إذا كانت الحقول فارغة
     setSubmitting(true)
     try {
       const res = await fetch(BASE_URL, {
@@ -99,7 +113,6 @@ export default function EmergencyPage() {
     setEditStatus(item.status)
   }
 
-  // --- تصفية البيانات ---
   const filtered = useMemo(() => {
     return items.filter((x) => {
       const matchesSearch = x.emergencyType?.toLowerCase().includes(q.toLowerCase())
@@ -108,7 +121,6 @@ export default function EmergencyPage() {
     })
   }, [q, statusFilter, items])
 
-  // --- حسابات الـ Pagination ---
   const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage))
   
   const paginatedData = useMemo(() => {
@@ -169,23 +181,31 @@ export default function EmergencyPage() {
                       <>
                         <td className="px-6 py-4 border-y border-r rounded-r-xl border-blue-100">
                           <select value={editType} onChange={(e) => setEditType(e.target.value)} className="w-full h-10 border border-blue-200 rounded-lg px-2 bg-white">
+                            <option value="" disabled>اختر النوع</option>
                             {EMERGENCY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
                         </td>
                         <td className="px-6 py-4 border-y border-blue-100 text-center">
                           <select value={editLevel} onChange={(e) => setEditLevel(e.target.value as EmergencyLevel)} className="h-10 border border-blue-200 rounded-lg px-2 bg-white">
+                            <option value="" disabled>المستوى</option>
                             {EMERGENCY_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
                           </select>
                         </td>
                         <td className="px-6 py-4 border-y border-blue-100 text-center">
                           <select value={editStatus} onChange={(e) => setEditStatus(e.target.value as EmergencyStatus)} className="h-10 border border-blue-200 rounded-lg px-2 bg-white">
+                            <option value="" disabled>الحالة</option>
                             {EMERGENCY_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                           </select>
                         </td>
                         <td className="px-6 py-4 border-y border-l rounded-l-xl border-blue-100">
                           <div className="flex justify-center gap-2">
-                            <Button size="sm" onClick={() => onSaveEdit(item.id)} className="bg-green-600 hover:bg-green-700 text-white h-9 w-9 p-0 rounded-full shadow-sm">
-                              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-5 w-5" />}
+                            <Button 
+                              size="sm" 
+                              onClick={() => onSaveEdit(item.id)} 
+                              disabled={!isEditValid || submitting}
+                              className={`h-9 w-9 p-0 rounded-full shadow-sm ${isEditValid ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-300'}`}
+                            >
+                              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-5 w-5 text-white" />}
                             </Button>
                             <Button variant="ghost" size="sm" onClick={() => setEditingId(null)} className="h-9 w-9 p-0 text-slate-400 hover:text-red-500 transition-colors"><X className="h-5 w-5" /></Button>
                           </div>
@@ -228,7 +248,6 @@ export default function EmergencyPage() {
             </table>
           </div>
 
-          {/* --- قسم الـ Pagination --- */}
           <div className="p-4 flex items-center justify-between border-t bg-slate-50/30">
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <span>عرض صفوف:</span>
@@ -272,36 +291,43 @@ export default function EmergencyPage() {
         </CardContent>
       </Card>
 
-      {/* مودال الإضافة */}
+      {/* مودال الإضافة - تم تعديل الحقول لتصبح كل حقل في سطر */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent dir="rtl" className="text-right sm:max-w-[450px] rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold text-slate-900 text-center pb-2">إضافة بلاغ طوارئ جديد</DialogTitle>
+            <DialogTitle className="text-2xl font-bold text-slate-900 text-center pb-2 border-b">إضافة بلاغ طوارئ جديد</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-6 py-6">
-            <div className="grid gap-2">
-              <label className="text-sm font-bold text-slate-600 mr-1">نوع الطوارئ</label>
-              <select value={newType} onChange={(e) => setNewType(e.target.value)} className="h-12 border border-slate-200 rounded-xl px-4 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
+          <div className="flex flex-col gap-5 py-6">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-bold text-slate-700 mr-1">نوع الطوارئ <span className="text-red-500">*</span></label>
+              <select value={newType} onChange={(e) => setNewType(e.target.value)} className="h-12 border border-slate-200 rounded-xl px-4 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 transition-all">
+                <option value="" disabled>اختر نوع البلاغ...</option>
                 {EMERGENCY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <label className="text-sm font-bold text-slate-600 mr-1">المستوى</label>
-                <select value={newLevel} onChange={(e) => setNewLevel(e.target.value as EmergencyLevel)} className="h-12 border border-slate-200 rounded-xl px-4 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
-                  {EMERGENCY_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
-                </select>
-              </div>
-              <div className="grid gap-2">
-                <label className="text-sm font-bold text-slate-600 mr-1">الحالة</label>
-                <select value={newStatus} onChange={(e) => setNewStatus(e.target.value as EmergencyStatus)} className="h-12 border border-slate-200 rounded-xl px-4 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
-                  {EMERGENCY_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
+            
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-bold text-slate-700 mr-1">المستوى <span className="text-red-500">*</span></label>
+              <select value={newLevel} onChange={(e) => setNewLevel(e.target.value as EmergencyLevel)} className="h-12 border border-slate-200 rounded-xl px-4 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 transition-all">
+                <option value="" disabled>اختر مستوى الخطورة...</option>
+                {EMERGENCY_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-bold text-slate-700 mr-1">الحالة <span className="text-red-500">*</span></label>
+              <select value={newStatus} onChange={(e) => setNewStatus(e.target.value as EmergencyStatus)} className="h-12 border border-slate-200 rounded-xl px-4 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 transition-all">
+                <option value="" disabled>اختر الحالة الحالية...</option>
+                {EMERGENCY_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
             </div>
           </div>
           <DialogFooter className="gap-3 sm:justify-center border-t pt-6">
-            <Button onClick={onAdd} disabled={submitting} className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 px-8 rounded-xl flex-1 shadow-md shadow-blue-100">
+            <Button 
+              onClick={onAdd} 
+              disabled={!isAddValid || submitting} 
+              className={`font-bold h-12 px-8 rounded-xl flex-1 shadow-md transition-all ${isAddValid ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-100' : 'bg-slate-300 cursor-not-allowed'}`}
+            >
               {submitting ? <Loader2 className="animate-spin" /> : 'حفظ البلاغ'}
             </Button>
             <Button variant="outline" onClick={() => setAddOpen(false)} className="h-12 px-8 rounded-xl flex-1 border-slate-200 text-slate-600">إلغاء</Button>

@@ -142,6 +142,7 @@ model Supervisor {
   id          String        @id @default(uuid())
   name        String
   phone       String?
+  area        String?       // أضيفي هذا الحقل ليتم حفظ المنطقة فيه
   createdAt   DateTime      @default(now())
   isProtected Boolean       @default(false)
   isTrashed   Boolean       @default(false)
@@ -454,7 +455,7 @@ model EnterpriseProduct {
 model VerificationToken {
   identifier String
   token      String   @unique
-  expires    DateTime
+  expires    DateTimepl
 
   @@unique([identifier, token])
 }

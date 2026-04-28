@@ -6,25 +6,44 @@ export async function GET(req: NextRequest) {
   const doctorQuery = searchParams.get('doctorQuery');
 
   try {
+    // إذا كان هناك طلب بحث عن طبيب
     if (doctorQuery) {
       const doctors = await prisma.doctor.findMany({
         where: {
           OR: [
-            { name: { contains: doctorQuery, mode: 'insensitive' } },
-            { specialty: { contains: doctorQuery, mode: 'insensitive' } }
+            { 
+              name: { 
+                contains: doctorQuery, 
+                mode: 'insensitive' 
+              } 
+            },
+            { 
+              specialty: { 
+                contains: doctorQuery, 
+                mode: 'insensitive' 
+              } 
+            }
           ]
         },
         include: {
+          // جلب بيانات المستشفى المرتبط بالطبيب (حسب الـ Schema عندك)
           hospital: {
-            select: { name: true } // جلب اسم المستشفى من علاقة الـ Foreign Key
+            select: {
+              name: true,
+            }
           }
         }
       });
+
       return NextResponse.json(doctors);
     }
-    
-    return NextResponse.json([]);
-  } catch (error) {
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+
+    // منطق جلب المستشفيات الافتراضي (إذا لم يوجد بحث)
+    const hospitals = await prisma.hospital.findMany();
+    return NextResponse.json(hospitals);
+
+  } catch (error: any) {
+    console.error("Database Error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
