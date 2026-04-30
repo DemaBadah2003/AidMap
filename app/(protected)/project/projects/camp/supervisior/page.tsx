@@ -33,7 +33,6 @@ type SupervisorApiItem = {
 
 const API_URL = '/api/project/camp/supervisior'
 
-// تحديث خارطة المناطق لتشمل الخيارات الجديدة
 const areaMap: Record<string, string> = {
   'east': 'شرق',
   'west': 'غرب',
@@ -79,9 +78,9 @@ export default function SupervisorsPage() {
   const [editDraft, setEditDraft] = useState<Omit<Supervisor, 'id'>>({
     nameAr: '', phone: '', area: '', status: 'نشط'
   })
-
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  
+  const [editErrors, setEditErrors] = useState<{name?: string, phone?: string}>({})
+  const [fieldErrors, setFieldErrors] = useState<{name?: string, phone?: string, area?: string}>({})
 
   const fetchSupervisors = async () => {
     setLoading(true)
@@ -109,7 +108,24 @@ export default function SupervisorsPage() {
   }, [q, items])
 
   const onAdd = async () => {
+    const errors: any = {}
+    if (!isValidName(nameAr)) errors.name = 'الاسم يجب أن يكون 3 حروف على الأقل'
+    if (!isValidPalestinePhone(phone)) errors.phone = 'رقم الجوال غير صحيح (يجب أن يبدأ بـ 056 أو 059)'
+    
+    // فحص التكرار عند الإضافة
+    if (items.some(sp => sp.phone === normalizePhone(phone))) {
+        errors.phone = 'رقم الجوال مسجل مسبقاً لمشرف آخر'
+    }
+
+    if (!area) errors.area = 'يرجى اختيار المنطقة'
+    
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      return
+    }
+
     setSubmitting(true)
+    setFieldErrors({})
     try {
       const created = await requestJSON<SupervisorApiItem>(API_URL, {
         method: 'POST',
@@ -129,16 +145,37 @@ export default function SupervisorsPage() {
       }, ...prev])
       setAddOpen(false)
       setNameAr(''); setPhone(''); setArea(''); setStatus('نشط')
-    } catch (err) { setErrorMessage('خطأ في الإضافة') } finally { setSubmitting(false) }
+    } catch (err: any) { 
+        setFieldErrors({ phone: err.message.includes('phone') || err.message.includes('مسجل') ? 'رقم الجوال مسجل مسبقاً' : undefined })
+    } finally { setSubmitting(false) }
   }
 
   const saveEditRow = async (id: string) => {
+    const errors: any = {}
+    const normalizedEditPhone = normalizePhone(editDraft.phone)
+
+    if (!isValidName(editDraft.nameAr)) errors.name = 'الاسم غير صحيح'
+    
+    // شرط التحقق من صيغة رقم الجوال
+    if (!isValidPalestinePhone(normalizedEditPhone)) {
+        errors.phone = 'رقم الجوال غير صحيح (يجب أن يبدأ بـ 056 أو 059)'
+    } 
+    // شرط منع تكرار الرقم مع مشرف آخر غير الذي يتم تعديله حالياً
+    else if (items.some(sp => sp.phone === normalizedEditPhone && sp.id !== id)) {
+        errors.phone = 'رقم الجوال مسجل مسبقاً لمشرف آخر'
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setEditErrors(errors)
+      return
+    }
+
     try {
       const updated = await requestJSON<SupervisorApiItem>(`${API_URL}?id=${id}`, {
         method: 'PUT',
         body: JSON.stringify({ 
           name: editDraft.nameAr, 
-          phone: normalizePhone(editDraft.phone), 
+          phone: normalizedEditPhone, 
           area: editDraft.area, 
           status: editDraft.status === 'نشط' ? 'ACTIVE' : 'INACTIVE' 
         }),
@@ -151,9 +188,14 @@ export default function SupervisorsPage() {
         status: toUiStatus(updated.status) 
       } : sp))
       setEditingId(null)
-    } catch { setErrorMessage('فشل التحديث') }
+      setEditErrors({})
+    } catch (err: any) { 
+        setEditErrors({ phone: 'خطأ: الرقم مسجل بالفعل أو حدث فشل في التحديث' })
+    }
   }
 
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const rangeStart = filtered.length === 0 ? 0 : (page - 1) * pageSize + 1
   const rangeEnd = Math.min(page * pageSize, filtered.length)
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize)
@@ -188,7 +230,7 @@ export default function SupervisorsPage() {
                 </select>
               </div>
 
-              <Button onClick={() => setAddOpen(true)} className="bg-blue-600 hover:bg-blue-700 font-semibold gap-2">
+              <Button onClick={() => { setAddOpen(true); setFieldErrors({}); }} className="bg-blue-600 hover:bg-blue-700 font-semibold gap-2">
                 <Plus className="h-4 w-4" /> إضافة مشرف
               </Button>
             </div>
@@ -213,10 +255,20 @@ export default function SupervisorsPage() {
                   return (
                     <tr key={sp.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-4 py-3 font-medium">
-                        {isEditing ? <Input value={editDraft.nameAr} onChange={e => setEditDraft({...editDraft, nameAr: e.target.value})} /> : sp.nameAr}
+                        {isEditing ? (
+                            <div className="space-y-1">
+                                <Input className={editErrors.name ? 'border-red-500' : ''} value={editDraft.nameAr} onChange={e => setEditDraft({...editDraft, nameAr: e.target.value})} />
+                                {editErrors.name && <p className="text-[10px] text-red-500">{editErrors.name}</p>}
+                            </div>
+                        ) : sp.nameAr}
                       </td>
                       <td className="px-4 py-3 text-slate-600">
-                        {isEditing ? <Input value={editDraft.phone} onChange={e => setEditDraft({...editDraft, phone: e.target.value})} /> : sp.phone}
+                        {isEditing ? (
+                            <div className="space-y-1">
+                                <Input className={editErrors.phone ? 'border-red-500' : ''} value={editDraft.phone} onChange={e => setEditDraft({...editDraft, phone: e.target.value})} maxLength={10} />
+                                {editErrors.phone && <p className="text-[10px] text-red-500 font-sans">{editErrors.phone}</p>}
+                            </div>
+                        ) : sp.phone}
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         {isEditing ? (
@@ -244,11 +296,13 @@ export default function SupervisorsPage() {
                           {isEditing ? (
                             <>
                               <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 px-2" onClick={() => saveEditRow(sp.id)}><Save className="size-4" /></Button>
-                              <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => setEditingId(null)}><X className="size-4" /></Button>
+                              <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => { setEditingId(null); setEditErrors({}); }}><X className="size-4" /></Button>
                             </>
                           ) : (
                             <Button size="sm" variant="outline" className="text-slate-600 hover:text-blue-600 h-9 w-9 p-0" onClick={() => {
-                              setEditingId(sp.id); setEditDraft({ nameAr: sp.nameAr, phone: sp.phone, area: sp.area, status: sp.status })
+                              setEditingId(sp.id); 
+                              setEditDraft({ nameAr: sp.nameAr, phone: sp.phone, area: sp.area, status: sp.status });
+                              setEditErrors({});
                             }}><Pencil className="size-4" /></Button>
                           )}
                         </div>
@@ -280,15 +334,17 @@ export default function SupervisorsPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-1.5 text-right">
               <label className="text-sm font-bold text-slate-700">الاسم <span className="text-red-500">*</span></label>
-              <Input placeholder="الاسم الثلاثي" value={nameAr} onChange={e => setNameAr(e.target.value)} />
+              <Input className={fieldErrors.name ? 'border-red-500' : ''} placeholder="الاسم الثلاثي" value={nameAr} onChange={e => setNameAr(e.target.value)} />
+              {fieldErrors.name && <p className="text-xs text-red-500">{fieldErrors.name}</p>}
             </div>
             <div className="space-y-1.5 text-right">
               <label className="text-sm font-bold text-slate-700">الجوال <span className="text-red-500">*</span></label>
-              <Input placeholder="059xxxxxxx" value={phone} onChange={e => setPhone(normalizePhone(e.target.value))} maxLength={10} />
+              <Input className={fieldErrors.phone ? 'border-red-500' : ''} placeholder="059xxxxxxx" value={phone} onChange={e => setPhone(normalizePhone(e.target.value))} maxLength={10} />
+              {fieldErrors.phone && <p className="text-xs text-red-500">{fieldErrors.phone}</p>}
             </div>
             <div className="space-y-1.5 text-right">
               <label className="text-sm font-bold text-slate-700">المنطقة <span className="text-red-500">*</span></label>
-              <select className="w-full h-11 border rounded-md px-3 outline-none focus:ring-2 focus:ring-blue-100 font-sans" value={area} onChange={e => setArea(e.target.value)}>
+              <select className={`w-full h-11 border rounded-md px-3 outline-none focus:ring-2 focus:ring-blue-100 font-sans ${fieldErrors.area ? 'border-red-500' : ''}`} value={area} onChange={e => setArea(e.target.value)}>
                 <option value="">اختر المنطقة...</option>
                 <option value="east">شرق</option>
                 <option value="west">غرب</option>
@@ -296,6 +352,7 @@ export default function SupervisorsPage() {
                 <option value="middle">وسطى</option>
                 <option value="south">جنوب</option>
               </select>
+              {fieldErrors.area && <p className="text-xs text-red-500">{fieldErrors.area}</p>}
             </div>
             <div className="space-y-1.5 text-right">
               <label className="text-sm font-bold text-slate-700 font-sans">الحالة</label>
@@ -306,7 +363,7 @@ export default function SupervisorsPage() {
             </div>
           </div>
           <DialogFooter className="flex flex-row-reverse gap-2 border-t pt-4">
-            <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold" onClick={onAdd} disabled={!isValidName(nameAr) || !isValidPalestinePhone(phone) || !area || submitting}>
+            <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold" onClick={onAdd} disabled={submitting}>
               {submitting ? 'جاري الحفظ...' : 'حفظ البيانات'}
             </Button>
             <Button className="flex-1 font-sans" variant="outline" onClick={() => setAddOpen(false)}>إلغاء</Button>

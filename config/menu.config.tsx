@@ -99,9 +99,9 @@ export const MENU_SIDEBAR: MenuConfig = [
         children: [
           { title: 'معاينة الخريطة', path: '/project/MapPreview' },
           { title: 'إضافة مكان', path: '/project/admins/addPlaces' },
-          { title: 'تسجيل مستفيد', path: '/project/admins/adminBeneficiary' },
+          { title: 'تسجيل مستفيد', path: '/project/admins/addBeneficiary' },
           { title: 'فحص مساعدة', path: '/project/admins/addAid' },
-          { title: 'طلب مساعدة ', path: '/project/admins/distributeAid' },
+          { title: 'طلب مساعدة ', path: '/project/admins/requestAid' },
         ],
       },
     ],

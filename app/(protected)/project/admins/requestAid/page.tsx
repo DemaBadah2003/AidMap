@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { requireCitizen } from '@/app/(protected)/project/helpers/route-guards'
+// import { requireCitizen } from '@/app/(protected)/project/helpers/route-guards'
 
 type FormErrors = {
   fullName?: string
@@ -22,7 +22,8 @@ export default function RequestAidPage() {
   const router = useRouter()
 
   useEffect(() => {
-    requireCitizen(router)
+    // تم تعطيل صلاحيات التحقق بناءً على الطلب
+    // requireCitizen(router)
   }, [router])
 
   const [fullName, setFullName] = useState('')

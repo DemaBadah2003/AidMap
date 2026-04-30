@@ -14,7 +14,8 @@ export default function MyAidPage() {
   const [result, setResult] = useState<AidResult | null>(null)
 
   useEffect(() => {
-    requireCitizen(router)
+    // تم تعطيل التحقق من الصلاحية مؤقتاً بناءً على طلبك
+    // requireCitizen(router)
   }, [router])
 
   const handleSearch = async (e: React.FormEvent) => {

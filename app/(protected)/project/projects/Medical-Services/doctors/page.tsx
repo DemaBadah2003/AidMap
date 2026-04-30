@@ -18,6 +18,9 @@ export default function DoctorsPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   
+  // حالة الأخطاء
+  const [errors, setErrors] = useState({})
+
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
 
@@ -58,21 +61,35 @@ export default function DoctorsPage() {
 
   useEffect(() => { setCurrentPage(1) }, [q])
 
-  const validate = (form) => {
-    if (!form.name || !form.phone || !form.hospitalId || !form.departmentId || !form.workSchedule) {
-      alert("يرجى ملء جميع الحقول المطلوبة")
-      return false
-    }
+  // دالة التحقق المعدلة
+  const validate = async (form, id = null) => {
+    let newErrors = {}
+    
+    if (!form.name) newErrors.name = "يرجى ادخال اسم الطبيب"
+    
     const phoneRegex = /^(056|059)\d{7}$/
-    if (!phoneRegex.test(form.phone)) {
-      alert("رقم الهاتف يجب أن يبدأ بـ 056 أو 059 ويتبعه 7 أرقام")
-      return false
+    if (!form.phone) {
+      newErrors.phone = "يرجى إدخال رقم الهاتف"
+    } else if (!phoneRegex.test(form.phone)) {
+      newErrors.phone = "رقم الهاتف يجب أن يبدأ بـ 056 أو 059 ويتبعه 7 أرقام"
+    } else {
+      // التحقق من التكرار محلياً قبل الطلب من السيرفر (اختياري للسرعة)
+      const isDuplicate = items.find(doc => doc.phone === form.phone && doc.id !== id)
+      if (isDuplicate) {
+        newErrors.phone = "رقم الهاتف هذا مسجل مسبقاً لطبيب آخر"
+      }
     }
-    return true
+
+    if (!form.hospitalId) newErrors.hospitalId = "يرجى اختيار المستشفى"
+    if (!form.departmentId) newErrors.departmentId = "يرجى اختيار القسم"
+    if (!form.workSchedule) newErrors.workSchedule = "يرجى تحديد جدول العمل"
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
 
   const onAdd = async () => {
-    if (!validate(addForm)) return
+    if (!(await validate(addForm))) return
     setSubmitting(true)
     try {
       const res = await fetch(API_URL, {
@@ -80,15 +97,20 @@ export default function DoctorsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(addForm)
       })
+      const data = await res.json()
+      
       if (res.ok) {
-        await fetchData(); setAddOpen(false); setAddForm(initialForm)
+        await fetchData(); setAddOpen(false); setAddForm(initialForm); setErrors({})
+      } else {
+        // إذا رجع السيرفر خطأ تكرار (Unique constraint)
+        if(data.message.includes("الهاتف")) setErrors({phone: data.message})
       }
     } catch (err) { console.error(err) }
     finally { setSubmitting(false) }
   }
 
   const onSaveEdit = async () => {
-    if (!validate(editForm)) return
+    if (!(await validate(editForm, editingId))) return
     setSubmitting(true)
     try {
       const res = await fetch(API_URL, {
@@ -96,14 +118,19 @@ export default function DoctorsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...editForm, id: editingId })
       })
+      const data = await res.json()
+      
       if (res.ok) {
-        await fetchData(); setEditingId(null); setEditForm(null)
+        await fetchData(); setEditingId(null); setEditForm(null); setErrors({})
+      } else {
+        if(data.message.includes("الهاتف")) setErrors({phone: data.message})
       }
     } catch (err) { console.error(err) }
     finally { setSubmitting(false) }
   }
 
   const startEdit = (item) => {
+    setErrors({})
     setEditingId(item.id)
     setEditForm({ ...item, description: item.description || '' })
   }
@@ -117,7 +144,6 @@ export default function DoctorsPage() {
       <Card className="rounded-2xl border-slate-200 overflow-hidden bg-white shadow-sm">
         <CardContent className="p-0">
           
-          {/* شريط الأدوات: البحث وزر الإضافة متقابلين */}
           <div className="p-4 border-b bg-slate-50/50 flex justify-between items-center gap-4">
             <div className="relative w-full max-w-sm">
               <Search className="absolute right-3 top-3 h-5 w-5 text-slate-400" />
@@ -129,12 +155,11 @@ export default function DoctorsPage() {
               />
             </div>
             
-            <Button onClick={() => setAddOpen(true)} className="bg-blue-600 rounded-xl px-6 h-11 text-white hover:bg-blue-700 shadow-md transition-all whitespace-nowrap">
+            <Button onClick={() => { setErrors({}); setAddOpen(true) }} className="bg-blue-600 rounded-xl px-6 h-11 text-white hover:bg-blue-700 shadow-md transition-all whitespace-nowrap">
               <Plus className="ml-2 h-5 w-5" /> إضافة طبيب جديد
             </Button>
           </div>
 
-          {/* الجدول مع سكرول عمودي (ارتفاع محدد لـ 5 صفوف تقريباً) */}
           <div className="overflow-x-auto overflow-y-auto max-h-[400px] relative">
             <table className="w-full text-right text-sm border-collapse">
               <thead className="bg-slate-50 border-b text-slate-600 font-bold sticky top-0 z-20 shadow-sm">
@@ -156,7 +181,10 @@ export default function DoctorsPage() {
                   <tr key={item.id} className={`transition-colors ${editingId === item.id ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
                     {editingId === item.id ? (
                       <>
-                        <td className="p-2"><Input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} className="h-9 text-xs" /></td>
+                        <td className="p-2">
+                            <Input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} className={`h-9 text-xs ${errors.name ? 'border-red-500' : ''}`} />
+                            {errors.name && <p className="text-[10px] text-red-500 mt-1">{errors.name}</p>}
+                        </td>
                         <td className="p-2">
                           <select className="w-full border rounded-md h-9 text-xs bg-white outline-none" value={editForm.hospitalId} onChange={e => setEditForm({...editForm, hospitalId: e.target.value})}>
                             {hospitals.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
@@ -170,7 +198,10 @@ export default function DoctorsPage() {
                             {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                           </select>
                         </td>
-                        <td className="p-2"><Input value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} className="h-9 font-mono text-xs" dir="ltr" /></td>
+                        <td className="p-2">
+                            <Input value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} className={`h-9 font-mono text-xs ${errors.phone ? 'border-red-500' : ''}`} dir="ltr" />
+                            {errors.phone && <p className="text-[10px] text-red-500 mt-1">{errors.phone}</p>}
+                        </td>
                         <td className="p-2">
                           <select className="w-full border rounded-md h-9 text-xs bg-white outline-none" value={editForm.workSchedule} onChange={e => setEditForm({...editForm, workSchedule: e.target.value})}>
                             <option value="السبت، الاثنين، الأربعاء">السبت، الاثنين، الأربعاء</option>
@@ -179,7 +210,7 @@ export default function DoctorsPage() {
                         </td>
                         <td className="p-2 text-center flex justify-center gap-1">
                           <Button onClick={onSaveEdit} className="h-8 w-8 p-0 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-sm"><Check className="h-4 w-4" /></Button>
-                          <Button onClick={() => setEditingId(null)} className="h-8 w-8 p-0 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-full"><X className="h-4 w-4" /></Button>
+                          <Button onClick={() => {setEditingId(null); setErrors({})}} className="h-8 w-8 p-0 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-full"><X className="h-4 w-4" /></Button>
                         </td>
                       </>
                     ) : (
@@ -200,21 +231,16 @@ export default function DoctorsPage() {
             </table>
           </div>
 
-          {/* --- الترقيم الصفحي (Pagination) --- */}
+          {/* الترقيم الصفحي */}
           {!loading && filtered.length > 0 && (
             <div className="p-4 border-t flex items-center justify-between bg-slate-50/50 flex-row-reverse relative z-30">
               <div className="flex items-center gap-3">
                 <span className="text-xs font-bold text-slate-500">عدد الأسطر:</span>
-                <select 
-                  value={itemsPerPage}
-                  onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                  className="border rounded px-2 py-1 text-xs bg-white outline-none focus:ring-1 focus:ring-blue-500 font-bold shadow-sm cursor-pointer"
-                >
+                <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="border rounded px-2 py-1 text-xs bg-white outline-none focus:ring-1 focus:ring-blue-500 font-bold shadow-sm cursor-pointer">
                   {[5, 10, 15, 20].map(val => (<option key={val} value={val}>{val}</option>))}
                 </select>
                 <span className="text-[11px] text-slate-400 mr-2 font-medium">عرض {currentItems.length} من {filtered.length}</span>
               </div>
-
               <div className="flex items-center gap-2" dir="ltr">
                 <Button variant="outline" size="sm" className="h-8 px-3 text-xs font-bold gap-1 shadow-sm bg-white" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
                   <ChevronLeft className="h-4 w-4" /> السابق
@@ -229,48 +255,52 @@ export default function DoctorsPage() {
         </CardContent>
       </Card>
 
-      {/* مودال الإضافة */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+      <Dialog open={addOpen} onOpenChange={(val) => { setAddOpen(val); if(!val) setErrors({}); }}>
         <DialogContent className="text-right sm:max-w-[450px] rounded-2xl font-sans p-6" dir="rtl">
           <DialogHeader><DialogTitle className="text-right font-bold text-xl border-b pb-3 text-slate-800">إضافة طبيب جديد</DialogTitle></DialogHeader>
           
           <div className="flex flex-col gap-5 py-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-slate-600 mr-1">اسم الطبيب الرباعي</label>
-              <Input placeholder="مثال: د. محمد أحمد العامودي" value={addForm.name} onChange={e => setAddForm({...addForm, name: e.target.value})} className="h-11 rounded-lg border-slate-200" />
+              <Input placeholder="مثال: د. محمد أحمد العامودي" value={addForm.name} onChange={e => setAddForm({...addForm, name: e.target.value})} className={`h-11 rounded-lg ${errors.name ? 'border-red-500' : 'border-slate-200'}`} />
+              {errors.name && <p className="text-[11px] text-red-500 mr-1">{errors.name}</p>}
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-slate-600 mr-1">المستشفى التابع له</label>
-              <select className="w-full border border-slate-200 rounded-lg p-2.5 h-11 bg-slate-50 text-sm outline-none focus:ring-2 focus:ring-blue-100 transition-all" value={addForm.hospitalId} onChange={e => setAddForm({...addForm, hospitalId: e.target.value})}>
+              <select className={`w-full border rounded-lg p-2.5 h-11 bg-slate-50 text-sm outline-none ${errors.hospitalId ? 'border-red-500' : 'border-slate-200'}`} value={addForm.hospitalId} onChange={e => setAddForm({...addForm, hospitalId: e.target.value})}>
                 <option value="">اختر المستشفى</option>
                 {hospitals.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
               </select>
+              {errors.hospitalId && <p className="text-[11px] text-red-500 mr-1">{errors.hospitalId}</p>}
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-slate-600 mr-1">القسم الطبي</label>
-              <select className="w-full border border-slate-200 rounded-lg p-2.5 h-11 bg-slate-50 text-sm outline-none focus:ring-2 focus:ring-blue-100 transition-all" value={addForm.departmentId} onChange={e => {
+              <select className={`w-full border rounded-lg p-2.5 h-11 bg-slate-50 text-sm outline-none ${errors.departmentId ? 'border-red-500' : 'border-slate-200'}`} value={addForm.departmentId} onChange={e => {
                 const d = departments.find(dep => dep.id === e.target.value);
                 setAddForm({...addForm, departmentId: e.target.value, specialty: d?.name || ''})
               }}>
                 <option value="">اختر التخصص</option>
                 {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
+              {errors.departmentId && <p className="text-[11px] text-red-500 mr-1">{errors.departmentId}</p>}
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-slate-600 mr-1">رقم هاتف التواصل</label>
-              <Input placeholder="059XXXXXXX" value={addForm.phone} onChange={e => setAddForm({...addForm, phone: e.target.value})} dir="ltr" className="h-11 rounded-lg border-slate-200" />
+              <Input placeholder="059XXXXXXX" value={addForm.phone} onChange={e => setAddForm({...addForm, phone: e.target.value})} dir="ltr" className={`h-11 rounded-lg ${errors.phone ? 'border-red-500' : 'border-slate-200'}`} />
+              {errors.phone && <p className="text-[11px] text-red-500 mr-1">{errors.phone}</p>}
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-slate-600 mr-1">أيام الدوام الرسمي</label>
-              <select className="w-full border border-slate-200 rounded-lg p-2.5 h-11 bg-slate-50 text-sm outline-none focus:ring-2 focus:ring-blue-100 transition-all" value={addForm.workSchedule} onChange={e => setAddForm({...addForm, workSchedule: e.target.value})}>
+              <select className={`w-full border rounded-lg p-2.5 h-11 bg-slate-50 text-sm outline-none ${errors.workSchedule ? 'border-red-500' : 'border-slate-200'}`} value={addForm.workSchedule} onChange={e => setAddForm({...addForm, workSchedule: e.target.value})}>
                 <option value="">حدد أيام المداومة</option>
                 <option value="السبت، الاثنين، الأربعاء">السبت، الاثنين، الأربعاء</option>
                 <option value="الأحد، الثلاثاء، الخميس">الأحد، الثلاثاء، الخميس</option>
               </select>
+              {errors.workSchedule && <p className="text-[11px] text-red-500 mr-1">{errors.workSchedule}</p>}
             </div>
           </div>
 

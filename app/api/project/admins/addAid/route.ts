@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma' // تأكد من مسار بريزما عندك
+import prisma  from '@/lib/prisma' // تأكد من مسار بريزما عندك
 
 function normalizeStatus(status?: string | null) {
   if (!status) return 'pending'

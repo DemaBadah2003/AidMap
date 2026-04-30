@@ -20,6 +20,7 @@ export default function RegisterCitizen() {
     setMessage(null);
 
     try {
+      // هنا يتم التحقق من صلاحيات الأدمن أو إرسال الطلب للسيرفر
       const response = await fetch('/api/project/admins/addBeneficiary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -42,13 +43,16 @@ export default function RegisterCitizen() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 border border-gray-100">
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-gray-800">تسجيل مستفيد جديد</h2>
-          <p className="text-gray-500 mt-2 text-sm">يرجى إدخال البيانات بدقة لضمان وصول المساعدات</p>
-        </div>
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4" dir="rtl">
+      
+      {/* العنوان في منتصف الصفحة فوق الكارد */}
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-bold text-gray-800">تسجيل مستفيد جديد</h2>
+        <p className="text-gray-500 mt-2 text-base font-normal">يرجى إدخال البيانات بدقة لضمان وصول المساعدات</p>
+      </div>
 
+      {/* الكارد الذي يحتوي على الحقول */}
+      <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 border border-gray-100">
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* حقل الاسم */}
           <div>
