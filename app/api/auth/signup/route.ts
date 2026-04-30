@@ -39,6 +39,7 @@ async function sendVerificationEmail(userId: string, userEmail: string, userName
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    console.log("1. Body received:", body); 
 
     // 1. التحقق من صحة البيانات باستخدام Zod
     const result = getSignupSchema().safeParse(body);
