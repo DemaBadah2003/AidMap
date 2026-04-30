@@ -53,11 +53,10 @@ export const MENU_SIDEBAR: MenuConfig = [
             title: 'الغذاء والمياه (المعونات)',
             path: '/project/projects/food-water',
             children: [
+              { title: 'الصفحة الرئيسية', path: '/project/projects/food-water/home' },
+
               { title: 'نقاط توزيع المياه', path: '/project/projects/food-water/water' },
               { title: 'نقاط توزيع الطعام', path: '/project/projects/food-water/food' },
-              { title: 'التوزيعات المؤسساتية', path: '/project/projects/food-water/Distributions' },
-              { title: 'المنتجات', path: '/project/projects/food-water/products' },
-               { title: 'المستفيد', path: '/project/projects/food-water/beneficiaries' },
                
 
 
@@ -70,6 +69,10 @@ export const MENU_SIDEBAR: MenuConfig = [
             title: 'المراكز الإيوائية',
             path: '/project/projects/camp',
             children: [
+             { title: 'الصفحة الرئيسية ', path: '/project/projects/camp/home' },
+             { title: 'جدول المواطن ', path: '/project/projects/camp/citizens' },
+
+
               { title: 'جدول مركز الايواء', path: '/project/projects/camp/shelters' },
               { title: 'جدول المخيمات', path: '/project/projects/camp/camps' },
 
@@ -79,16 +82,7 @@ export const MENU_SIDEBAR: MenuConfig = [
           },
 
           // 5. المؤسسات الداعمة
-          {
-            title: 'المؤسسات الداعمة',
-            path: '/project/projects/institutions',
-            children: [
-              { title: 'المؤسسات', path: '/project/projects/institution/institutions' },
-              { title: 'منتجات المؤسسات', path: '/project/projects/institution/Enterprise-Products' },
-              { title: 'الخدمات', path: '/project/projects/institution/service' },
-              { title: 'الخدمات المؤسساتية', path: '/project/projects/institution/institutional-services' },
-            ],
-          },
+        ,
         ],
       },
       {

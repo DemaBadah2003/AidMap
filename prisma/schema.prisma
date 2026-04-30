@@ -6,6 +6,8 @@ datasource db {
   provider = "postgresql"
 }
 
+// --- إدارة المستخدمين والصلاحيات (User Management) ---
+
 model User {
   id              String      @id @default(uuid())
   email           String      @unique
@@ -88,6 +90,8 @@ model Account {
   @@unique([provider, providerAccountId], name: "provider_providerAccountId")
 }
 
+// --- نظام الإيواء والمخيمات (Shelter & Camps) ---
+
 model Shelter {
   id            String         @id @default(uuid())
   supervisorId  String
@@ -129,7 +133,7 @@ model Camps {
   isTrashed            Boolean        @default(false)
   isProtected          Boolean        @default(false)
   addresses            Address[]
-  beneficiaries        Beneficiary[]
+  citizens             Citizens[]
   place                Place?         @relation("CampPlace", fields: [placeId], references: [id])
   supervisor           Supervisor?    @relation(fields: [supervisorId], references: [id])
   emergencies          Emergency[]
@@ -142,7 +146,7 @@ model Supervisor {
   id          String        @id @default(uuid())
   name        String
   phone       String?
-  area        String?       // أضيفي هذا الحقل ليتم حفظ المنطقة فيه
+  area        String?
   createdAt   DateTime      @default(now())
   isProtected Boolean       @default(false)
   isTrashed   Boolean       @default(false)
@@ -155,42 +159,43 @@ model Supervisor {
   @@index([status])
 }
 
-model Hospital {
-  id          String         @id @default(uuid())
-  type        HospitalType   // حكومي، وكالة، خاص
-  name        String         // اسم المستشفى
-  region      Region         // الموقع العام (للفلترة السريعة)
-  phone       String
-  latitude    Decimal?       @db.Decimal(10, 7)
-  longitude   Decimal?       @db.Decimal(10, 7)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+// --- المنظومة الصحية (Medical System) ---
 
-  addressId   String
-  address     Address        @relation(fields: [addressId], references: [id])
+model Hospital {
+  id        String       @id @default(uuid())
+  type      HospitalType
+  name      String
+  region    Region
+  phone     String
+  latitude  Decimal?     @db.Decimal(10, 7)
+  longitude Decimal?     @db.Decimal(10, 7)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  addressId String
+  address   Address @relation(fields: [addressId], references: [id])
 
   departments   Department[]
   distributions Distribution[]
   doctors       Doctor[]
   patients      Patient[]
-  // تم حذف علاقة الصيدليات (pharmacies) من هنا
-  
-  placeId     String?        @unique
-  place       Place?         @relation("HospitalPlace", fields: [placeId], references: [id])
+
+  placeId String? @unique
+  place   Place?  @relation("HospitalPlace", fields: [placeId], references: [id])
 
   @@index([type])
   @@index([region])
 }
 
 model Department {
-  id          String    @id @default(uuid())
-  name        String    // اسم القسم (مثل: غرفة العمليات)
-  deptType    String    // نوع التخصص (مثل: الجراحة العامة)
-  status      String    @default("يعمل بكفاءة") // الحالة التشغيلية
-  description String?   // ملاحظات / وصف
+  id          String     @id @default(uuid())
+  name        String
+  deptType    String
+  status      String     @default("يعمل بكفاءة")
+  description String?
   hospitalId  String
-  createdAt   DateTime  @default(now())
-  hospital    Hospital  @relation(fields: [hospitalId], references: [id])
+  createdAt   DateTime   @default(now())
+  hospital    Hospital   @relation(fields: [hospitalId], references: [id])
   doctors     Doctor[]
   services    Service[]
 }
@@ -210,8 +215,8 @@ model Doctor {
   id           String      @id @default(uuid())
   name         String
   phone        String
-  specialty    String      // التخصص
-  workSchedule String      // مواعيد العمل
+  specialty    String
+  workSchedule String
   description  String?
   hospitalId   String
   departmentId String?
@@ -223,7 +228,7 @@ model Doctor {
 model Patient {
   id          String   @id @default(uuid())
   name        String
-  nationalId  String   @unique 
+  nationalId  String   @unique
   age         String
   address     String
   phone       String
@@ -233,17 +238,58 @@ model Patient {
   hospital    Hospital @relation(fields: [hospitalId], references: [id])
 }
 
-model Address {
-  id          String    @id @default(uuid())
-  title       String    // اسم المنطقة (مثل: البريج، النصيرات، الرمال)
-  region      Region    // الموقع العام (NORTH, SOUTH, WEST, EAST, CENTRAL)
-  description String?
-  createdAt   DateTime  @default(now())
-  
-  hospitals   Hospital[] 
+// --- نظام الموارد (Water & Food Points) ---
 
-  campId      String?
-  camp        Camps?    @relation(fields: [campId], references: [id])
+model WaterPoint {
+  id        String           @id @default(uuid())
+  name      String
+  type      WaterType        @default(SWEET)
+  status    WaterPointStatus @default(OPERATIONAL)
+  
+  placeId   String?          @unique
+  place     Place?           @relation("WaterPointPlace", fields: [placeId], references: [id])
+  
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([status])
+  @@index([type])
+}
+
+
+model FoodPoint {
+  id          String          @id @default(uuid())
+  name        String
+  
+  // الحقول الجديدة التي طلبتها
+  location    String?         // الموقع (شرق / غرب / شمال / جنوب)
+  region      String?         // المنطقة (حقل نصي عادي)
+  
+  serviceType FoodServiceType @default(HOT_MEALS)
+  status      FoodPointStatus @default(OPERATIONAL)
+  
+  placeId     String?         @unique
+  place       Place?          @relation("FoodPointPlace", fields: [placeId], references: [id])
+  
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([status])
+  @@index([location]) // إضافة فهرس للموقع لتسريع عمليات البحث والتصفية
+}
+// --- البنية التحتية واللوجستيات (Infrastructure & Logistics) ---
+
+model Address {
+  id          String   @id @default(uuid())
+  title       String
+  region      Region
+  description String?
+  createdAt   DateTime @default(now())
+
+  hospitals Hospital[]
+
+  campId String?
+  camp   Camps?  @relation(fields: [campId], references: [id])
 }
 
 model Institution {
@@ -272,9 +318,10 @@ model Institution {
   @@index([isTrashed])
 }
 
-model Beneficiary {
+model Citizens {
   id             String              @id @default(uuid())
   name           String
+  idNumber       String?             @unique
   phone          String              @unique
   numberOfFamily Int                 @default(0)
   priority       BeneficiaryPriority @default(NORMAL)
@@ -316,13 +363,13 @@ model Distribution {
   institutionId String
   quantity      Int                @default(0)
   aidId         String?
-  beneficiaryId String?
+  citizenId     String?
   hospitalId    String?
   placeId       String?
   productId     String?
   status        DistributionStatus @default(PENDING)
   aid           Aid?               @relation(fields: [aidId], references: [id])
-  beneficiary   Beneficiary?       @relation(fields: [beneficiaryId], references: [id])
+  citizen       Citizens?          @relation(fields: [citizenId], references: [id])
   hospital      Hospital?          @relation(fields: [hospitalId], references: [id])
   institution   Institution        @relation(fields: [institutionId], references: [id])
   place         Place?             @relation("PlaceDistribution", fields: [placeId], references: [id])
@@ -384,6 +431,8 @@ model Place {
   hospital      Hospital?      @relation("HospitalPlace")
   institution   Institution?   @relation("InstitutionPlace")
   shelter       Shelter?       @relation("ShelterPlace")
+  waterPoint    WaterPoint?    @relation("WaterPointPlace")
+  foodPoint     FoodPoint?     @relation("FoodPointPlace")
 
   @@index([type])
   @@index([status])
@@ -391,6 +440,8 @@ model Place {
   @@index([isTrashed])
   @@index([name])
 }
+
+// --- النظام التقني (System & Logs) ---
 
 model Session {
   id           String   @id @default(cuid())
@@ -419,14 +470,14 @@ model Contact {
   id            String        @id @default(uuid())
   institutionId String
   type          String?
-  beneficiaryId String
+  citizenId     String
   date          DateTime      @default(now())
   notes         String?
   status        ContactStatus @default(NOT_DONE)
-  beneficiary   Beneficiary   @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  citizen       Citizens      @relation(fields: [citizenId], references: [id], onDelete: Cascade)
   institution   Institution   @relation(fields: [institutionId], references: [id], onDelete: Cascade)
 
-  @@index([beneficiaryId])
+  @@index([citizenId])
   @@index([institutionId])
 }
 
@@ -455,7 +506,7 @@ model EnterpriseProduct {
 model VerificationToken {
   identifier String
   token      String   @unique
-  expires    DateTimepl
+  expires    DateTime
 
   @@unique([identifier, token])
 }
@@ -499,7 +550,7 @@ model SystemSetting {
 
 model DistributeAidForm {
   id               String                  @id @default(uuid())
-  beneficiaryName  String
+  citizenName      String
   aidType          String
   quantity         Int
   status           DistributeAidFormStatus @default(SCHEDULED)
@@ -509,7 +560,7 @@ model DistributeAidForm {
   notes            String?
   updatedAt        DateTime                @updatedAt
 
-  @@index([beneficiaryName])
+  @@index([citizenName])
   @@index([aidType])
   @@index([status])
   @@index([distributionDate])
@@ -622,4 +673,25 @@ enum Region {
   SOUTH
   EAST
   WEST
+}
+
+enum WaterType {
+  SWEET
+  SALTY
+}
+
+enum WaterPointStatus {
+  OPERATIONAL
+  STOPPED
+}
+
+enum FoodPointStatus {
+  OPERATIONAL
+  STOPPED
+}
+
+enum FoodServiceType {
+  HOT_MEALS
+  DRY_RATIONS
+  BAKERY
 }
