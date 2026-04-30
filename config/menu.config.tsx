@@ -40,6 +40,12 @@ export const MENU_SIDEBAR: MenuConfig = [
             title: 'الخدمات التعليمية والطلاب',
             path: '/project/projects/education',
             children: [
+                  { title: '  الصفحة الرئيسية ', path: '/project/projects/education/home' },
+
+
+              
+              
+
               { title: 'مراكز الدعم النفسي', path: '/project/projects/education/psychological' },
               { title: 'نقاط الإنترنت للدراسة', path: '/project/projects/education/internet' },
               { title: 'قضايا الطلاب والتعليم', path: '/project/projects/education/student-issues' },

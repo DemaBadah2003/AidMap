@@ -16,7 +16,9 @@ import {
   Plus, 
   Search, 
   Loader2, 
-  GraduationCap
+  GraduationCap,
+  ChevronRight,
+  ChevronLeft
 } from 'lucide-react'
 
 type EducationCase = {
@@ -28,12 +30,11 @@ type EducationCase = {
   status: string
 }
 
-const BASE_URL = '/api/project/projects/education-cases' 
+const BASE_URL = '/api/project/education/student-issues' 
 const topControlHeight = 'h-10'
 const inputBaseClass = 'w-full min-w-0 rounded-lg border-slate-200 bg-white text-right text-xs sm:text-sm outline-none focus:!ring-2 focus:!ring-slate-100 font-normal'
 const selectBaseClass = 'w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-right text-xs sm:text-sm outline-none focus:ring-2 focus:ring-slate-100 font-normal'
 
-// الخيارات المحددة للقوائم المنسدلة
 const CASE_TYPES = ["تسجيل طالب جديد", "طلب قرطاسية", "انقطاع عن الدراسة", "احتياج دروس تقوية"]
 const STUDY_LEVELS = ["ابتدائي", "إعدادي", "ثانوي"]
 const CASE_STATUS = ["جديد", "تم توفير الخدمة", "قيد المتابعة"]
@@ -41,13 +42,15 @@ const CASE_STATUS = ["جديد", "تم توفير الخدمة", "قيد الم�
 export default function EducationCasesPage() {
   const [q, setQ] = useState('')
   const [items, setItems] = useState<EducationCase[]>([])
+  const [studentOptions, setStudentOptions] = useState<string[]>([])
+  const [schoolOptions, setSchoolOptions] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Pagination States
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(5) 
+  const [itemsPerPage, setItemsPerPage] = useState(5) 
 
   const [addOpen, setAddOpen] = useState(false)
-  
-  // الحالات (States) للإضافة
   const [caseType, setCaseType] = useState('')
   const [studyLevel, setStudyLevel] = useState('')
   const [studentName, setStudentName] = useState('')
@@ -65,23 +68,29 @@ export default function EducationCasesPage() {
     try {
       const res = await fetch(BASE_URL)
       const data = await res.json()
-      setItems(data)
+      setItems(data.cases || [])
+      setStudentOptions(data.studentList || [])
+      setSchoolOptions(data.schoolList || [])
     } catch (err) { console.error('Fetch error:', err) } 
     finally { setLoading(false) }
   }
 
   useEffect(() => { fetchData() }, [])
 
-  const isEditValid = useMemo(() => {
-    return editDraft.caseType !== '' && editDraft.studentName !== '' && editDraft.schoolName !== ''
-  }, [editDraft])
-
-  const isAddValid = useMemo(() => {
-    return caseType !== '' && studentName !== '' && schoolName !== ''
-  }, [caseType, studentName, schoolName])
+  // التحقق من التكرار (منع إضافة نفس الطالب لنفس نوع القضية)
+  const isDuplicate = (sName: string, cType: string, excludeId?: string) => {
+    return items.some(item => 
+      item.studentName === sName && 
+      item.caseType === cType && 
+      item.id !== excludeId
+    )
+  }
 
   const onAdd = async () => {
-    if (!isAddValid) return
+    if (isDuplicate(studentName, caseType)) {
+      alert("هذه القضية مسجلة مسبقاً لهذا الطالب!")
+      return
+    }
     setSubmitting(true)
     try {
       const res = await fetch(BASE_URL, {
@@ -98,7 +107,10 @@ export default function EducationCasesPage() {
   }
 
   const saveEditRow = async (id: string) => {
-    if (!isEditValid) return
+    if (isDuplicate(editDraft.studentName, editDraft.caseType, id)) {
+      alert("البيانات مكررة، يوجد سجل آخر مشابه!")
+      return
+    }
     try {
       const res = await fetch(`${BASE_URL}?id=${id}`, {
         method: 'PATCH',
@@ -125,9 +137,10 @@ export default function EducationCasesPage() {
     return filtered.slice(start, start + itemsPerPage)
   }, [filtered, currentPage, itemsPerPage])
 
+  const totalPages = Math.ceil(filtered.length / itemsPerPage)
+
   return (
     <div className="w-full px-4 py-6" dir="rtl">
-      {/* العنوان على اليمين */}
       <div className="mb-6 flex items-center justify-start gap-2 font-arabic">
         <GraduationCap className="w-6 h-6 text-blue-600" />
         <h1 className="text-2xl font-bold text-slate-900">إدارة قضايا التعليم</h1>
@@ -150,9 +163,10 @@ export default function EducationCasesPage() {
             </Button>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* إضافة سكرول داخلي عند زيادة البيانات عن 5 صفوف */}
+          <div className="overflow-x-auto max-h-[450px] overflow-y-auto">
             <table className="w-full text-right border-collapse text-sm">
-              <thead className="bg-slate-50/80 border-b border-slate-100">
+              <thead className="bg-slate-50/80 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
                   <th className="p-4 text-slate-500 font-bold">نوع القضية</th>
                   <th className="p-4 text-slate-500 font-bold">المرحلة</th>
@@ -172,7 +186,6 @@ export default function EducationCasesPage() {
                       <td className="p-4">
                         {isEditing ? (
                           <select className={selectBaseClass} value={editDraft.caseType} onChange={e => setEditDraft({...editDraft, caseType: e.target.value})}>
-                            <option value="">اختر نوع القضية</option>
                             {CASE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
                         ) : c.caseType}
@@ -180,13 +193,24 @@ export default function EducationCasesPage() {
                       <td className="p-4 font-bold">
                         {isEditing ? (
                           <select className={selectBaseClass} value={editDraft.studyLevel} onChange={e => setEditDraft({...editDraft, studyLevel: e.target.value})}>
-                            <option value="">المرحلة</option>
                             {STUDY_LEVELS.map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
                         ) : c.studyLevel}
                       </td>
-                      <td className="p-4">{c.studentName}</td>
-                      <td className="p-4">{c.schoolName}</td>
+                      <td className="p-4">
+                        {isEditing ? (
+                          <select className={selectBaseClass} value={editDraft.studentName} onChange={e => setEditDraft({...editDraft, studentName: e.target.value})}>
+                             {studentOptions.map(name => <option key={name} value={name}>{name}</option>)}
+                          </select>
+                        ) : c.studentName}
+                      </td>
+                      <td className="p-4">
+                        {isEditing ? (
+                           <select className={selectBaseClass} value={editDraft.schoolName} onChange={e => setEditDraft({...editDraft, schoolName: e.target.value})}>
+                             {schoolOptions.map(name => <option key={name} value={name}>{name}</option>)}
+                           </select>
+                        ) : c.schoolName}
+                      </td>
                       <td className="p-4">
                          {isEditing ? (
                             <select className={selectBaseClass} value={editDraft.status} onChange={e => setEditDraft({...editDraft, status: e.target.value})}>
@@ -216,67 +240,88 @@ export default function EducationCasesPage() {
               </tbody>
             </table>
           </div>
+
+          {/* الترقيم (Pagination) */}
+          <div className="p-4 border-t flex items-center justify-between bg-slate-50/50">
+            {/* يمين: التحكم في عدد الصفوف */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500">عرض:</span>
+              <select 
+                value={itemsPerPage} 
+                onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                className="text-xs border rounded p-1 outline-none"
+              >
+                {[5, 10, 15, 20].map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+
+            {/* يسار: السابق والتالي */}
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => prev - 1)}
+                className="h-8 px-2"
+              >
+                <ChevronRight className="h-4 w-4 ml-1" /> السابق
+              </Button>
+              <span className="text-xs font-bold px-2 text-slate-600">صفحة {currentPage} من {totalPages || 1}</span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={currentPage === totalPages || totalPages === 0}
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                className="h-8 px-2"
+              >
+                التالي <ChevronLeft className="h-4 w-4 mr-1" />
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      {/* النافذة المنبثقة للإضافة */}
+      {/* نافذة الإضافة */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent dir="rtl" className="max-w-md font-arabic rounded-2xl shadow-2xl border-none">
           <DialogHeader>
             <DialogTitle className="text-right text-lg font-bold">إضافة قضية تعليمية جديدة</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-5 py-4 text-right">
-            
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-slate-700">نوع القضية</label>
-               <select className={`${selectBaseClass} h-11 bg-slate-50 border-slate-200`} value={caseType} onChange={e => setCaseType(e.target.value)}>
+               <select className={`${selectBaseClass} h-11 bg-slate-50`} value={caseType} onChange={e => setCaseType(e.target.value)}>
                   <option value="">اختر نوع القضية</option>
                   {CASE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                </select>
             </div>
-
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-slate-700">المرحلة الدراسية</label>
-               <select className={`${selectBaseClass} h-11 bg-slate-50 border-slate-200`} value={studyLevel} onChange={e => setStudyLevel(e.target.value)}>
+               <select className={`${selectBaseClass} h-11 bg-slate-50`} value={studyLevel} onChange={e => setStudyLevel(e.target.value)}>
                   <option value="">اختر المرحلة</option>
                   {STUDY_LEVELS.map(t => <option key={t} value={t}>{t}</option>)}
                </select>
             </div>
-
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-slate-700">اسم الطالب</label>
-               <select className={`${selectBaseClass} h-11 bg-slate-50 border-slate-200`} value={studentName} onChange={e => setStudentName(e.target.value)}>
+               <select className={`${selectBaseClass} h-11 bg-slate-50`} value={studentName} onChange={e => setStudentName(e.target.value)}>
                   <option value="">اختر طالباً...</option>
-                  {/* هنا يتم السحب من جدول المواطنين برمجياً، وضعت أمثلة */}
-                  <option value="ياسين محمود">ياسين محمود</option>
-                  <option value="ليان عبدالله">ليان عبدالله</option>
+                  {studentOptions.map(name => <option key={name} value={name}>{name}</option>)}
                </select>
             </div>
-
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-slate-700">المدرسة المعنية</label>
-               <select className={`${selectBaseClass} h-11 bg-slate-50 border-slate-200`} value={schoolName} onChange={e => setSchoolName(e.target.value)}>
+               <select className={`${selectBaseClass} h-11 bg-slate-50`} value={schoolName} onChange={e => setSchoolName(e.target.value)}>
                   <option value="">اختر المدرسة...</option>
-                  {/* هنا يتم السحب من جدول المدارس برمجياً */}
-                  <option value="مدرسة القدس">مدرسة القدس</option>
-                  <option value="مدرسة العودة">مدرسة العودة</option>
+                  {schoolOptions.map(name => <option key={name} value={name}>{name}</option>)}
                </select>
             </div>
-
-            <div className="space-y-1.5">
-               <label className="text-xs font-bold text-slate-700">الحالة</label>
-               <select className={`${selectBaseClass} h-11 bg-slate-50 border-slate-200`} value={status} onChange={e => setStatus(e.target.value)}>
-                  {CASE_STATUS.map(t => <option key={t} value={t}>{t}</option>)}
-               </select>
-            </div>
-
           </div>
-
           <DialogFooter className="gap-3 mt-2">
-            <Button onClick={onAdd} disabled={submitting || !isAddValid} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 rounded-xl">
+            <Button onClick={onAdd} disabled={submitting || !caseType || !studentName} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 rounded-xl">
               {submitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null} حفظ القضية
             </Button>
-            <Button variant="outline" onClick={() => setAddOpen(false)} className="flex-1 h-11 border-slate-200 rounded-xl">إلغاء</Button>
+            <Button variant="outline" onClick={() => setAddOpen(false)} className="flex-1 h-11 rounded-xl">إلغاء</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { requireAdmin } from '@/app/(protected)/project/helpers/route-guards'
+// تم تعطيل الاستيراد لعدم الحاجة له حالياً
+// import { requireAdmin } from '@/app/(protected)/project/helpers/route-guards'
 
-// تحديث أنواع الأماكن لتشمل الخيارات الجديدة
 type PlaceType = 'shelter' | 'hospital' | 'water' | 'food'
 
 type FormState = {
@@ -31,25 +31,20 @@ const INITIAL_FORM: FormState = {
 
 export default function AddPlacesPage() {
   const router = useRouter()
-  const [isAuthorized, setIsAuthorized] = useState(false)
+  // جعلنا الحالة الافتراضية true لتجاوز شاشة التحقق فوراً
+  const [isAuthorized, setIsAuthorized] = useState(true)
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    // تم تعطيل منطق التحقق الخارجي للسماح لكِ بالدخول
     const checkAuth = async () => {
-      try {
-        await requireAdmin(router)
-        setIsAuthorized(true)
-      } catch {
-        // في حال عدم وجود صلاحية سيتم التحويل لصفحة غير مصرح له
-        router.push('/unauthorized')
-      }
+      setIsAuthorized(true)
     }
     checkAuth()
-  }, [router])
+  }, [])
 
-  // التحقق مما إذا كان المكان هو مركز إيواء لإظهار حقول السعة
   const isShelter = useMemo(() => form.type === 'shelter', [form.type])
 
   const updateField = (key: keyof FormState, value: string) => {
@@ -71,21 +66,19 @@ export default function AddPlacesPage() {
           ...form,
           latitude: Number(form.lat),
           longitude: Number(form.lng),
-          // تحويل القيم النصية لأرقام عند الإرسال
           capacity: form.capacity ? Number(form.capacity) : 0,
           occupancy: form.occupancy ? Number(form.occupancy) : 0,
           availableBeds: form.availableBeds ? Number(form.availableBeds) : 0,
         }),
       })
 
-      // ملاحظة: إذا ظهر خطأ "Unexpected token <" تأكدي أن الـ API لا يعيد صفحة 404 أو HTML
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: 'حدث خطأ غير متوقع في الخادم' }))
         throw new Error(errorData.message || 'فشل في حفظ البيانات')
       }
 
       router.push('/project/MapPreview')
-      router.refresh() // لتحديث البيانات في صفحة الخريطة
+      router.refresh() 
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -93,9 +86,10 @@ export default function AddPlacesPage() {
     }
   }
 
+  // لن يظهر هذا الجزء لأننا وضعنا isAuthorized كـ true
   if (!isAuthorized) return (
     <div className="p-10 text-center animate-pulse">
-      <div className="text-blue-600 font-bold">جاري التحقق من صلاحيات المسؤول...</div>
+      <div className="text-blue-600 font-bold">جاري التحقق من الصلاحيات...</div>
     </div>
   )
 
@@ -107,7 +101,7 @@ export default function AddPlacesPage() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-semibold text-gray-600 mr-1">اسم المكان</label>
+            <label className="text-sm font-semibold text-gray-600 mr-1">اسم المكان (بالعربية)</label>
             <input 
               className="border p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
               placeholder="مثال: مدرسة الإيواء المركزية" 

@@ -90,6 +90,91 @@ model Account {
   @@unique([provider, providerAccountId], name: "provider_providerAccountId")
 }
 
+// --- النظام التعليمي وخدمات الطلاب (Education & Student Services) ---
+
+model PsychologicalSupport {
+  id           String   @id @default(uuid())
+  centerName   String   // اسم المركز
+  specialist   String   // الأخصائي
+  phoneNumber  String   // رقم الهاتف (بدلاً من contactInfo)
+  appointments String   // المواعيد العامة
+  serviceType  String   // نوع الخدمة
+  capacity     Int      @default(0) // السعة
+  currentCount Int      @default(0) // عدد الموجود (بدلاً من casesCount)
+  status       String   @default("متاح") // الحالة (متاح/ممتلئ)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  isTrashed    Boolean  @default(false)
+
+  @@index([centerName])
+  @@index([specialist])
+}
+// تم تغيير الاسم من WifiPoint إلى Internet
+model Internet {
+  id           String   @id @default(uuid())
+  placeName    String   // اسم المكان
+  powerSource  String   // مصدر الطاقة
+  wifiQuality  String   // جودة الإنترنت
+  seatsCount   Int      @default(0) // عدد الكراسي
+  isFree       String   // مجانية أم بمقابل
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  isTrashed    Boolean  @default(false)
+
+  // علاقة مع نموذج Place إذا كنت تريد ربطها بالخريطة
+  placeId      String?  @unique
+  place        Place?   @relation("InternetPlace", fields: [placeId], references: [id])
+
+  @@index([placeName])
+  @@index([wifiQuality])
+}
+
+model StudentIssue {
+  id          String   @id @default(uuid())
+  issueType   String   
+  level       String   
+  studentName String   
+  schoolName  String   
+  status      String   
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isTrashed   Boolean  @default(false)
+
+  @@index([studentName])
+}
+
+model School {
+  id          String   @id @default(uuid())
+  name        String   
+  location    String?  
+  region      String?  
+  level       String?  
+  studyDays   String?  
+  timing      String?  
+  fees        Float    @default(0) 
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isTrashed   Boolean  @default(false)
+}
+
+model Student {
+  id            String   @id @default(uuid())
+  name          String   
+  nationalId    String   @unique 
+  level         String   
+  birthDate     DateTime 
+  guardianName  String   
+  guardianPhone String   
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  isTrashed     Boolean  @default(false)
+}
+
 // --- نظام الإيواء والمخيمات (Shelter & Camps) ---
 
 model Shelter {
@@ -108,12 +193,6 @@ model Shelter {
   updatedAt     DateTime       @updatedAt
   place         Place?         @relation("ShelterPlace", fields: [placeId], references: [id])
   supervisor    Supervisor     @relation(fields: [supervisorId], references: [id])
-
-  @@index([supervisorId])
-  @@index([fillStatus])
-  @@index([name])
-  @@index([area])
-  @@index([isTrashed])
 }
 
 model Camps {
@@ -137,9 +216,6 @@ model Camps {
   place                Place?         @relation("CampPlace", fields: [placeId], references: [id])
   supervisor           Supervisor?    @relation(fields: [supervisorId], references: [id])
   emergencies          Emergency[]
-
-  @@index([supervisorId])
-  @@index([status])
 }
 
 model Supervisor {
@@ -155,8 +231,6 @@ model Supervisor {
   camps       Camps[]
   emergencies Emergency[]
   shelters    Shelter[]
-
-  @@index([status])
 }
 
 // --- المنظومة الصحية (Medical System) ---
@@ -182,20 +256,17 @@ model Hospital {
 
   placeId String? @unique
   place   Place?  @relation("HospitalPlace", fields: [placeId], references: [id])
-
-  @@index([type])
-  @@index([region])
 }
 
 model Department {
-  id          String     @id @default(uuid())
+  id          String   @id @default(uuid())
   name        String
   deptType    String
-  status      String     @default("يعمل بكفاءة")
+  status      String   @default("يعمل بكفاءة")
   description String?
   hospitalId  String
-  createdAt   DateTime   @default(now())
-  hospital    Hospital   @relation(fields: [hospitalId], references: [id])
+  createdAt   DateTime @default(now())
+  hospital    Hospital @relation(fields: [hospitalId], references: [id])
   doctors     Doctor[]
   services    Service[]
 }
@@ -251,32 +322,24 @@ model WaterPoint {
   
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
-
-  @@index([status])
-  @@index([type])
 }
 
 
 model FoodPoint {
   id          String          @id @default(uuid())
   name        String
-  
-  // الحقول الجديدة التي طلبتها
-  location    String?         // الموقع (شرق / غرب / شمال / جنوب)
-  region      String?         // المنطقة (حقل نصي عادي)
-  
+  location    String?
+  region      String?
   serviceType FoodServiceType @default(HOT_MEALS)
   status      FoodPointStatus @default(OPERATIONAL)
   
-  placeId     String?         @unique
-  place       Place?          @relation("FoodPointPlace", fields: [placeId], references: [id])
+  placeId     String?          @unique
+  place       Place?           @relation("FoodPointPlace", fields: [placeId], references: [id])
   
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-
-  @@index([status])
-  @@index([location]) // إضافة فهرس للموقع لتسريع عمليات البحث والتصفية
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 }
+
 // --- البنية التحتية واللوجستيات (Infrastructure & Logistics) ---
 
 model Address {
@@ -312,10 +375,6 @@ model Institution {
   place               Place?               @relation("InstitutionPlace", fields: [placeId], references: [id])
   institutionProducts InstitutionProduct[]
   institutionServices InstitutionService[]
-
-  @@index([status])
-  @@index([presence])
-  @@index([isTrashed])
 }
 
 model Citizens {
@@ -336,13 +395,6 @@ model Citizens {
   camp           Camps?              @relation(fields: [campId], references: [id])
   contacts       Contact[]
   distributions  Distribution[]
-
-  @@index([campId])
-  @@index([area])
-  @@index([name])
-  @@index([phone])
-  @@index([isActive])
-  @@index([isTrashed])
 }
 
 model Aid {
@@ -433,12 +485,7 @@ model Place {
   shelter       Shelter?       @relation("ShelterPlace")
   waterPoint    WaterPoint?    @relation("WaterPointPlace")
   foodPoint     FoodPoint?     @relation("FoodPointPlace")
-
-  @@index([type])
-  @@index([status])
-  @@index([isActive])
-  @@index([isTrashed])
-  @@index([name])
+  internet      Internet?      @relation("InternetPlace") // تحديث العلاقة هنا
 }
 
 // --- النظام التقني (System & Logs) ---
@@ -462,8 +509,6 @@ model SystemLog {
   ipAddress   String?
   meta        String?
   user        User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
 }
 
 model Contact {
@@ -476,9 +521,6 @@ model Contact {
   status        ContactStatus @default(NOT_DONE)
   citizen       Citizens      @relation(fields: [citizenId], references: [id], onDelete: Cascade)
   institution   Institution   @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-
-  @@index([citizenId])
-  @@index([institutionId])
 }
 
 model Emergency {
@@ -559,11 +601,6 @@ model DistributeAidForm {
   institutionId    String?
   notes            String?
   updatedAt        DateTime                @updatedAt
-
-  @@index([citizenName])
-  @@index([aidType])
-  @@index([status])
-  @@index([distributionDate])
 }
 
 model RequestAid {

@@ -1,36 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient
-}
-
-const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ['error'],
-  })
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
-
-const NATIONAL_ID_REGEX = /^\d{9}$/
-const REPEATED_DIGITS_REGEX = /^(\d)\1+$/
+import { prisma } from '@/lib/prisma' // تأكد من مسار بريزما عندك
 
 function normalizeStatus(status?: string | null) {
   if (!status) return 'pending'
-
-  switch (status.toUpperCase()) {
-    case 'PENDING':
-      return 'pending'
-    case 'DONE':
-      return 'done'
-    case 'CANCELED':
-      return 'canceled'
-    default:
-      return status.toLowerCase()
-  }
+  const s = status.toUpperCase()
+  if (s === 'PENDING') return 'pending'
+  if (s === 'APPROVED') return 'approved'
+  if (s === 'DELIVERED') return 'delivered'
+  if (s === 'REJECTED') return 'rejected'
+  return 'pending'
 }
 
 export async function GET(req: NextRequest) {
@@ -39,85 +17,37 @@ export async function GET(req: NextRequest) {
     const nationalId = searchParams.get('nationalId')
 
     if (!nationalId) {
-      return NextResponse.json(
-        {
-          message: 'رقم الهوية مطلوب',
-        },
-        { status: 400 }
-      )
+      return NextResponse.json({ message: 'رقم الهوية مطلوب' }, { status: 400 })
     }
 
-    if (!/^\d+$/.test(nationalId)) {
-      return NextResponse.json(
-        {
-          message: 'رقم الهوية يجب أن يحتوي على أرقام فقط',
-        },
-        { status: 400 }
-      )
-    }
-
-    if (!NATIONAL_ID_REGEX.test(nationalId)) {
-      return NextResponse.json(
-        {
-          message: 'رقم الهوية يجب أن يحتوي على 9 أرقام',
-        },
-        { status: 400 }
-      )
-    }
-
-    if (nationalId === '000000000' || REPEATED_DIGITS_REGEX.test(nationalId)) {
-      return NextResponse.json(
-        {
-          message: 'رقم الهوية غير صالح',
-        },
-        { status: 400 }
-      )
-    }
-
-    const requestAid = await prisma.requestAid.findFirst({
-      where: {
-        nationalId,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+    // البحث في جدول aidRequest بناءً على رقم الهوية
+    const request = await prisma.aidRequest.findFirst({
+      where: { nationalId: nationalId },
+      orderBy: { createdAt: 'desc' }, // جلب أحدث طلب للمواطن
     })
 
-    if (!requestAid) {
-      return NextResponse.json(
-        {
-          found: false,
-        },
-        { status: 200 }
-      )
+    if (!request) {
+      return NextResponse.json({ found: false, message: 'رقم الهوية هذا غير موجود في كشوفات المساعدات' }, { status: 200 })
     }
 
-    return NextResponse.json(
-      {
-        found: true,
-        beneficiaryName: requestAid.fullName,
-        nationalId: requestAid.nationalId,
-        phone: requestAid.phone,
-        aidType: requestAid.aidType,
-        numberOfFamily: requestAid.familyCount,
-        address: requestAid.address,
-        notes: requestAid.notes,
-        status: normalizeStatus(requestAid.status),
-        requestNumber: requestAid.id,
-        distributionDate: null,
-        pickupLocation: null,
-      },
-      { status: 200 }
-    )
-  } catch (error) {
-    console.error('GET /api/project/admins/addAid error:', error)
+    // إرجاع البيانات كما يتوقعها الفرونت إند
+    return NextResponse.json({
+      found: true,
+      beneficiaryName: request.fullName,
+      nationalId: request.nationalId,
+      phone: request.phone,
+      aidType: request.aidType,
+      numberOfFamily: request.familyCount,
+      address: request.address,
+      notes: request.notes,
+      status: normalizeStatus(request.status),
+      requestNumber: request.id,
+      distributionDate: null, // يمكن إضافتها لاحقاً من قاعدة البيانات
+      pickupLocation: null,   // يمكن إضافتها لاحقاً من قاعدة البيانات
+    }, { status: 200 })
 
-    return NextResponse.json(
-      {
-        message: 'حدث خطأ أثناء فحص حالة المساعدة',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+  } catch (error) {
+    console.error('Search Aid Error:', error)
+    return NextResponse.json({ message: 'حدث خطأ أثناء فحص البيانات' }, { status: 500 })
   }
 }

@@ -12,70 +12,78 @@ import {
   DialogFooter,
 } from '../../../../../../components/ui/dialog'
 import { 
-  Pencil, 
-  Plus, 
-  Search, 
-  Loader2, 
-  User,
-  GraduationCap
+  Pencil, Plus, Search, Loader2, User, GraduationCap, AlertCircle, Check, X
 } from 'lucide-react'
 
-// تعريف نوع البيانات للحقول الستة المطلوبة
 type Student = {
   id: string
-  studentName: string       // اسم الطالب
-  nationalId: string        // رقم الهوية
-  birthDate: string         // تاريخ الميلاد
-  gradeLevel: string        // المرحلة الدراسية
-  parentName: string        // اسم ولي الأمر
-  parentPhone: string       // رقم هاتف ولي الأمر
+  studentName: string
+  nationalId: string
+  birthDate: string
+  gradeLevel: string
+  parentName: string
+  parentPhone: string
 }
 
-const BASE_URL = '/api/project/projects/students'
-const topControlHeight = 'h-10'
-const inputBaseClass = 'w-full min-w-0 rounded-lg border-slate-200 bg-white text-right text-xs sm:text-sm outline-none focus:!ring-2 focus:!ring-slate-100 font-normal'
-const selectBaseClass = 'w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-right text-xs sm:text-sm outline-none focus:ring-2 focus:ring-slate-100 font-normal'
+const BASE_URL = '/api/project/education/students'
 
 export default function StudentsPage() {
   const [q, setQ] = useState('')
   const [items, setItems] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
   
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(5)
-
-  // Add Form States
-  const [addOpen, setAddOpen] = useState(false)
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [formData, setFormData] = useState<Omit<Student, 'id'>>({
-    studentName: '',
-    nationalId: '',
-    birthDate: '',
-    gradeLevel: '',
-    parentName: '',
-    parentPhone: ''
+    studentName: '', nationalId: '', birthDate: '', gradeLevel: '', parentName: '', parentPhone: ''
   })
-
   const [submitting, setSubmitting] = useState(false)
+
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editRowData, setEditRowData] = useState<Student | null>(null)
+
+  const getErrors = (data: Omit<Student, 'id'>, isEditing = false, currentId?: string) => {
+    const e: Record<string, string> = {}
+    
+    if (data.studentName && data.studentName.trim().split(/\s+/).length < 4) 
+      e.studentName = "يجب إدخال الاسم رباعياً على الأقل"
+    
+    if (data.nationalId && !/^\d{9}$/.test(data.nationalId)) {
+      e.nationalId = "رقم الهوية يجب أن يتكون من 9 أرقام"
+    } else if (data.nationalId) {
+      const isDuplicate = items.some(item => 
+        item.nationalId === data.nationalId && (!isEditing || item.id !== currentId)
+      )
+      if (isDuplicate) e.nationalId = "رقم الهوية هذا مسجل مسبقاً"
+    }
+
+    if (data.parentPhone && !/^(056|059)\d{7}$/.test(data.parentPhone)) 
+      e.parentPhone = "يجب أن يبدأ بـ 056 أو 059 ويتبعه 7 أرقام"
+    
+    return e
+  }
+
+  const canSave = (data: Omit<Student, 'id'>, isEditing = false, currentId?: string) => {
+    const hasEmptyFields = Object.values(data).some(val => val.trim() === '')
+    const hasErrors = Object.keys(getErrors(data, isEditing, currentId)).length > 0
+    return !hasEmptyFields && !hasErrors
+  }
+
+  const addErrors = useMemo(() => getErrors(formData), [formData, items])
+  const editErrors = useMemo(() => editRowData ? getErrors(editRowData, true, editingId!) : {}, [editRowData, items])
 
   const fetchStudents = async () => {
     setLoading(true)
     try {
       const res = await fetch(BASE_URL)
       const data = await res.json()
-      setItems(data)
-    } catch (err) { console.error('Fetch error:', err) } 
-    finally { setLoading(false) }
+      setItems(Array.isArray(data) ? data : [])
+    } catch (err) { setItems([]) } finally { setLoading(false) }
   }
 
   useEffect(() => { fetchStudents() }, [])
 
-  const isFormValid = (data: any) => {
-    return data.studentName.trim() !== '' && data.nationalId.trim() !== '' && data.gradeLevel !== ''
-  }
-
-  const onAdd = async () => {
-    if (!isFormValid(formData)) return
+  const handleAddSubmit = async () => {
+    if (!canSave(formData)) return
     setSubmitting(true)
     try {
       const res = await fetch(BASE_URL, {
@@ -85,167 +93,182 @@ export default function StudentsPage() {
       })
       if (res.ok) {
         await fetchStudents()
-        setAddOpen(false)
-        resetForm()
-        setCurrentPage(1)
+        setAddDialogOpen(false)
+        setFormData({ studentName: '', nationalId: '', birthDate: '', gradeLevel: '', parentName: '', parentPhone: '' })
       }
     } finally { setSubmitting(false) }
   }
 
-  const resetForm = () => {
-    setFormData({
-      studentName: '', nationalId: '', birthDate: '',
-      gradeLevel: '', parentName: '', parentPhone: ''
-    })
+  const handleSaveEdit = async () => {
+    if (!editRowData || !canSave(editRowData, true, editingId!)) return
+    setSubmitting(true)
+    try {
+      const res = await fetch(`${BASE_URL}?id=${editRowData.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editRowData)
+      })
+      if (res.ok) {
+        await fetchStudents()
+        setEditingId(null)
+      }
+    } finally { setSubmitting(false) }
   }
 
-  const filtered = useMemo(() => {
-    return items.filter((s) => {
-      return !q || s.studentName.includes(q) || s.nationalId.includes(q)
-    })
-  }, [q, items])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage))
-  const paginatedData = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage
-    return filtered.slice(start, start + itemsPerPage)
-  }, [filtered, currentPage, itemsPerPage])
-
-  const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1
-  const rangeEnd = Math.min(currentPage * itemsPerPage, filtered.length)
+  const filtered = items.filter(s => !q || s.studentName.includes(q) || s.nationalId.includes(q))
 
   return (
     <div className="w-full px-4 py-6" dir="rtl">
-      {/* العنوان على اليمين تماماً */}
       <div className="mb-6 flex items-center justify-start gap-2">
         <GraduationCap className="w-8 h-8 text-blue-600" />
-        <h1 className="text-2xl font-bold text-slate-900">سجل بيانات الطلاب</h1>
+        <h1 className="text-2xl font-bold text-slate-900">نظام إدارة الطلاب</h1>
       </div>
 
       <Card className="overflow-hidden border-slate-200 shadow-sm rounded-xl bg-white">
         <CardContent className="p-0">
-          {/* شريط الأدوات العلوي */}
-          <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b">
+          <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b bg-white sticky top-0 z-10">
             <div className="relative w-full max-w-xs">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="بحث بالاسم أو الهوية..."
-                className={`${inputBaseClass} ${topControlHeight} pr-10 bg-slate-50 border-none`}
+                className="w-full h-10 pr-10 bg-slate-50 border-none rounded-lg"
               />
             </div>
-
-            <Button
-              onClick={() => setAddOpen(true)}
-              className={`bg-blue-600 text-white hover:bg-blue-700 ${topControlHeight} px-4 rounded-lg mr-auto shadow-sm`}
-            >
-              <Plus className="h-4 w-4 ml-2" />
-              إضافة طالب جديد
+            <Button onClick={() => setAddDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white mr-auto">
+              <Plus className="h-4 w-4 ml-2" /> إضافة طالب جديد
             </Button>
           </div>
 
-          {/* عرض الجدول - ترتيب الحقول المطلوب */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse text-sm">
-              <thead className="bg-slate-50/80 border-b border-slate-100">
+          {/* إضافة السكرول هنا عند تجاوز الارتفاع المحدد */}
+          <div className="overflow-auto max-h-[450px] scrollbar-thin scrollbar-thumb-slate-200">
+            <table className="w-full text-right text-sm">
+              <thead className="bg-slate-50 border-b text-slate-500 font-bold sticky top-0 z-20">
                 <tr>
-                  <th className="p-4 text-slate-500 font-bold">اسم الطالب</th>
-                  <th className="p-4 text-slate-500 font-bold">رقم الهوية</th>
-                  <th className="p-4 text-slate-500 font-bold">المرحلة</th>
-                  <th className="p-4 text-slate-500 font-bold">تاريخ الميلاد</th>
-                  <th className="p-4 text-slate-500 font-bold">اسم ولي الأمر</th>
-                  <th className="p-4 text-slate-500 font-bold">رقم هاتف ولي الأمر</th>
-                  <th className="p-4 text-center text-slate-500 font-bold">تعديل</th>
+                  <th className="p-4 text-xs font-bold text-slate-700">اسم الطالب</th>
+                  <th className="p-4 text-xs font-bold text-slate-700">رقم الهوية</th>
+                  <th className="p-4 text-xs font-bold text-slate-700">المرحلة</th>
+                  <th className="p-4 text-xs font-bold text-slate-700">تاريخ الميلاد</th>
+                  <th className="p-4 text-xs font-bold text-slate-700">ولي الأمر</th>
+                  <th className="p-4 text-xs font-bold text-slate-700">رقم الهاتف</th>
+                  <th className="p-4 text-center text-xs font-bold text-slate-700">تعديل</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
+              <tbody className="divide-y divide-slate-100">
                 {loading ? (
-                  <tr><td colSpan={7} className="p-20 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600" /></td></tr>
-                ) : paginatedData.length === 0 ? (
-                  <tr><td colSpan={7} className="p-10 text-center text-slate-400">لا توجد بيانات متاحة</td></tr>
-                ) : paginatedData.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-4 font-bold text-slate-900">{s.studentName}</td>
-                    <td className="p-4 font-mono text-slate-600">{s.nationalId}</td>
-                    <td className="p-4 text-slate-600">{s.gradeLevel}</td>
-                    <td className="p-4 text-slate-600 font-mono">{s.birthDate}</td>
-                    <td className="p-4 text-slate-600">{s.parentName}</td>
-                    <td className="p-4 text-blue-600 font-mono">{s.parentPhone}</td>
-                    <td className="p-4 text-center">
-                      <button className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-md border border-slate-100 text-slate-400">
-                        <Pencil className="w-4 h-4"/>
-                      </button>
-                    </td>
+                  <tr><td colSpan={7} className="p-10 text-center"><Loader2 className="animate-spin mx-auto text-blue-600" /></td></tr>
+                ) : filtered.map((s) => (
+                  <tr key={s.id} className={`${editingId === s.id ? 'bg-blue-50/40' : 'hover:bg-slate-50 transition-colors'}`}>
+                    {editingId === s.id ? (
+                      <>
+                        <td className="p-2">
+                           <Input className={`h-9 ${editErrors.studentName ? 'border-red-500' : ''}`} value={editRowData?.studentName} onChange={e => setEditRowData({...editRowData!, studentName: e.target.value})} />
+                           {editErrors.studentName && <p className="text-[9px] text-red-500 mt-1 font-bold">{editErrors.studentName}</p>}
+                        </td>
+                        <td className="p-2">
+                           <Input className={`h-9 ${editErrors.nationalId ? 'border-red-500' : ''}`} value={editRowData?.nationalId} onChange={e => setEditRowData({...editRowData!, nationalId: e.target.value})} />
+                           {editErrors.nationalId && <p className="text-[9px] text-red-500 mt-1 font-bold">{editErrors.nationalId}</p>}
+                        </td>
+                        <td className="p-2">
+                          <select className="h-9 w-full border rounded-md text-xs px-2" value={editRowData?.gradeLevel} onChange={e => setEditRowData({...editRowData!, gradeLevel: e.target.value})}>
+                            <option value="ابتدائي">ابتدائي</option>
+                            <option value="إعدادي">إعدادي</option>
+                            <option value="ثانوي">ثانوي</option>
+                          </select>
+                        </td>
+                        <td className="p-2"><Input type="date" className="h-9" value={editRowData?.birthDate} onChange={e => setEditRowData({...editRowData!, birthDate: e.target.value})} /></td>
+                        <td className="p-2"><Input className="h-9" value={editRowData?.parentName} onChange={e => setEditRowData({...editRowData!, parentName: e.target.value})} /></td>
+                        <td className="p-2">
+                           <Input className={`h-9 ${editErrors.parentPhone ? 'border-red-500' : ''}`} value={editRowData?.parentPhone} onChange={e => setEditRowData({...editRowData!, parentPhone: e.target.value})} />
+                           {editErrors.parentPhone && <p className="text-[9px] text-red-500 mt-1 font-bold">{editErrors.parentPhone}</p>}
+                        </td>
+                        <td className="p-2 text-center">
+                          <div className="flex justify-center gap-1">
+                            <button disabled={!canSave(editRowData!, true, editingId!)} onClick={handleSaveEdit} className="p-1 text-green-600 hover:bg-green-50 rounded disabled:opacity-30"><Check className="w-5 h-5"/></button>
+                            <button onClick={() => setEditingId(null)} className="p-1 text-red-600 hover:bg-red-50 rounded"><X className="w-5 h-5"/></button>
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="p-4 font-bold text-slate-900">{s.studentName}</td>
+                        <td className="p-4 font-mono text-slate-600">{s.nationalId}</td>
+                        <td className="p-4 text-slate-600">{s.gradeLevel}</td>
+                        <td className="p-4 font-mono text-slate-600">{s.birthDate}</td>
+                        <td className="p-4 text-slate-600">{s.parentName}</td>
+                        <td className="p-4 font-mono text-blue-600">{s.parentPhone}</td>
+                        <td className="p-4 text-center">
+                          <button onClick={() => { setEditingId(s.id); setEditRowData(s); }} className="p-2 text-slate-400 hover:text-blue-600 border border-slate-100 rounded-md">
+                            <Pencil className="w-4 h-4"/>
+                          </button>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-
-          {/* الترقيم */}
-          <div className="p-4 flex items-center justify-between border-t bg-slate-50/30">
-            <span className="text-xs text-slate-500 font-medium">عرض {rangeStart} - {rangeEnd} من {filtered.length}</span>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)}>السابق</Button>
-              <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>التالي</Button>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
-      {/* نافذة إضافة طالب */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="max-w-md shadow-2xl border-none rounded-2xl font-arabic overflow-y-auto max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="text-right text-lg font-bold text-blue-800 flex items-center gap-2">
-              <User className="w-5 h-5" />
-              تسجيل بيانات طالب جديد
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="flex flex-col gap-4 py-4 text-right">
-            <div className="space-y-1.5 w-full">
-               <label className="text-xs font-bold text-slate-700">اسم الطالب رباعي</label>
-               <Input className="h-11 bg-slate-50" value={formData.studentName} onChange={e => setFormData({...formData, studentName: e.target.value})} placeholder="الاسم الكامل" />
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent dir="rtl" className="max-w-md rounded-2xl">
+          <DialogHeader><DialogTitle className="text-right text-blue-700 flex items-center gap-2"><User className="w-5 h-5"/> تسجيل طالب جديد</DialogTitle></DialogHeader>
+          <div className="flex flex-col gap-4 py-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-700">اسم الطالب رباعي</label>
+              <Input className={`h-11 bg-slate-50 ${addErrors.studentName ? 'border-red-400' : ''}`} value={formData.studentName} onChange={e => setFormData({...formData, studentName: e.target.value})} />
+              {addErrors.studentName && <span className="text-[10px] text-red-500 flex items-center gap-1 font-bold"><AlertCircle className="w-3 h-3"/> {addErrors.studentName}</span>}
             </div>
-
-            <div className="space-y-1.5 w-full">
-               <label className="text-xs font-bold text-slate-700">رقم الهوية</label>
-               <Input className="h-11 bg-slate-50" value={formData.nationalId} onChange={e => setFormData({...formData, nationalId: e.target.value})} placeholder="9 أرقام" />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-700">رقم الهوية</label>
+              <Input className={`h-11 bg-slate-50 ${addErrors.nationalId ? 'border-red-400' : ''}`} value={formData.nationalId} onChange={e => setFormData({...formData, nationalId: e.target.value})} />
+              {addErrors.nationalId && <span className="text-[10px] text-red-500 flex items-center gap-1 font-bold"><AlertCircle className="w-3 h-3"/> {addErrors.nationalId}</span>}
             </div>
-
-            <div className="space-y-1.5 w-full">
-               <label className="text-xs font-bold text-slate-700">تاريخ الميلاد</label>
-               <Input type="date" className="h-11 bg-slate-50 text-right" value={formData.birthDate} onChange={e => setFormData({...formData, birthDate: e.target.value})} />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-700">المرحلة الدراسية</label>
+              <select className="h-11 bg-slate-50 border rounded-lg px-3 text-sm outline-none focus:ring-1 focus:ring-blue-500" value={formData.gradeLevel} onChange={e => setFormData({...formData, gradeLevel: e.target.value})}>
+                <option value="">اختر المرحلة</option>
+                <option value="ابتدائي">ابتدائي</option>
+                <option value="إعدادي">إعدادي</option>
+                <option value="ثانوي">ثانوي</option>
+              </select>
             </div>
-
-            <div className="space-y-1.5 w-full">
-               <label className="text-xs font-bold text-slate-700">المرحلة الدراسية</label>
-               <select className={`${selectBaseClass} h-11 bg-slate-50`} value={formData.gradeLevel} onChange={e => setFormData({...formData, gradeLevel: e.target.value})}>
-                  <option value="">اختر المرحلة</option>
-                  <option value="ابتدائي">ابتدائي</option>
-                  <option value="إعدادي">إعدادي</option>
-                  <option value="ثانوي">ثانوي</option>
-               </select>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-700">تاريخ الميلاد</label>
+              <Input type="date" className="h-11 bg-slate-50" value={formData.birthDate} onChange={e => setFormData({...formData, birthDate: e.target.value})} />
             </div>
-
-            <div className="space-y-1.5 w-full">
-               <label className="text-xs font-bold text-slate-700">اسم ولي الأمر</label>
-               <Input className="h-11 bg-slate-50" value={formData.parentName} onChange={e => setFormData({...formData, parentName: e.target.value})} placeholder="الاسم كاملاً" />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-700">اسم ولي الأمر</label>
+              <Input className="h-11 bg-slate-50" value={formData.parentName} onChange={e => setFormData({...formData, parentName: e.target.value})} />
             </div>
-
-            <div className="space-y-1.5 w-full">
-               <label className="text-xs font-bold text-slate-700">رقم هاتف ولي الأمر</label>
-               <Input className="h-11 bg-slate-50" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: e.target.value})} placeholder="059XXXXXXX" />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-700">رقم هاتف ولي الأمر</label>
+              <Input className={`h-11 bg-slate-50 ${addErrors.parentPhone ? 'border-red-400' : ''}`} value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: e.target.value})} />
+              {addErrors.parentPhone && <span className="text-[10px] text-red-500 flex items-center gap-1 font-bold"><AlertCircle className="w-3 h-3"/> {addErrors.parentPhone}</span>}
             </div>
           </div>
           
-          <DialogFooter className="mt-4 flex flex-col sm:flex-row items-center gap-3 w-full">
-            <Button onClick={onAdd} disabled={submitting || !isFormValid(formData)} className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 h-11 rounded-xl font-bold text-white transition-all shadow-md">
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : "حفظ بيانات الطالب"}
+          <DialogFooter className="flex flex-row-reverse gap-3 pt-4">
+            <Button 
+              onClick={handleAddSubmit} 
+              disabled={submitting || !canSave(formData)} 
+              className="flex-1 bg-blue-600 hover:bg-blue-700 h-11 text-white rounded-xl shadow-lg shadow-blue-100 font-bold"
+            >
+              {submitting ? <Loader2 className="animate-spin" /> : "حفظ البيانات"}
             </Button>
-            <Button variant="outline" onClick={() => setAddOpen(false)} className="w-full sm:flex-1 h-11 rounded-xl">إلغاء</Button>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setAddDialogOpen(false);
+                setFormData({ studentName: '', nationalId: '', birthDate: '', gradeLevel: '', parentName: '', parentPhone: '' });
+              }} 
+              className="flex-1 h-11 rounded-xl font-bold border-slate-200 text-slate-600 hover:bg-slate-50"
+            >
+              إلغاء
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
