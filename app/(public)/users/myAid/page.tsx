@@ -1,34 +1,54 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 export default function MyAidPage() {
   const [nationalId, setNationalId] = useState('')
   const [result, setResult] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSearch = async (e: any) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    // محاكاة جلب البيانات للتوضيح
-    setTimeout(() => {
-      setResult({ 
-        found: true, 
-        beneficiaryName: 'أحمد محمود علي', 
-        status: 'pending', // يمكن أن تكون 'approved' أو 'rejected'
-        address: 'غزة - الرمال - شارع الشهداء', 
-        notes: 'يرجى إحضار الهوية الأصلية عند الاستلام وتجنب الازدحام.' 
-      })
+    setError('')
+    setResult(null)
+
+    // التحقق من طول رقم الهوية قبل الإرسال
+    if (nationalId.length !== 9) {
+      setError('يرجى إدخال رقم هوية صحيح (9 أرقام)')
       setLoading(false)
-    }, 500)
+      return
+    }
+
+    try {
+      // جلب البيانات من الـ API الحقيقي
+      const res = await fetch(`/api/project/admins/addAid?nationalId=${nationalId}`)
+      const data = await res.json()
+
+      if (data.found) {
+        setResult(data)
+      } else {
+        setError(data.message || 'رقم الهوية غير موجود في السجلات')
+      }
+    } catch (err) {
+      setError('حدث خطأ في الاتصال بالسيرفر')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // دالة لتحديد نص ولون الحالة
   const getStatusDisplay = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return { text: 'قيد المراجعة', color: 'text-amber-600 bg-amber-50 border-amber-100' };
+    const s = status?.toLowerCase();
+    switch (s) {
       case 'approved':
         return { text: 'تمت الموافقة', color: 'text-green-600 bg-green-50 border-green-100' };
+      case 'pending':
+        return { text: 'قيد المراجعة', color: 'text-amber-600 bg-amber-50 border-amber-100' };
+      case 'rejected':
+        return { text: 'مرفوض', color: 'text-red-600 bg-red-50 border-red-100' };
+      case 'no_request':
+        return { text: 'لا يوجد طلب مقدم', color: 'text-slate-500 bg-slate-50 border-slate-200' };
       default:
         return { text: 'تحت الفحص', color: 'text-slate-600 bg-slate-50 border-slate-100' };
     }
@@ -51,18 +71,29 @@ export default function MyAidPage() {
               <input
                 type="text"
                 value={nationalId}
-                onChange={(e) => setNationalId(e.target.value)}
-                className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all"
-                placeholder="أدخل رقم الهوية هنا..."
+                onChange={(e) => setNationalId(e.target.value.replace(/\D/g, ''))}
+                maxLength={9}
+                className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all text-left"
+                placeholder="000000000"
               />
             </div>
-            <button className="h-12 rounded-xl bg-blue-600 px-10 font-bold text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700 active:scale-95">
+            <button 
+              type="submit"
+              disabled={loading}
+              className="h-12 rounded-xl bg-blue-600 px-10 font-bold text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-50"
+            >
               {loading ? 'جارٍ الفحص...' : 'فحص الحالة'}
             </button>
           </form>
+
+          {error && (
+            <div className="mt-4 text-sm text-red-600 font-bold mr-2">
+              {error}
+            </div>
+          )}
         </div>
 
-        {/* كارد النتائج المعدل */}
+        {/* كارد النتائج الحقيقي */}
         {result && (
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md md:p-10 animate-in fade-in zoom-in duration-300">
             <h2 className="mb-8 text-xl font-bold text-slate-800 border-b border-slate-100 pb-4">تفاصيل النتيجة</h2>
@@ -77,7 +108,7 @@ export default function MyAidPage() {
                 </div>
               </div>
 
-              {/* حقل حالة الطلب - بجانب الاسم */}
+              {/* حقل حالة الطلب */}
               <div className="space-y-2">
                 <span className="text-sm font-bold text-slate-400 mr-1">حالة الطلب</span>
                 <div className={`flex h-12 items-center rounded-xl border px-4 font-bold ${getStatusDisplay(result.status).color}`}>
@@ -85,7 +116,7 @@ export default function MyAidPage() {
                 </div>
               </div>
 
-              {/* حقل العنوان - يأخذ العرض كاملاً */}
+              {/* حقل العنوان */}
               <div className="md:col-span-2 space-y-2">
                 <span className="text-sm font-bold text-slate-400 mr-1">العنوان بالتفصيل</span>
                 <div className="flex min-h-[48px] items-center rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 font-bold text-slate-700">
@@ -93,7 +124,7 @@ export default function MyAidPage() {
                 </div>
               </div>
 
-              {/* حقل الملاحظات - يأخذ العرض كاملاً */}
+              {/* حقل الملاحظات */}
               <div className="md:col-span-2 space-y-2">
                 <span className="text-sm font-bold text-slate-400 mr-1">ملاحظات إضافية من الإدارة</span>
                 <div className="min-h-[120px] rounded-xl border border-slate-100 bg-slate-50 p-4 font-bold text-slate-700 whitespace-pre-wrap leading-relaxed">
@@ -105,7 +136,6 @@ export default function MyAidPage() {
           </div>
         )}
 
-        {/* تذييل الصفحة للتأكد من وجود مساحة سفلية */}
         <div className="mt-12 text-center text-slate-400 text-sm">
           نظام الإغاثة الموحد - 2026
         </div>

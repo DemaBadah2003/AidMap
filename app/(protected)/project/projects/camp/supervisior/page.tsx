@@ -12,7 +12,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '../../../../../../components/ui/dialog'
-import { Pencil, Save, X, Plus, Search, MapPin } from 'lucide-react'
+import { Pencil, Save, X, Plus, Search, MapPin, Loader2 } from 'lucide-react'
 
 // --- الأنواع والتنسيقات ---
 type Supervisor = {
@@ -112,7 +112,6 @@ export default function SupervisorsPage() {
     if (!isValidName(nameAr)) errors.name = 'الاسم يجب أن يكون 3 حروف على الأقل'
     if (!isValidPalestinePhone(phone)) errors.phone = 'رقم الجوال غير صحيح (يجب أن يبدأ بـ 056 أو 059)'
     
-    // فحص التكرار عند الإضافة
     if (items.some(sp => sp.phone === normalizePhone(phone))) {
         errors.phone = 'رقم الجوال مسجل مسبقاً لمشرف آخر'
     }
@@ -156,11 +155,9 @@ export default function SupervisorsPage() {
 
     if (!isValidName(editDraft.nameAr)) errors.name = 'الاسم غير صحيح'
     
-    // شرط التحقق من صيغة رقم الجوال
     if (!isValidPalestinePhone(normalizedEditPhone)) {
         errors.phone = 'رقم الجوال غير صحيح (يجب أن يبدأ بـ 056 أو 059)'
     } 
-    // شرط منع تكرار الرقم مع مشرف آخر غير الذي يتم تعديله حالياً
     else if (items.some(sp => sp.phone === normalizedEditPhone && sp.id !== id)) {
         errors.phone = 'رقم الجوال مسجل مسبقاً لمشرف آخر'
     }
@@ -201,28 +198,28 @@ export default function SupervisorsPage() {
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize)
 
   return (
-    <div className="w-full px-3 py-6 sm:px-6" dir="rtl">
-      <div className="mb-6 text-right">
-        <h1 className="text-2xl font-bold text-slate-800 font-sans">المشرفون</h1>
-        <p className="text-sm text-slate-500">الرئيسية <span className="mx-1">{'>'}</span> <span className="text-slate-800">إدارة المشرفين</span></p>
+    <div className="w-full px-2 py-4 sm:px-6 sm:py-6" dir="rtl">
+      <div className="mb-6 text-right px-1">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800 font-sans">المشرفون</h1>
+        <p className="text-xs sm:text-sm text-slate-500">الرئيسية <span className="mx-1">{'>'}</span> <span className="text-slate-800">إدارة المشرفين</span></p>
       </div>
 
-      <Card className="border-slate-200 shadow-sm overflow-hidden">
+      <Card className="border-slate-200 shadow-sm overflow-hidden rounded-xl bg-white">
         <CardContent className="p-0">
           <div className="p-4 border-b border-slate-100 bg-white">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center w-full md:w-auto">
                 <div className="relative w-full sm:w-[260px]">
                   <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input 
-                    value={q} onChange={(e) => setQ(e.target.value)} 
-                    placeholder="ابحث عن مشرف" className="pr-9" 
+                    value={q} onChange={(e) => {setQ(e.target.value); setPage(1);}} 
+                    placeholder="ابحث عن مشرف" className="pr-9 h-10 text-sm" 
                   />
                 </div>
                 <select 
                   value={statusFilter} 
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
-                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm sm:w-[160px] outline-none focus:ring-2 focus:ring-slate-100"
+                  onChange={(e) => {setStatusFilter(e.target.value as any); setPage(1);}}
+                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm sm:w-[160px] outline-none focus:ring-2 focus:ring-slate-100 transition-all"
                 >
                   <option value="all">كل الحالات</option>
                   <option value="active">نشط</option>
@@ -230,143 +227,175 @@ export default function SupervisorsPage() {
                 </select>
               </div>
 
-              <Button onClick={() => { setAddOpen(true); setFieldErrors({}); }} className="bg-blue-600 hover:bg-blue-700 font-semibold gap-2">
+              <Button onClick={() => { setAddOpen(true); setFieldErrors({}); }} className="bg-blue-600 hover:bg-blue-700 font-semibold gap-2 h-10 w-full md:w-auto shadow-sm">
                 <Plus className="h-4 w-4" /> إضافة مشرف
               </Button>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-right">
-              <thead className="bg-slate-50 text-slate-600 border-b border-slate-200 font-sans">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">المشرف</th>
-                  <th className="px-4 py-3 font-semibold">رقم الجوال</th>
-                  <th className="px-4 py-3 font-semibold">المنطقة</th>
-                  <th className="px-4 py-3 font-semibold">الحالة</th>
-                  <th className="px-4 py-3 font-semibold">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loading ? (
-                  <tr><td colSpan={5} className="py-10 text-center text-slate-400 font-medium">جاري تحميل البيانات...</td></tr>
-                ) : pageItems.length > 0 ? pageItems.map((sp) => {
-                  const isEditing = editingId === sp.id
-                  return (
-                    <tr key={sp.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-4 py-3 font-medium">
-                        {isEditing ? (
-                            <div className="space-y-1">
-                                <Input className={editErrors.name ? 'border-red-500' : ''} value={editDraft.nameAr} onChange={e => setEditDraft({...editDraft, nameAr: e.target.value})} />
-                                {editErrors.name && <p className="text-[10px] text-red-500">{editErrors.name}</p>}
-                            </div>
-                        ) : sp.nameAr}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {isEditing ? (
-                            <div className="space-y-1">
-                                <Input className={editErrors.phone ? 'border-red-500' : ''} value={editDraft.phone} onChange={e => setEditDraft({...editDraft, phone: e.target.value})} maxLength={10} />
-                                {editErrors.phone && <p className="text-[10px] text-red-500 font-sans">{editErrors.phone}</p>}
-                            </div>
-                        ) : sp.phone}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {isEditing ? (
-                          <select className="h-9 border rounded-md px-2 w-full" value={editDraft.area} onChange={e => setEditDraft({...editDraft, area: e.target.value})}>
-                             <option value="east">شرق</option>
-                             <option value="west">غرب</option>
-                             <option value="north">شمال</option>
-                             <option value="middle">وسطى</option>
-                             <option value="south">جنوب</option>
-                          </select>
-                        ) : <div className="flex items-center gap-1"><MapPin className="size-3 text-slate-400" />{areaMap[sp.area] || sp.area}</div>}
-                      </td>
-                      <td className="px-4 py-3">
-                        {isEditing ? (
-                          <select className="h-9 border rounded-md px-2 w-full" value={editDraft.status} onChange={e => setEditDraft({...editDraft, status: e.target.value as any})}>
-                            <option value="نشط">نشط</option>
-                            <option value="موقوف">موقوف</option>
-                          </select>
-                        ) : (
-                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${sp.status === 'نشط' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{sp.status}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          {isEditing ? (
-                            <>
-                              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 px-2" onClick={() => saveEditRow(sp.id)}><Save className="size-4" /></Button>
-                              <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => { setEditingId(null); setEditErrors({}); }}><X className="size-4" /></Button>
-                            </>
-                          ) : (
-                            <Button size="sm" variant="outline" className="text-slate-600 hover:text-blue-600 h-9 w-9 p-0" onClick={() => {
-                              setEditingId(sp.id); 
-                              setEditDraft({ nameAr: sp.nameAr, phone: sp.phone, area: sp.area, status: sp.status });
-                              setEditErrors({});
-                            }}><Pencil className="size-4" /></Button>
-                          )}
-                        </div>
-                      </td>
+          {/* تعديل: إضافة سكرول عمودي للجدول بارتفاع مخصص لـ 5 صفوف تقريباً */}
+          <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 relative">
+             <div className="max-h-[350px] overflow-y-auto">
+                <table className="w-full text-sm text-right whitespace-nowrap border-collapse">
+                  <thead className="bg-slate-50/80 text-slate-600 border-b border-slate-200 font-sans sticky top-0 z-10">
+                    <tr>
+                      <th className="px-4 py-3.5 font-semibold bg-slate-50">المشرف</th>
+                      <th className="px-4 py-3.5 font-semibold bg-slate-50">رقم الجوال</th>
+                      <th className="px-4 py-3.5 font-semibold bg-slate-50">المنطقة</th>
+                      <th className="px-4 py-3.5 font-semibold bg-slate-50">الحالة</th>
+                      <th className="px-4 py-3.5 font-semibold text-center bg-slate-50">الإجراءات</th>
                     </tr>
-                  )
-                }) : <tr><td colSpan={5} className="py-10 text-center text-slate-400">لا توجد بيانات للمشرفين</td></tr>}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {loading ? (
+                      <tr><td colSpan={5} className="py-16 text-center text-slate-400 font-medium">
+                        <div className="flex flex-col items-center gap-2">
+                            <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                            <span>جاري تحميل البيانات...</span>
+                        </div>
+                      </td></tr>
+                    ) : pageItems.length > 0 ? pageItems.map((sp) => {
+                      const isEditing = editingId === sp.id
+                      return (
+                        <tr key={sp.id} className={`hover:bg-slate-50/50 transition-colors ${isEditing ? 'bg-blue-50/30' : ''}`}>
+                          <td className="px-4 py-3 font-medium">
+                            {isEditing ? (
+                                <div className="space-y-1 min-w-[150px]">
+                                    <Input className={`h-9 text-sm ${editErrors.name ? 'border-red-500' : ''}`} value={editDraft.nameAr} onChange={e => setEditDraft({...editDraft, nameAr: e.target.value})} />
+                                    {editErrors.name && <p className="text-[10px] text-red-500">{editErrors.name}</p>}
+                                </div>
+                            ) : sp.nameAr}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 font-sans">
+                            {isEditing ? (
+                                <div className="space-y-1 min-w-[130px]">
+                                    <Input className={`h-9 text-sm font-sans ${editErrors.phone ? 'border-red-500' : ''}`} value={editDraft.phone} onChange={e => setEditDraft({...editDraft, phone: e.target.value})} maxLength={10} />
+                                    {editErrors.phone && <p className="text-[10px] text-red-500 font-sans">{editErrors.phone}</p>}
+                                </div>
+                            ) : sp.phone}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {isEditing ? (
+                              <select className="h-9 border border-slate-200 rounded-md px-2 w-full text-sm outline-none focus:ring-2 focus:ring-blue-50" value={editDraft.area} onChange={e => setEditDraft({...editDraft, area: e.target.value})}>
+                                 {Object.entries(areaMap).map(([val, label]) => (
+                                    <option key={val} value={val}>{label}</option>
+                                 ))}
+                              </select>
+                            ) : <div className="flex items-center gap-1.5"><MapPin className="size-3.5 text-slate-400" />{areaMap[sp.area] || sp.area}</div>}
+                          </td>
+                          <td className="px-4 py-3">
+                            {isEditing ? (
+                              <select className="h-9 border border-slate-200 rounded-md px-2 w-full text-sm outline-none focus:ring-2 focus:ring-blue-50" value={editDraft.status} onChange={e => setEditDraft({...editDraft, status: e.target.value as any})}>
+                                <option value="نشط">نشط</option>
+                                <option value="موقوف">موقوف</option>
+                              </select>
+                            ) : (
+                              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold inline-flex items-center ${sp.status === 'نشط' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{sp.status}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-2 justify-center">
+                              {isEditing ? (
+                                <>
+                                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8 w-8 p-0" onClick={() => saveEditRow(sp.id)}><Save className="size-4" /></Button>
+                                  <Button size="sm" variant="outline" className="h-8 w-8 p-0 border-slate-200" onClick={() => { setEditingId(null); setEditErrors({}); }}><X className="size-4" /></Button>
+                                </>
+                              ) : (
+                                <Button size="sm" variant="outline" className="text-slate-500 hover:text-blue-600 hover:bg-blue-50 h-8 w-8 p-0 border-slate-200" onClick={() => {
+                                  setEditingId(sp.id); 
+                                  setEditDraft({ nameAr: sp.nameAr, phone: sp.phone, area: sp.area, status: sp.status });
+                                  setEditErrors({});
+                                }}><Pencil className="size-3.5" /></Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    }) : <tr><td colSpan={5} className="py-20 text-center text-slate-400 italic">لا توجد بيانات للمشرفين حالياً</td></tr>}
+                  </tbody>
+                </table>
+             </div>
           </div>
 
-          <div className="p-4 border-t border-slate-200 flex items-center justify-between bg-slate-50/50">
-            <div className="text-sm text-slate-600 font-medium font-sans">عرض {rangeStart} - {rangeEnd} من {filtered.length}</div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>السابق</Button>
-              <div className="h-9 px-3 flex items-center bg-white border rounded-md text-blue-600 font-bold text-sm">{page} / {Math.max(1, Math.ceil(filtered.length / pageSize))}</div>
-              <Button size="sm" variant="outline" disabled={page >= Math.ceil(filtered.length / pageSize)} onClick={() => setPage(p => p + 1)}>التالي</Button>
+          <div className="p-4 border-t border-slate-200 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-slate-50/50 font-sans">
+            <div className="flex items-center gap-3 justify-center sm:justify-start">
+              <span className="text-sm text-slate-500 font-bold">عرض:</span>
+              <select 
+                value={pageSize} 
+                onChange={(e) => {setPageSize(Number(e.target.value)); setPage(1);}}
+                className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 shadow-sm"
+              >
+                {[5, 10, 15, 20].map(size => <option key={size} value={size}>{size}</option>)}
+              </select>
+              <div className="text-sm text-slate-500 mr-2">
+                إظهار <span className="font-bold text-slate-800">{rangeStart} - {rangeEnd}</span> من <span className="font-bold text-slate-800">{filtered.length}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-2">
+              <div className="h-9 px-4 flex items-center bg-white border border-slate-200 rounded-lg text-blue-600 font-bold text-sm shadow-sm ml-2">
+                صفحة {page} / {Math.max(1, Math.ceil(filtered.length / pageSize))}
+              </div>
+              <Button size="sm" variant="outline" className="h-9 px-3 border-slate-200 bg-white" disabled={page === 1} onClick={() => setPage(p => p - 1)}>السابق</Button>
+              <Button size="sm" variant="outline" className="h-9 px-3 border-slate-200 bg-white" disabled={page >= Math.ceil(filtered.length / pageSize)} onClick={() => setPage(p => p + 1)}>التالي</Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="sm:max-w-md" dir="rtl">
+        <DialogContent className="w-[95%] max-w-md rounded-2xl p-5" dir="rtl">
           <DialogHeader className="text-right">
-            <DialogTitle className="text-xl font-sans">إضافة مشرف جديد</DialogTitle>
-            <DialogDescription className="font-sans">يرجى إدخال بيانات المشرف وتحديد منطقته بدقة.</DialogDescription>
+            <DialogTitle className="text-xl font-bold text-slate-800">إضافة مشرف جديد</DialogTitle>
+            <DialogDescription className="text-slate-500 mt-1">أدخل بيانات المشرف وسيظهر فوراً في القائمة.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-5">
             <div className="space-y-1.5 text-right">
               <label className="text-sm font-bold text-slate-700">الاسم <span className="text-red-500">*</span></label>
-              <Input className={fieldErrors.name ? 'border-red-500' : ''} placeholder="الاسم الثلاثي" value={nameAr} onChange={e => setNameAr(e.target.value)} />
-              {fieldErrors.name && <p className="text-xs text-red-500">{fieldErrors.name}</p>}
+              <Input className={`h-11 bg-slate-50 border-slate-200 ${fieldErrors.name ? 'border-red-500 focus-visible:ring-red-100' : ''}`} placeholder="الاسم الثلاثي" value={nameAr} onChange={e => setNameAr(e.target.value)} />
+              {fieldErrors.name && <p className="text-[11px] text-red-500">{fieldErrors.name}</p>}
             </div>
+            
             <div className="space-y-1.5 text-right">
               <label className="text-sm font-bold text-slate-700">الجوال <span className="text-red-500">*</span></label>
-              <Input className={fieldErrors.phone ? 'border-red-500' : ''} placeholder="059xxxxxxx" value={phone} onChange={e => setPhone(normalizePhone(e.target.value))} maxLength={10} />
-              {fieldErrors.phone && <p className="text-xs text-red-500">{fieldErrors.phone}</p>}
+              <Input className={`h-11 bg-slate-50 border-slate-200 font-sans ${fieldErrors.phone ? 'border-red-500 focus-visible:ring-red-100' : ''}`} placeholder="059xxxxxxx" value={phone} onChange={e => setPhone(normalizePhone(e.target.value))} maxLength={10} />
+              {fieldErrors.phone && <p className="text-[11px] text-red-500 font-sans">{fieldErrors.phone}</p>}
             </div>
+
             <div className="space-y-1.5 text-right">
               <label className="text-sm font-bold text-slate-700">المنطقة <span className="text-red-500">*</span></label>
-              <select className={`w-full h-11 border rounded-md px-3 outline-none focus:ring-2 focus:ring-blue-100 font-sans ${fieldErrors.area ? 'border-red-500' : ''}`} value={area} onChange={e => setArea(e.target.value)}>
+              <select className={`w-full h-11 border rounded-lg px-3 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-100 transition-all ${fieldErrors.area ? 'border-red-500' : 'border-slate-200'}`} value={area} onChange={e => setArea(e.target.value)}>
                 <option value="">اختر المنطقة...</option>
-                <option value="east">شرق</option>
-                <option value="west">غرب</option>
-                <option value="north">شمال</option>
-                <option value="middle">وسطى</option>
-                <option value="south">جنوب</option>
+                {Object.entries(areaMap).map(([val, label]) => (
+                    <option key={val} value={val}>{label}</option>
+                ))}
               </select>
-              {fieldErrors.area && <p className="text-xs text-red-500">{fieldErrors.area}</p>}
+              {fieldErrors.area && <p className="text-[11px] text-red-500">{fieldErrors.area}</p>}
             </div>
+
             <div className="space-y-1.5 text-right">
-              <label className="text-sm font-bold text-slate-700 font-sans">الحالة</label>
-              <select className="w-full h-11 border rounded-md px-3 outline-none focus:ring-2 focus:ring-blue-100 font-sans" value={status} onChange={e => setStatus(e.target.value as any)}>
+              <label className="text-sm font-bold text-slate-700">الحالة</label>
+              <select className="w-full h-11 border border-slate-200 bg-slate-50 rounded-lg px-3 outline-none focus:ring-2 focus:ring-blue-100" value={status} onChange={e => setStatus(e.target.value as any)}>
                 <option value="نشط">نشط</option>
                 <option value="موقوف">موقوف</option>
               </select>
             </div>
           </div>
-          <DialogFooter className="flex flex-row-reverse gap-2 border-t pt-4">
-            <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold" onClick={onAdd} disabled={submitting}>
-              {submitting ? 'جاري الحفظ...' : 'حفظ البيانات'}
+          <DialogFooter className="flex flex-row gap-3 pt-2">
+            <Button 
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 rounded-xl shadow-md" 
+              onClick={onAdd} 
+              disabled={submitting}
+            >
+              {submitting ? <><Loader2 className="h-4 w-4 animate-spin ml-2" /> جاري الحفظ...</> : 'حفظ البيانات'}
             </Button>
-            <Button className="flex-1 font-sans" variant="outline" onClick={() => setAddOpen(false)}>إلغاء</Button>
+            <Button 
+              className="flex-1 h-11 rounded-xl border-slate-200 text-slate-600" 
+              variant="outline" 
+              onClick={() => setAddOpen(false)}
+            >
+              إلغاء
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -121,39 +121,41 @@ export default function WifiPointsPage() {
   }, [filtered, currentPage, itemsPerPage])
 
   return (
-    <div className="w-full px-4 py-6" dir="rtl">
-      <div className="mb-6 text-right">
-        <h1 className="text-2xl font-bold text-slate-900">نقاط الإنترنت للدراسة</h1>
-        <p className="text-sm text-slate-500 mt-1">الرئيسية &gt; خدمات الطلاب &gt; نقاط الإنترنت</p>
+    <div className="w-full px-2 md:px-4 py-6 font-arabic" dir="rtl">
+      <div className="mb-6 text-right px-2">
+        <h1 className="text-xl md:text-2xl font-bold text-slate-900">نقاط الإنترنت للدراسة</h1>
+        <p className="text-xs md:text-sm text-slate-500 mt-1">الرئيسية &gt; خدمات الطلاب &gt; نقاط الإنترنت</p>
       </div>
 
       <Card className="overflow-hidden border-slate-200 shadow-sm rounded-xl bg-white flex flex-col">
         <CardContent className="p-0 flex flex-col h-full">
+          {/* Header - متجاوب عمودياً في الموبايل */}
           <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b bg-white z-20">
-            <div className="relative w-full max-w-xs">
+            <div className="relative w-full sm:max-w-xs">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
+              <input
                 value={q}
                 onChange={(e) => { setQ(e.target.value); setCurrentPage(1); }}
                 placeholder="بحث عن مكان..."
-                className="w-full pr-10 bg-slate-50 border-none rounded-lg h-10 text-sm outline-none"
+                className="w-full pr-10 pl-3 bg-slate-50 border-none rounded-lg h-10 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20"
               />
             </div>
-            <Button onClick={() => setAddOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 h-10 px-4 rounded-lg mr-auto">
+            <Button onClick={() => setAddOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 h-10 px-4 rounded-lg w-full sm:w-auto sm:mr-auto">
               <Plus className="h-4 w-4 ml-2" /> إضافة نقطة
             </Button>
           </div>
 
-          <div className={`w-full overflow-x-auto ${paginatedData.length > 5 ? 'max-h-[400px] overflow-y-auto' : ''}`}>
-            <table className="w-full text-right border-collapse text-sm">
-              <thead className="bg-slate-50/90 sticky top-0 z-10 border-b backdrop-blur-sm">
+          {/* الجدول مع تمرير أفقي للموبايل */}
+          <div className="w-full overflow-x-auto overflow-y-auto max-h-[500px]">
+            <table className="w-full text-right border-collapse text-sm min-w-[600px]">
+              <thead className="bg-slate-50/90 sticky top-0 z-10 border-b backdrop-blur-sm shadow-sm">
                 <tr>
-                  <th className="p-4 text-slate-500 font-bold">اسم المكان</th>
-                  <th className="p-4 text-slate-500 font-bold">مصدر الطاقة</th>
-                  <th className="p-4 text-center text-slate-500 font-bold">الجودة</th>
-                  <th className="p-4 text-center text-slate-500 font-bold">المقاعد</th>
-                  <th className="p-4 text-center text-slate-500 font-bold">التكلفة</th>
-                  <th className="p-4 text-center text-slate-500 font-bold">الإجراءات</th>
+                  <th className="p-4 text-slate-500 font-bold whitespace-nowrap">اسم المكان</th>
+                  <th className="p-4 text-slate-500 font-bold whitespace-nowrap">مصدر الطاقة</th>
+                  <th className="p-4 text-center text-slate-500 font-bold whitespace-nowrap">الجودة</th>
+                  <th className="p-4 text-center text-slate-500 font-bold whitespace-nowrap">المقاعد</th>
+                  <th className="p-4 text-center text-slate-500 font-bold whitespace-nowrap">التكلفة</th>
+                  <th className="p-4 text-center text-slate-500 font-bold whitespace-nowrap">الإجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -163,9 +165,9 @@ export default function WifiPointsPage() {
                   <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
                     {editingId === c.id ? (
                       <>
-                        <td className="p-2"><Input className="h-8" value={editData?.placeName} onChange={e => setEditData({...editData!, placeName: e.target.value})} /></td>
+                        <td className="p-2"><Input className="h-8 min-w-[120px]" value={editData?.placeName} onChange={e => setEditData({...editData!, placeName: e.target.value})} /></td>
                         <td className="p-2">
-                          <select className="w-full border rounded-lg h-8 px-2 text-xs" value={editData?.powerSource} onChange={e => setEditData({...editData!, powerSource: e.target.value})}>
+                          <select className="w-full border rounded-lg h-8 px-2 text-xs min-w-[100px]" value={editData?.powerSource} onChange={e => setEditData({...editData!, powerSource: e.target.value})}>
                             <option value="">اختر</option>
                             <option value="طاقة شمسية">طاقة شمسية</option>
                             <option value="مولد">مولد</option>
@@ -173,16 +175,16 @@ export default function WifiPointsPage() {
                           </select>
                         </td>
                         <td className="p-2">
-                          <select className="w-full border rounded-lg h-8 px-2 text-xs text-center" value={editData?.wifiQuality} onChange={e => setEditData({...editData!, wifiQuality: e.target.value})}>
+                          <select className="w-full border rounded-lg h-8 px-2 text-xs text-center min-w-[100px]" value={editData?.wifiQuality} onChange={e => setEditData({...editData!, wifiQuality: e.target.value})}>
                             <option value="">اختر</option>
                             <option value="ضعيفة">ضعيفة</option>
                             <option value="متوسطة">متوسطة</option>
                             <option value="جيدة">جيدة</option>
                           </select>
                         </td>
-                        <td className="p-2"><Input type="number" className="h-8 text-center" value={editData?.seatsCount} onChange={e => setEditData({...editData!, seatsCount: Number(e.target.value)})} /></td>
+                        <td className="p-2"><Input type="number" className="h-8 text-center min-w-[70px]" value={editData?.seatsCount} onChange={e => setEditData({...editData!, seatsCount: Number(e.target.value)})} /></td>
                         <td className="p-2">
-                          <select className="w-full border rounded-lg h-8 px-2 text-xs text-center" value={editData?.isFree} onChange={e => setEditData({...editData!, isFree: e.target.value})}>
+                          <select className="w-full border rounded-lg h-8 px-2 text-xs text-center min-w-[100px]" value={editData?.isFree} onChange={e => setEditData({...editData!, isFree: e.target.value})}>
                             <option value="">اختر</option>
                             <option value="مجانية">مجانية</option>
                             <option value="بمقابل بسيط">بمقابل بسيط</option>
@@ -197,11 +199,11 @@ export default function WifiPointsPage() {
                       </>
                     ) : (
                       <>
-                        <td className="p-4 font-bold text-slate-900">{c.placeName}</td>
-                        <td className="p-4 flex items-center gap-2 text-slate-600"><BatteryCharging className="w-3.5 h-3.5 text-orange-500" /> {c.powerSource}</td>
-                        <td className="p-4 text-center"><span className={`px-2 py-0.5 rounded text-[10px] ${c.wifiQuality === 'جيدة' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{c.wifiQuality}</span></td>
-                        <td className="p-4 text-center font-medium">{c.seatsCount} مقعد</td>
-                        <td className="p-4 text-center"><span className={c.isFree === 'مجانية' ? 'text-emerald-600 font-bold' : 'text-blue-600'}>{c.isFree}</span></td>
+                        <td className="p-4 font-bold text-slate-900 whitespace-nowrap">{c.placeName}</td>
+                        <td className="p-4 flex items-center gap-2 text-slate-600 whitespace-nowrap"><BatteryCharging className="w-3.5 h-3.5 text-orange-500" /> {c.powerSource}</td>
+                        <td className="p-4 text-center"><span className={`px-2 py-0.5 rounded text-[10px] whitespace-nowrap ${c.wifiQuality === 'جيدة' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{c.wifiQuality}</span></td>
+                        <td className="p-4 text-center font-medium whitespace-nowrap">{c.seatsCount} مقعد</td>
+                        <td className="p-4 text-center whitespace-nowrap"><span className={c.isFree === 'مجانية' ? 'text-emerald-600 font-bold' : 'text-blue-600'}>{c.isFree}</span></td>
                         <td className="p-4 text-center">
                           <button onClick={() => startEdit(c)} className="p-2 hover:bg-slate-100 rounded-md text-slate-400"><Pencil className="w-4 h-4"/></button>
                         </td>
@@ -213,47 +215,49 @@ export default function WifiPointsPage() {
             </table>
           </div>
 
-          <div className="p-4 border-t flex flex-row justify-between items-center bg-slate-50/50 mt-auto">
-            <div className="flex items-center gap-2">
+          {/* Footer الترقيم - متجاوب عمودياً في الشاشات الصغيرة جداً */}
+          <div className="p-4 border-t flex flex-col sm:flex-row justify-between items-center bg-slate-50/50 mt-auto gap-4">
+            <div className="flex items-center gap-2 order-2 sm:order-1">
               <span className="text-xs text-slate-500">عرض:</span>
-              <select className="border rounded-md text-xs h-8 px-1 outline-none" value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}>
+              <select className="border rounded-md text-xs h-8 px-1 outline-none bg-white" value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}>
                 {[5, 10, 15, 20].map(val => (<option key={val} value={val}>{val}</option>))}
               </select>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 order-1 sm:order-2">
               <span className="text-xs text-slate-500 ml-2">صفحة {currentPage} من {totalPages || 1}</span>
-              <Button variant="outline" size="sm" className="h-8 px-2 text-xs" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>السابق <ChevronRight className="w-3 h-3 mr-1" /></Button>
-              <Button variant="outline" size="sm" className="h-8 px-2 text-xs" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(prev => prev + 1)}>التالي <ChevronLeft className="w-3 h-3 ml-1" /></Button>
+              <div className="flex gap-1">
+                <Button variant="outline" size="sm" className="h-8 px-2 text-xs" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>السابق <ChevronRight className="w-3 h-3 mr-1" /></Button>
+                <Button variant="outline" size="sm" className="h-8 px-2 text-xs" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(prev => prev + 1)}>التالي <ChevronLeft className="w-3 h-3 ml-1" /></Button>
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* نافذة الإضافة المحدثة بترتيب الأزرار المطلوب */}
+      {/* نافذة الإضافة - متجاوب العرض */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="max-w-md rounded-2xl">
+        <DialogContent dir="rtl" className="max-w-[95vw] sm:max-w-md rounded-2xl p-4 md:p-6 overflow-y-auto max-h-[90vh]">
           <DialogHeader><DialogTitle className="text-right text-emerald-700 font-bold">إضافة نقطة إنترنت جديدة</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-4 py-4 text-right">
             <div className="space-y-1"><label className="text-xs font-bold text-slate-600">اسم المكان *</label><Input placeholder="مثلاً: خيمة الشباب" value={formData.placeName} onChange={e => setFormData({...formData, placeName: e.target.value})} /></div>
-            <div className="space-y-1"><label className="text-xs font-bold text-slate-600">مصدر الطاقة *</label><select className="w-full border rounded-lg h-10 px-3 text-sm bg-slate-50" value={formData.powerSource} onChange={e => setFormData({...formData, powerSource: e.target.value})}><option value="">اختر</option><option value="طاقة شمسية">طاقة شمسية</option><option value="مولد">مولد</option><option value="بطاريات">بطاريات</option></select></div>
-            <div className="space-y-1"><label className="text-xs font-bold text-slate-600">جودة الإنترنت *</label><select className="w-full border rounded-lg h-10 px-3 text-sm bg-slate-50" value={formData.wifiQuality} onChange={e => setFormData({...formData, wifiQuality: e.target.value})}><option value="">اختر</option><option value="ضعيفة">ضعيفة</option><option value="متوسطة">متوسطة</option><option value="جيدة">جيدة</option></select></div>
+            <div className="space-y-1"><label className="text-xs font-bold text-slate-600">مصدر الطاقة *</label><select className="w-full border rounded-lg h-10 px-3 text-sm bg-slate-50 outline-none" value={formData.powerSource} onChange={e => setFormData({...formData, powerSource: e.target.value})}><option value="">اختر</option><option value="طاقة شمسية">طاقة شمسية</option><option value="مولد">مولد</option><option value="بطاريات">بطاريات</option></select></div>
+            <div className="space-y-1"><label className="text-xs font-bold text-slate-600">جودة الإنترنت *</label><select className="w-full border rounded-lg h-10 px-3 text-sm bg-slate-50 outline-none" value={formData.wifiQuality} onChange={e => setFormData({...formData, wifiQuality: e.target.value})}><option value="">اختر</option><option value="ضعيفة">ضعيفة</option><option value="متوسطة">متوسطة</option><option value="جيدة">جيدة</option></select></div>
             <div className="space-y-1"><label className="text-xs font-bold text-slate-600">عدد المقاعد *</label><Input type="number" value={formData.seatsCount} onChange={e => setFormData({...formData, seatsCount: Number(e.target.value)})} /></div>
-            <div className="space-y-1"><label className="text-xs font-bold text-slate-600">التكلفة *</label><select className="w-full border rounded-lg h-10 px-3 text-sm bg-slate-50" value={formData.isFree} onChange={e => setFormData({...formData, isFree: e.target.value})}><option value="">اختر</option><option value="مجانية">مجانية</option><option value="بمقابل بسيط">بمقابل بسيط</option></select></div>
+            <div className="space-y-1"><label className="text-xs font-bold text-slate-600">التكلفة *</label><select className="w-full border rounded-lg h-10 px-3 text-sm bg-slate-50 outline-none" value={formData.isFree} onChange={e => setFormData({...formData, isFree: e.target.value})}><option value="">اختر</option><option value="مجانية">مجانية</option><option value="بمقابل بسيط">بمقابل بسيط</option></select></div>
             
             {!isDataValid(formData) && (
               <div className="flex items-center gap-2 text-[10px] text-amber-600 bg-amber-50 p-2 rounded-lg">
-                <AlertCircle className="w-3 h-3" />
+                <AlertCircle className="w-3 h-3 flex-shrink-0" />
                 <span>يرجى ملء جميع الحقول للحفظ.</span>
               </div>
             )}
           </div>
           
-          {/* الأزرار بجانب بعضها: حفظ على اليمين، إلغاء على اليسار */}
-          <DialogFooter className="flex flex-row gap-2 sm:justify-start">
+          <DialogFooter className="flex flex-row gap-2 sm:justify-start pt-2">
             <Button 
               onClick={onAdd} 
               disabled={submitting || !isDataValid(formData)} 
-              className={`flex-1 bg-emerald-600 hover:bg-emerald-700 h-11 rounded-xl ${!isDataValid(formData) && 'opacity-50'}`}
+              className={`flex-1 bg-emerald-600 hover:bg-emerald-700 h-11 rounded-xl text-white ${!isDataValid(formData) && 'opacity-50'}`}
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : 'حفظ النقطة'}
             </Button>

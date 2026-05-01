@@ -148,16 +148,16 @@ export default function CampsPage() {
   const rangeEnd = Math.min(currentPage * itemsPerPage, filtered.length)
 
   return (
-    <div className="w-full px-4 py-6" dir="rtl">
+    <div className="w-full px-2 sm:px-4 py-6" dir="rtl">
       <div className="mb-6 text-right">
-        <h1 className="text-2xl font-bold text-slate-900">إدارة المخيمات</h1>
-        <p className="text-sm text-slate-500 mt-1 font-normal">الرئيسية &gt; إدارة المخيمات</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">إدارة المخيمات</h1>
+        <p className="text-xs sm:text-sm text-slate-500 mt-1 font-normal">الرئيسية &gt; إدارة المخيمات</p>
       </div>
 
       <Card className="overflow-hidden border-slate-200 shadow-sm rounded-xl bg-white">
         <CardContent className="p-0">
-          <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b">
-            <div className="relative w-full max-w-xs">
+          <div className="p-4 flex flex-col lg:flex-row items-center gap-3 border-b">
+            <div className="relative w-full lg:max-w-xs">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 value={q}
@@ -167,37 +167,38 @@ export default function CampsPage() {
               />
             </div>
             
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className={`${selectBaseClass} ${topControlHeight} sm:w-[130px] bg-slate-50 border-slate-200`}
-            >
-              <option value="all">كل الحالات</option>
-              <option value="FULL">ممتلئ</option>
-              <option value="NOT_FULL">غير ممتلئ</option>
-            </select>
+            <div className="flex w-full lg:w-auto gap-2 items-center lg:ml-auto">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className={`${selectBaseClass} ${topControlHeight} flex-1 lg:w-[130px] bg-slate-50 border-slate-200`}
+              >
+                <option value="all">كل الحالات</option>
+                <option value="FULL">ممتلئ</option>
+                <option value="NOT_FULL">غير ممتلئ</option>
+              </select>
+            </div>
 
             <Button
               onClick={() => setAddOpen(true)}
-              className={`bg-blue-600 text-white hover:bg-blue-700 ${topControlHeight} px-4 rounded-lg mr-auto shadow-sm`}
+              className={`bg-blue-600 text-white hover:bg-blue-700 ${topControlHeight} px-4 rounded-lg mr-auto shadow-sm w-full lg:w-auto`}
             >
               <Plus className="h-4 w-4 ml-2" />
-              إضافة مخيم
+              <span className="text-xs sm:text-sm">إضافة مخيم</span>
             </Button>
           </div>
 
-          {/* التعديل هنا: إضافة max-h-80 لعمل سكرول عند تجاوز 5 صفوف تقريباً وجعل الرأس ثابتاً */}
           <div className="overflow-x-auto overflow-y-auto max-h-[420px] scrollbar-thin scrollbar-thumb-slate-200">
-            <table className="w-full text-right border-collapse text-sm relative">
+            <table className="w-full text-right border-collapse text-xs sm:text-sm relative min-w-[700px]">
               <thead className="bg-slate-50/90 border-b border-slate-100 sticky top-0 z-10 backdrop-blur-sm">
                 <tr>
-                  <th className="p-4 text-slate-500 font-bold">اسم المخيم</th>
-                  <th className="p-4 text-slate-500 font-bold">المنطقة</th>
-                  <th className="p-4 text-slate-500 font-bold">الموقع</th>
-                  <th className="p-4 text-center text-slate-500 font-bold">السعة</th>
-                  <th className="p-4 text-center text-slate-500 font-bold">الحالي</th>
-                  <th className="p-4 text-center text-slate-500 font-bold">الحالة</th>
-                  <th className="p-4 text-center text-slate-500 font-bold">الإجراءات</th>
+                  <th className="p-3 sm:p-4 text-slate-500 font-bold">اسم المخيم</th>
+                  <th className="p-3 sm:p-4 text-slate-500 font-bold hidden md:table-cell">المنطقة</th>
+                  <th className="p-3 sm:p-4 text-slate-500 font-bold">الموقع</th>
+                  <th className="p-3 sm:p-4 text-center text-slate-500 font-bold">السعة</th>
+                  <th className="p-3 sm:p-4 text-center text-slate-500 font-bold">الحالي</th>
+                  <th className="p-3 sm:p-4 text-center text-slate-500 font-bold">الحالة</th>
+                  <th className="p-3 sm:p-4 text-center text-slate-500 font-bold">الإجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white font-arabic">
@@ -209,35 +210,35 @@ export default function CampsPage() {
                   const isEditing = editingId === c.id;
                   return (
                     <tr key={c.id} className={`hover:bg-slate-50/50 transition-colors ${isEditing ? 'bg-blue-50/40' : ''}`}>
-                      <td className="p-4">{isEditing ? <Input className="h-9 border-blue-400" value={editDraft.name} onChange={e => setEditDraft({...editDraft, name: e.target.value})} /> : c.name}</td>
-                      <td className="p-4">{isEditing ? (
+                      <td className="p-3 sm:p-4">{isEditing ? <Input className="h-9 border-blue-400 text-xs sm:text-sm" value={editDraft.name} onChange={e => setEditDraft({...editDraft, name: e.target.value})} /> : c.name}</td>
+                      <td className="p-3 sm:p-4 hidden md:table-cell">{isEditing ? (
                         <select className={`${selectBaseClass} h-9 border-blue-400`} value={editDraft.area} onChange={e => setEditDraft({...editDraft, area: e.target.value, subArea: ''})}>
                           <option value="">اختر..</option>
                           {Object.keys(AREAS_DATA).map(a => <option key={a} value={a}>{a}</option>)}
                         </select>
                       ) : c.area}</td>
-                      <td className="p-4">{isEditing ? (
+                      <td className="p-3 sm:p-4">{isEditing ? (
                         <select className={`${selectBaseClass} h-9 border-blue-400`} value={editDraft.subArea} onChange={e => setEditDraft({...editDraft, subArea: e.target.value})} disabled={!editDraft.area}>
                           <option value="">اختر..</option>
                           {editDraft.area && AREAS_DATA[editDraft.area].map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                       ) : c.subArea}</td>
-                      <td className="p-4 text-center">{isEditing ? <Input type="number" className="h-9 w-20 mx-auto border-blue-400 text-center" value={editDraft.capacity || ''} onChange={e => setEditDraft({...editDraft, capacity: Number(e.target.value)})} /> : c.capacity}</td>
-                      <td className="p-4 text-center">{isEditing ? <Input type="number" className="h-9 w-20 mx-auto border-blue-400 text-center" value={editDraft.currentFamiliesCount || ''} onChange={e => setEditDraft({...editDraft, currentFamiliesCount: Number(e.target.value)})} /> : c.currentFamiliesCount}</td>
-                      <td className="p-4 text-center">
-                        <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${c.currentFamiliesCount >= c.capacity ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                      <td className="p-3 sm:p-4 text-center">{isEditing ? <Input type="number" className="h-9 w-16 sm:w-20 mx-auto border-blue-400 text-center" value={editDraft.capacity || ''} onChange={e => setEditDraft({...editDraft, capacity: Number(e.target.value)})} /> : c.capacity}</td>
+                      <td className="p-3 sm:p-4 text-center">{isEditing ? <Input type="number" className="h-9 w-16 sm:w-20 mx-auto border-blue-400 text-center" value={editDraft.currentFamiliesCount || ''} onChange={e => setEditDraft({...editDraft, currentFamiliesCount: Number(e.target.value)})} /> : c.currentFamiliesCount}</td>
+                      <td className="p-3 sm:p-4 text-center">
+                        <span className={`px-2 py-1 rounded-md text-[9px] sm:text-[10px] font-bold ${c.currentFamiliesCount >= c.capacity ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                           {c.currentFamiliesCount >= c.capacity ? 'ممتلئ' : 'متاح'}
                         </span>
                       </td>
-                      <td className="p-4 text-center">
+                      <td className="p-3 sm:p-4 text-center">
                         {isEditing ? (
                           <div className="flex gap-1 justify-center">
-                            <Button size="sm" onClick={() => saveEditRow(c.id)} disabled={!isEditValid} className={!isEditValid ? 'opacity-40 grayscale' : 'bg-green-600 text-white'}>حفظ</Button>
-                            <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>إلغاء</Button>
+                            <Button size="sm" onClick={() => saveEditRow(c.id)} disabled={!isEditValid} className={!isEditValid ? 'opacity-40 grayscale' : 'bg-green-600 text-white h-8 text-[10px] sm:text-xs'}>حفظ</Button>
+                            <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="h-8 text-[10px] sm:text-xs">إلغاء</Button>
                           </div>
                         ) : (
                           <button onClick={() => { setEditingId(c.id); setEditDraft(c); }} className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-md border border-slate-100 text-slate-400 transition-all">
-                            <Pencil className="w-4 h-4"/>
+                            <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4"/>
                           </button>
                         )}
                       </td>
@@ -248,8 +249,8 @@ export default function CampsPage() {
             </table>
           </div>
 
-          <div className="p-4 flex items-center justify-between border-t bg-slate-50/30 font-arabic">
-            <div className="flex items-center gap-2 text-sm text-slate-500">
+          <div className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t bg-slate-50/30 font-arabic">
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-500 order-2 sm:order-1">
               <span>عرض صفوف:</span>
               <select 
                 value={itemsPerPage} 
@@ -262,7 +263,7 @@ export default function CampsPage() {
               </select>
             </div>
 
-            <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-4 text-xs sm:text-sm order-1 sm:order-2">
               <span className="text-slate-500 font-medium">
                 {rangeStart} - {rangeEnd} <span className="mx-1 text-slate-300">|</span> من {filtered.length}
               </span>
@@ -270,7 +271,7 @@ export default function CampsPage() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="h-8 px-3 border-slate-200 hover:bg-white font-normal" 
+                  className="h-8 px-2 sm:px-3 border-slate-200 hover:bg-white font-normal" 
                   disabled={currentPage <= 1} 
                   onClick={() => setCurrentPage(p => p - 1)}
                 >
@@ -279,7 +280,7 @@ export default function CampsPage() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="h-8 px-3 border-slate-200 hover:bg-white font-normal" 
+                  className="h-8 px-2 sm:px-3 border-slate-200 hover:bg-white font-normal" 
                   disabled={currentPage >= totalPages} 
                   onClick={() => setCurrentPage(p => p + 1)}
                 >
@@ -292,56 +293,62 @@ export default function CampsPage() {
       </Card>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="max-w-md shadow-2xl border-none rounded-2xl font-arabic">
+        <DialogContent dir="rtl" className="w-[95%] sm:max-w-md shadow-2xl border-none rounded-2xl font-arabic p-4 sm:p-6 overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="text-right text-lg font-bold">إضافة مخيم جديد</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-4 text-right">
+            {/* الحقول الآن تأتي في سطر واحد لكل منها باستخدام flex-col الافتراضي */}
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-slate-700">اسم المخيم</label>
-               <Input className="h-11 bg-slate-50 border-slate-200" value={name} onChange={e => setName(e.target.value)} placeholder="أدخل اسم المخيم" />
+               <Input className="h-10 sm:h-11 bg-slate-50 border-slate-200" value={name} onChange={e => setName(e.target.value)} placeholder="أدخل اسم المخيم" />
             </div>
+            
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-slate-700">المنطقة</label>
-               <select className={`${selectBaseClass} h-11 bg-slate-50 border-slate-200`} value={selectedArea} onChange={e => {setSelectedArea(e.target.value); setSelectedSubArea('')}}>
+               <select className={`${selectBaseClass} h-10 sm:h-11 bg-slate-50 border-slate-200`} value={selectedArea} onChange={e => {setSelectedArea(e.target.value); setSelectedSubArea('')}}>
                   <option value="">اختر المنطقة</option>
                   {Object.keys(AREAS_DATA).map(a => <option key={a} value={a}>{a}</option>)}
                </select>
             </div>
+
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-slate-700">الموقع</label>
-               <select className={`${selectBaseClass} h-11 bg-slate-50 border-slate-200`} value={selectedSubArea} onChange={e => setSelectedSubArea(e.target.value)} disabled={!selectedArea}>
+               <select className={`${selectBaseClass} h-10 sm:h-11 bg-slate-50 border-slate-200`} value={selectedSubArea} onChange={e => setSelectedSubArea(e.target.value)} disabled={!selectedArea}>
                   <option value="">اختر الموقع</option>
                   {selectedArea && AREAS_DATA[selectedArea].map(s => <option key={s} value={s}>{s}</option>)}
                </select>
             </div>
+
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-slate-700">السعة القصوى</label>
-               <Input className="h-11 bg-slate-50 border-slate-200" type="number" placeholder="0" value={capacity || ''} onChange={e => setCapacity(Number(e.target.value))} />
+               <Input className="h-10 sm:h-11 bg-slate-50 border-slate-200" type="number" placeholder="0" value={capacity || ''} onChange={e => setCapacity(Number(e.target.value))} />
             </div>
+
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-slate-700">العائلات حالياً</label>
-               <Input className="h-11 bg-slate-50 border-slate-200" type="number" placeholder="0" value={currentFamiliesCount || ''} onChange={e => setCurrentFamiliesCount(Number(e.target.value))} />
+               <Input className="h-10 sm:h-11 bg-slate-50 border-slate-200" type="number" placeholder="0" value={currentFamiliesCount || ''} onChange={e => setCurrentFamiliesCount(Number(e.target.value))} />
             </div>
+
             {!isAddValid && (
               <div className="text-[10px] text-amber-600 flex items-center gap-2 bg-amber-50 p-2.5 rounded-lg border border-amber-100">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0"/> يرجى إكمال جميع الحقول الإلزامية لتفعيل زر الحفظ.
+                <AlertCircle className="w-3.5 h-3.5 shrink-0"/> يرجى إكمال الحقول الإلزامية لحفظ البيانات.
               </div>
             )}
           </div>
           
-          <DialogFooter className="mt-2 flex flex-row items-center gap-3 w-full">
+          <DialogFooter className="mt-2 flex flex-col sm:flex-row items-center gap-3 w-full">
             <Button 
               onClick={onAdd} 
               disabled={submitting || !isAddValid} 
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 rounded-xl"
+              className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 sm:h-11 rounded-xl"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null} حفظ البيانات
             </Button>
             <Button 
               variant="outline" 
               onClick={() => setAddOpen(false)} 
-              className="flex-1 h-11 font-normal text-slate-600 bg-white hover:bg-slate-50 border-slate-200 rounded-xl"
+              className="w-full sm:flex-1 h-10 sm:h-11 font-normal text-slate-600 bg-white hover:bg-slate-50 border-slate-200 rounded-xl"
             >
               إلغاء
             </Button>

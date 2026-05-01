@@ -31,7 +31,6 @@ export default function AddressPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
 
@@ -132,21 +131,19 @@ export default function AddressPage() {
     }
   };
 
-  // Filter and Paginate logic
   const filtered = useMemo(() => {
     return items.filter(item =>
       !q || item.title?.includes(q) || item.description?.includes(q)
     );
   }, [q, items]);
 
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  
   const paginatedItems = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filtered.slice(startIndex, startIndex + itemsPerPage);
   }, [filtered, currentPage, itemsPerPage]);
 
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
-
-  // Reset page to 1 when searching or changing limit
   useEffect(() => { setCurrentPage(1); }, [q, itemsPerPage]);
 
   return (
@@ -156,9 +153,9 @@ export default function AddressPage() {
         <p className="text-sm text-slate-500 mt-1 font-normal">الرئيسية &gt; العناوين والمواقع</p>
       </div>
 
-      <Card className="overflow-hidden border-slate-200 shadow-sm rounded-xl bg-white h-[calc(100vh-220px)] min-h-[420px] flex flex-col">
-        <CardContent className="p-0 flex-1 min-h-0 flex flex-col">
-          <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b">
+      <Card className="overflow-hidden border-slate-200 shadow-sm rounded-xl bg-white flex flex-col">
+        <CardContent className="p-0 flex-1 flex flex-col">
+          <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b bg-white z-20">
             <div className="relative w-full max-w-xs">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
@@ -173,10 +170,9 @@ export default function AddressPage() {
             </Button>
           </div>
 
-          {/* Table Container with Scroll */}
-          <div className="overflow-x-auto overflow-y-auto custom-scrollbar flex-1 min-h-0">
+          <div className="overflow-x-auto overflow-y-auto max-h-[365px] flex-1">
             <table className="w-full text-right text-sm border-collapse">
-              <thead className="bg-slate-50/80 border-b border-slate-100 sticky top-0 z-10">
+              <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10 shadow-sm">
                 <tr>
                   <th className="p-4 text-slate-500 font-bold bg-slate-50">الموقع العام</th>
                   <th className="p-4 text-slate-500 font-bold bg-slate-50">المنطقة</th>
@@ -193,7 +189,7 @@ export default function AddressPage() {
                     <td className="p-4 font-medium text-slate-700">
                       {editingId === item.id ? (
                         <select
-                          className="w-full border border-slate-200 rounded-lg h-10 px-3 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-100"
+                          className="w-full border border-slate-200 rounded-lg h-10 px-3 bg-white outline-none focus:ring-2 focus:ring-blue-100"
                           value={editTitle}
                           onChange={e => { setEditTitle(e.target.value); setEditDescription('') }}
                         >
@@ -207,7 +203,7 @@ export default function AddressPage() {
                     <td className="p-4 text-slate-600">
                       {editingId === item.id ? (
                         <select
-                          className="w-full border border-slate-200 rounded-lg h-10 px-3 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-50"
+                          className="w-full border border-slate-200 rounded-lg h-10 px-3 bg-white outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-50"
                           value={editDescription}
                           onChange={e => setEditDescription(e.target.value)}
                           disabled={!editTitle}
@@ -223,25 +219,11 @@ export default function AddressPage() {
                       <div className="flex items-center justify-center gap-2">
                         {editingId === item.id ? (
                           <>
-                            <button
-                              onClick={onEdit}
-                              disabled={submitting || !isEditValid}
-                              className="px-3 py-2 border border-slate-100 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-all"
-                            >
-                              حفظ
-                            </button>
-                            <button
-                              onClick={cancelInlineEdit}
-                              className="px-3 py-2 border border-slate-200 rounded-md hover:bg-slate-100 text-slate-600 transition-all"
-                            >
-                              إلغاء
-                            </button>
+                            <Button onClick={onEdit} disabled={submitting || !isEditValid} size="sm" className="bg-blue-600">حفظ</Button>
+                            <Button onClick={cancelInlineEdit} variant="outline" size="sm">إلغاء</Button>
                           </>
                         ) : (
-                          <button
-                            onClick={() => startInlineEdit(item)}
-                            className="p-2 border border-slate-100 rounded-md hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-all"
-                          >
+                          <button onClick={() => startInlineEdit(item)} className="p-2 border border-slate-100 rounded-md hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-all">
                             <Pencil className="w-4 h-4" />
                           </button>
                         )}
@@ -253,56 +235,55 @@ export default function AddressPage() {
             </table>
           </div>
 
-          {/* Pagination Footer */}
+          {/* --- Pagination Footer Reorganized --- */}
           {!loading && filtered.length > 0 && (
             <div className="p-4 border-t flex items-center justify-between bg-slate-50/30">
-              {/* Pagination (Left Side - Buttons) */}
+              {/* Right Side: Rows per page selection */}
               <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 font-bold">عرض:</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                  className="h-8 border border-slate-200 rounded-md bg-white text-xs px-2 outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                >
+                  {[5, 10, 15, 20].map(val => (
+                    <option key={val} value={val}>{val}</option>
+                  ))}
+                </select>
+                <span className="text-xs text-slate-500 font-bold">عناصر</span>
+              </div>
+
+              {/* Left Side: Prev/Next controls */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-slate-600 ml-2">
+                  صفحة {currentPage} من {totalPages}
+                </span>
+                
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="h-8 w-8 p-0 rounded-md border-slate-200"
+                  className="h-8 w-8 p-0"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
-                
-                <span className="text-xs font-medium text-slate-600 px-2">
-                  صفحة {currentPage} من {totalPages}
-                </span>
 
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="h-8 w-8 p-0 rounded-md border-slate-200"
+                  className="h-8 w-8 p-0"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-              </div>
-
-              {/* Items Per Page (Right Side) */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500">إظهار:</span>
-                <select
-                  value={itemsPerPage}
-                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                  className="h-8 border border-slate-200 rounded-md bg-white text-xs px-2 outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  {[5, 10, 15, 20].map(val => (
-                    <option key={val} value={val}>{val}</option>
-                  ))}
-                </select>
-                <span className="text-xs text-slate-500 font-medium">عناصر</span>
               </div>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* نافذة الإضافة */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent dir="rtl" className="max-w-md rounded-2xl">
           <DialogHeader><DialogTitle className="text-right text-lg font-bold">إضافة موقع جديد</DialogTitle></DialogHeader>
@@ -332,10 +313,10 @@ export default function AddressPage() {
             </div>
           </div>
           <DialogFooter className="flex flex-row gap-3">
-            <Button onClick={onAdd} disabled={submitting || !isAddValid} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-11 rounded-xl">
+            <Button onClick={onAdd} disabled={submitting || !isAddValid} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-11 rounded-xl font-bold">
               {submitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null} حفظ الموقع
             </Button>
-            <Button variant="outline" onClick={() => { setAddOpen(false); resetForm() }} className="flex-1 h-11 rounded-xl border-slate-200">إلغاء</Button>
+            <Button variant="outline" onClick={() => { setAddOpen(false); resetForm() }} className="flex-1 h-11 rounded-xl border-slate-200 font-bold text-slate-500 hover:text-slate-700">إلغاء</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

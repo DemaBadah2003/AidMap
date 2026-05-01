@@ -109,22 +109,22 @@ export default function DepartmentsPage() {
   }
 
   return (
-    <div className="p-6 font-arabic text-right" dir="rtl">
+    <div className="p-2 md:p-6 font-arabic text-right" dir="rtl">
       {/* العنوان الخارجي */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">إدارة الأقسام الطبية</h1>
+      <div className="mb-6 px-2 md:px-0">
+        <h1 className="text-xl md:text-2xl font-bold text-slate-800">إدارة الأقسام الطبية</h1>
       </div>
 
-      <Card className="border-none shadow-sm overflow-hidden bg-white">
+      <Card className="border-none shadow-sm overflow-hidden bg-white mx-auto w-full">
         <CardContent className="p-0">
           
-          {/* --- شريط البحث وزر الإضافة داخل الكارد --- */}
-          <div className="p-4 border-b bg-slate-50/50 flex flex-row justify-between items-center gap-4">
-            <div className="relative w-full max-w-sm">
+          {/* --- شريط البحث وزر الإضافة (Responsive Layout) --- */}
+          <div className="p-4 border-b bg-slate-50/50 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="relative w-full md:max-w-sm">
               <Search className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
               <Input 
                 placeholder="بحث سريع عن قسم أو تخصص..." 
-                className="pr-9 focus-visible:ring-blue-500 bg-white" 
+                className="pr-9 focus-visible:ring-blue-500 bg-white w-full" 
                 value={q} 
                 onChange={(e) => setQ(e.target.value)} 
               />
@@ -132,67 +132,71 @@ export default function DepartmentsPage() {
 
             <Button 
               onClick={() => { resetForm(); setAddOpen(true); }} 
-              className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm shrink-0"
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm w-full md:w-auto shrink-0"
             >
               <Plus className="ml-2 h-5 w-5" /> إضافة قسم جديد
             </Button>
           </div>
 
-          {/* --- حاوية الجدول مع سكرول ورأس ثابت --- */}
-          <div className="overflow-x-auto overflow-y-auto max-h-[450px] relative">
-            <table className="w-full text-right border-collapse">
-              <thead className="bg-slate-50 border-b text-slate-500 uppercase text-xs sticky top-0 z-20 shadow-sm">
-                <tr>
-                  <th className="p-4 font-bold bg-slate-50">نوع التخصص</th>
-                  <th className="p-4 font-bold bg-slate-50">اسم القسم</th>
-                  <th className="p-4 font-bold text-center bg-slate-50">الحالة التشغيلية</th>
-                  <th className="p-4 font-bold bg-slate-50">وصف الخدمات</th>
-                  <th className="p-4 text-center font-bold bg-slate-50">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="text-sm">
-                {loading ? (
-                  <tr><td colSpan={5} className="p-10 text-center"><Loader2 className="animate-spin mx-auto text-blue-600" /></td></tr>
-                ) : currentItems.length === 0 ? (
-                    <tr><td colSpan={5} className="p-10 text-center text-slate-400 font-bold">لا توجد بيانات</td></tr>
-                ) : currentItems.map((item: any) => (
-                  <tr key={item.id} className={`border-b hover:bg-slate-50/50 transition-colors ${editingId === item.id ? 'bg-blue-50/50' : ''}`}>
-                    {editingId === item.id ? (
-                      <>
-                        <td className="p-2"><select className="w-full border rounded p-1.5 bg-white text-xs" value={formData.deptType} onChange={e => setFormData({...formData, deptType: e.target.value, name: ''})}>{Object.keys(DEPARTMENTS_BY_SPECIALTY).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
-                        <td className="p-2"><select className="w-full border rounded p-1.5 bg-white text-xs" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}>{DEPARTMENTS_BY_SPECIALTY[formData.deptType]?.map(d => <option key={d} value={d}>{d}</option>)}</select></td>
-                        <td className="p-2"><select className="w-full border rounded p-1.5 bg-white text-center text-xs" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}><option value="يعمل بكفاءة">يعمل بكفاءة</option><option value="مزدحم">مزدحم</option><option value="خارج الخدمة">خارج الخدمة</option></select></td>
-                        <td className="p-2"><input className="w-full border rounded p-1.5 bg-white text-xs" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></td>
-                        <td className="p-2 text-center flex justify-center gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => onSave(item.id)} disabled={submitting} className="text-green-600"><Check className="w-5 h-5" /></Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="text-red-500"><X className="w-5 h-5" /></Button>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="p-4 text-blue-600 font-medium">{item.deptType}</td>
-                        <td className="p-4 font-bold">{item.name}</td>
-                        <td className="p-4 text-center">
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${item.status === 'يعمل بكفاءة' ? 'bg-green-100 text-green-700' : item.status === 'مزدحم' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
-                            {item.status}
-                          </span>
-                        </td>
-                        <td className="p-4 text-slate-500 text-xs">{item.description || '-'}</td>
-                        <td className="p-4 text-center">
-                          <Button variant="ghost" size="sm" onClick={() => { setEditingId(item.id); setFormData({ name: item.name, deptType: item.deptType, status: item.status, description: item.description || '' }); }}><Pencil className="w-4 h-4 text-slate-400" /></Button>
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* --- حاوية الجدول مع دعم التمرير الأفقي (Table Responsive) --- */}
+          <div className="overflow-x-auto w-full">
+            <div className="inline-block min-w-full align-middle">
+               <div className="max-h-[450px] overflow-y-auto relative">
+                <table className="w-full text-right border-collapse min-w-[700px]">
+                  <thead className="bg-slate-50 border-b text-slate-500 uppercase text-xs sticky top-0 z-20 shadow-sm">
+                    <tr>
+                      <th className="p-4 font-bold bg-slate-50 w-1/5">نوع التخصص</th>
+                      <th className="p-4 font-bold bg-slate-50 w-1/5">اسم القسم</th>
+                      <th className="p-4 font-bold text-center bg-slate-50 w-1/5">الحالة</th>
+                      <th className="p-4 font-bold bg-slate-50 w-1/4">وصف الخدمات</th>
+                      <th className="p-4 text-center font-bold bg-slate-50 w-1/6">الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-sm">
+                    {loading ? (
+                      <tr><td colSpan={5} className="p-10 text-center"><Loader2 className="animate-spin mx-auto text-blue-600" /></td></tr>
+                    ) : currentItems.length === 0 ? (
+                        <tr><td colSpan={5} className="p-10 text-center text-slate-400 font-bold">لا توجد بيانات</td></tr>
+                    ) : currentItems.map((item: any) => (
+                      <tr key={item.id} className={`border-b hover:bg-slate-50/50 transition-colors ${editingId === item.id ? 'bg-blue-50/50' : ''}`}>
+                        {editingId === item.id ? (
+                          <>
+                            <td className="p-2"><select className="w-full border rounded p-1.5 bg-white text-xs" value={formData.deptType} onChange={e => setFormData({...formData, deptType: e.target.value, name: ''})}>{Object.keys(DEPARTMENTS_BY_SPECIALTY).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
+                            <td className="p-2"><select className="w-full border rounded p-1.5 bg-white text-xs" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}>{DEPARTMENTS_BY_SPECIALTY[formData.deptType]?.map(d => <option key={d} value={d}>{d}</option>)}</select></td>
+                            <td className="p-2"><select className="w-full border rounded p-1.5 bg-white text-center text-xs" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}><option value="يعمل بكفاءة">يعمل بكفاءة</option><option value="مزدحم">مزدحم</option><option value="خارج الخدمة">خارج الخدمة</option></select></td>
+                            <td className="p-2"><input className="w-full border rounded p-1.5 bg-white text-xs" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></td>
+                            <td className="p-2 text-center flex justify-center gap-1">
+                              <Button size="sm" variant="ghost" onClick={() => onSave(item.id)} disabled={submitting} className="text-green-600"><Check className="w-5 h-5" /></Button>
+                              <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="text-red-500"><X className="w-5 h-5" /></Button>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="p-4 text-blue-600 font-medium">{item.deptType}</td>
+                            <td className="p-4 font-bold">{item.name}</td>
+                            <td className="p-4 text-center">
+                              <span className={`px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap ${item.status === 'يعمل بكفاءة' ? 'bg-green-100 text-green-700' : item.status === 'مزدحم' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
+                                {item.status}
+                              </span>
+                            </td>
+                            <td className="p-4 text-slate-500 text-xs truncate max-w-[150px]">{item.description || '-'}</td>
+                            <td className="p-4 text-center">
+                              <Button variant="ghost" size="sm" onClick={() => { setEditingId(item.id); setFormData({ name: item.name, deptType: item.deptType, status: item.status, description: item.description || '' }); }}><Pencil className="w-4 h-4 text-slate-400" /></Button>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
-          {/* --- وحدة التحكم بالترقيم (Pagination) --- */}
+          {/* --- وحدة التحكم بالترقيم (Pagination - Responsive) --- */}
           {!loading && filteredItems.length > 0 && (
-            <div className="p-4 border-t flex items-center justify-between bg-slate-50/50">
-              <div className="flex items-center gap-3">
+            <div className="p-4 border-t flex flex-col sm:flex-row items-center justify-between bg-slate-50/50 gap-4">
+              <div className="flex items-center gap-3 order-2 sm:order-1">
                 <span className="text-xs font-bold text-slate-500">عرض:</span>
                 <select 
                   value={itemsPerPage}
@@ -201,16 +205,16 @@ export default function DepartmentsPage() {
                 >
                   {[5, 10, 15, 20].map(val => (<option key={val} value={val}>{val}</option>))}
                 </select>
-                <span className="text-[11px] text-slate-400 mr-2 font-medium">إجمالي {filteredItems.length} عنصر</span>
+                <span className="text-[11px] text-slate-400 mr-2 font-medium">إجمالي {filteredItems.length}</span>
               </div>
 
-              <div className="flex items-center gap-2" dir="ltr">
-                <Button variant="outline" size="sm" className="h-8 px-3 text-xs font-bold gap-1 shadow-sm" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
-                  <ChevronLeft className="h-4 w-4" /> السابق
+              <div className="flex items-center gap-2 order-1 sm:order-2" dir="ltr">
+                <Button variant="outline" size="sm" className="h-8 px-2 md:px-3 text-xs font-bold gap-1 shadow-sm" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
+                  <ChevronLeft className="h-4 w-4" /> <span className="hidden md:inline">السابق</span>
                 </Button>
                 <div className="text-xs font-bold px-3 py-1.5 bg-white border rounded-md shadow-sm">{currentPage} / {totalPages}</div>
-                <Button variant="outline" size="sm" className="h-8 px-3 text-xs font-bold gap-1 shadow-sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>
-                  التالي <ChevronRight className="h-4 w-4" />
+                <Button variant="outline" size="sm" className="h-8 px-2 md:px-3 text-xs font-bold gap-1 shadow-sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+                   <span className="hidden md:inline">التالي</span> <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -218,17 +222,17 @@ export default function DepartmentsPage() {
         </CardContent>
       </Card>
 
-      {/* Dialog إضافة قسم جديد */}
+      {/* Dialog إضافة قسم جديد (Responsive Width) */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="font-arabic max-w-md">
+        <DialogContent dir="rtl" className="font-arabic w-[95vw] max-w-md rounded-lg">
           <DialogHeader><DialogTitle className="text-right font-bold text-slate-800 border-b pb-2">إضافة قسم جديد</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4 text-right">
+          <div className="space-y-4 py-4 text-right overflow-y-auto max-h-[70vh]">
             <div className="space-y-1"><label className="text-xs font-bold text-slate-500">نوع التخصص</label><select className="w-full border rounded-lg p-2.5 bg-slate-50 outline-none text-sm" value={formData.deptType} onChange={e => setFormData({...formData, deptType: e.target.value, name: ''})}><option value="">اختر التخصص</option>{Object.keys(DEPARTMENTS_BY_SPECIALTY).map(s => <option key={s} value={s}>{s}</option>)}</select></div>
             <div className="space-y-1"><label className="text-xs font-bold text-slate-500">اسم القسم</label><select className="w-full border rounded-lg p-2.5 bg-slate-50 outline-none text-sm" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} disabled={!formData.deptType}><option value="">اختر القسم</option>{formData.deptType && DEPARTMENTS_BY_SPECIALTY[formData.deptType].map(d => <option key={d} value={d}>{d}</option>)}</select></div>
             <div className="space-y-1"><label className="text-xs font-bold text-slate-500">الحالة التشغيلية</label><select className="w-full border rounded-lg p-2.5 bg-slate-50 outline-none text-sm" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}><option value="يعمل بكفاءة">يعمل بكفاءة</option><option value="مزدحم">مزدحم</option><option value="خارج الخدمة">خارج الخدمة</option></select></div>
             <div className="space-y-1"><label className="text-xs font-bold text-slate-500">ملاحظات وصفية</label><textarea placeholder="وصف الخدمات..." className="w-full border rounded-lg p-2.5 bg-slate-50 h-24 text-sm" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
           </div>
-          <DialogFooter className="flex gap-2 pt-4 border-t">
+          <DialogFooter className="flex flex-row gap-2 pt-4 border-t">
             <Button onClick={() => onSave()} disabled={submitting} className="flex-1 bg-blue-600 font-bold h-11 text-white">{submitting ? <Loader2 className="animate-spin" /> : 'حفظ البيانات'}</Button>
             <Button variant="outline" onClick={() => setAddOpen(false)} className="h-11 flex-1">إلغاء</Button>
           </DialogFooter>

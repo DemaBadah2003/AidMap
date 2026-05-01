@@ -136,120 +136,144 @@ export default function HospitalsPage() {
   };
 
   return (
-    <div className="w-full px-4 py-6 bg-white" dir="rtl">
-      <h1 className="text-2xl font-bold text-slate-700 mb-6"> النقاط الطبية </h1>
+    <div className="w-full px-2 md:px-4 py-6 bg-white" dir="rtl">
+      <h1 className="text-xl md:text-2xl font-bold text-slate-700 mb-6 px-2"> النقاط الطبية </h1>
 
-      <Card className="border-slate-200 shadow-sm overflow-hidden flex flex-col">
+      <Card className="border-slate-200 shadow-sm overflow-hidden flex flex-col mx-auto w-full">
         <CardContent className="p-0 flex flex-col">
-          <div className="p-4 border-b bg-slate-50/50 flex justify-between items-center gap-4">
-            <div className="relative max-w-xs flex-1">
+          {/* Header Section: Responsive layout */}
+          <div className="p-4 border-b bg-slate-50/50 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="relative w-full md:max-w-xs">
               <Search className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
-              <Input placeholder="بحث..." className="pr-9 border-slate-200 bg-white" value={q} onChange={e => {setQ(e.target.value); setCurrentPage(1);}} />
+              <Input 
+                placeholder="بحث..." 
+                className="pr-9 border-slate-200 bg-white w-full" 
+                value={q} 
+                onChange={e => {setQ(e.target.value); setCurrentPage(1);}} 
+              />
             </div>
-            <Button onClick={() => {setErrors({}); setAddOpen(true);}} className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Button 
+              onClick={() => {setErrors({}); setAddOpen(true);}} 
+              className="bg-blue-600 hover:bg-blue-700 text-white w-full md:w-auto"
+            >
               <Plus className="ml-2 h-4 w-4" /> إضافة منشأة طبية 
             </Button>
           </div>
           
-          <div className="overflow-auto max-h-[450px]">
-            <table className="w-full text-right border-collapse min-w-[700px]">
-              <thead className="bg-slate-50 text-slate-500 border-b sticky top-0 z-10">
-                <tr>
-                  <th className="p-4 text-xs font-bold uppercase w-[20%]">النوع</th>
-                  <th className="p-4 text-xs font-bold uppercase w-[40%]">الاسم</th>
-                  <th className="p-4 text-xs font-bold uppercase w-[25%]">رقم التواصل</th>
-                  <th className="p-4 text-xs font-bold uppercase w-[15%] text-center">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 bg-white text-slate-600">
-                {loading ? (
-                  <tr><td colSpan={4} className="p-12 text-center text-slate-400"><Loader2 className="animate-spin mx-auto h-6 w-6" /></td></tr>
-                ) : paginatedItems.map(item => (
-                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                    {editingId === item.id ? (
-                      <>
-                        <td className="p-2 align-top">
-                            <select 
-                                value={editForm.hospitalType} 
-                                onChange={e => {setEditForm({...editForm, hospitalType: e.target.value, hospitalName: ''}); setErrors({});}} 
-                                className={`w-full border rounded p-1.5 text-sm outline-none ${errors.hospitalType ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200'}`}
-                            >
-                              {HOSPITAL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
-                        </td>
-                        <td className="p-2 align-top">
-                            <select 
-                                value={editForm.hospitalName} 
-                                onChange={e => {setEditForm({...editForm, hospitalName: e.target.value}); setErrors({});}} 
-                                className={`w-full border rounded p-1.5 text-sm outline-none ${errors.hospitalName ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200'}`}
-                            >
-                                <option value="">اختر الاسم..</option>
-                                {(MASTER_DATA[editForm.hospitalType] || []).map(n => <option key={n} value={n}>{n}</option>)}
-                            </select>
-                        </td>
-                        <td className="p-2 align-top">
-                            <Input 
-                                className={`h-9 font-mono text-sm ${errors.phone ? 'border-red-500 focus-visible:ring-red-500' : 'border-slate-200'}`} 
-                                value={editForm.phone} 
-                                onChange={e => {setEditForm({...editForm, phone: e.target.value}); setErrors({});}} 
-                                maxLength={10} 
-                            />
-                            {errors.phone && <p className="text-[10px] text-red-500 mt-1 font-bold leading-tight">{errors.phone}</p>}
-                        </td>
-                        <td className="p-2 text-center flex justify-center gap-2">
-                          <Button size="sm" onClick={onSaveEdit} disabled={submitting} className="bg-blue-600 hover:bg-blue-700 h-8 w-8 p-0">
-                            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 text-white" />}
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => {setEditingId(null); setErrors({});}} className="h-8 w-8 p-0 text-slate-400">
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="p-4 text-sm">
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${item.hospitalType === 'حكومي' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}>
-                              {item.hospitalType}
-                            </span>
-                        </td>
-                        <td className="p-4 text-sm font-medium">{item.hospitalName}</td>
-                        <td className="p-4 text-sm font-mono">{item.phone}</td>
-                        <td className="p-4 text-center">
-                          <Button variant="ghost" size="sm" onClick={() => { setEditingId(item.id); setEditForm({...item}); setErrors({}); }} className="text-slate-400 hover:text-blue-600 p-2">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Table Container: Responsive Scroll */}
+          <div className="overflow-x-auto w-full">
+            <div className="inline-block min-w-full align-middle">
+              <div className="max-h-[450px] overflow-y-auto">
+                <table className="w-full text-right border-collapse min-w-[600px] table-fixed">
+                  <thead className="bg-slate-50 text-slate-500 border-b sticky top-0 z-10">
+                    <tr>
+                      <th className="p-4 text-xs font-bold uppercase w-[20%]">النوع</th>
+                      <th className="p-4 text-xs font-bold uppercase w-[40%]">الاسم</th>
+                      <th className="p-4 text-xs font-bold uppercase w-[25%]">رقم التواصل</th>
+                      <th className="p-4 text-xs font-bold uppercase w-[15%] text-center">الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white text-slate-600">
+                    {loading ? (
+                      <tr><td colSpan={4} className="p-12 text-center text-slate-400"><Loader2 className="animate-spin mx-auto h-6 w-6" /></td></tr>
+                    ) : paginatedItems.map(item => (
+                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                        {editingId === item.id ? (
+                          <>
+                            <td className="p-2 align-top">
+                                <select 
+                                    value={editForm.hospitalType} 
+                                    onChange={e => {setEditForm({...editForm, hospitalType: e.target.value, hospitalName: ''}); setErrors({});}} 
+                                    className={`w-full border rounded p-1.5 text-sm outline-none ${errors.hospitalType ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200'}`}
+                                >
+                                  {HOSPITAL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                            </td>
+                            <td className="p-2 align-top">
+                                <select 
+                                    value={editForm.hospitalName} 
+                                    onChange={e => {setEditForm({...editForm, hospitalName: e.target.value}); setErrors({});}} 
+                                    className={`w-full border rounded p-1.5 text-sm outline-none ${errors.hospitalName ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200'}`}
+                                >
+                                    <option value="">اختر الاسم..</option>
+                                    {(MASTER_DATA[editForm.hospitalType] || []).map(n => <option key={n} value={n}>{n}</option>)}
+                                </select>
+                            </td>
+                            <td className="p-2 align-top">
+                                <Input 
+                                    className={`h-9 font-mono text-sm ${errors.phone ? 'border-red-500 focus-visible:ring-red-500' : 'border-slate-200'}`} 
+                                    value={editForm.phone} 
+                                    onChange={e => {setEditForm({...editForm, phone: e.target.value}); setErrors({});}} 
+                                    maxLength={10} 
+                                />
+                                {errors.phone && <p className="text-[10px] text-red-500 mt-1 font-bold leading-tight">{errors.phone}</p>}
+                            </td>
+                            <td className="p-2 text-center flex justify-center gap-2">
+                              <Button size="sm" onClick={onSaveEdit} disabled={submitting} className="bg-blue-600 hover:bg-blue-700 h-8 w-8 p-0">
+                                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 text-white" />}
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => {setEditingId(null); setErrors({});}} className="h-8 w-8 p-0 text-slate-400">
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="p-4 text-sm">
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold inline-block whitespace-nowrap ${item.hospitalType === 'حكومي' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}>
+                                  {item.hospitalType}
+                                </span>
+                            </td>
+                            <td className="p-4 text-sm font-medium truncate max-w-[150px] md:max-w-none">{item.hospitalName}</td>
+                            <td className="p-4 text-sm font-mono whitespace-nowrap">{item.phone}</td>
+                            <td className="p-4 text-center">
+                              <Button variant="ghost" size="sm" onClick={() => { setEditingId(item.id); setEditForm({...item}); setErrors({}); }} className="text-slate-400 hover:text-blue-600 p-2">
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
-          <div className="p-4 border-t bg-slate-50/50 flex justify-between items-center shrink-0">
+          {/* Footer Section: Pagination and page size */}
+          <div className="p-4 border-t bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0">
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <span>عرض</span>
-              <select value={pageSize} onChange={(e) => {setPageSize(Number(e.target.value)); setCurrentPage(1);}} className="border rounded px-1 py-1 outline-none">
+              <select value={pageSize} onChange={(e) => {setPageSize(Number(e.target.value)); setCurrentPage(1);}} className="border rounded px-1 py-1 outline-none bg-white">
                 {[5, 10, 15, 20].map(size => <option key={size} value={size}>{size}</option>)}
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)} className="h-8 px-2"><ChevronRight className="h-4 w-4" /></Button>
-              <span className="text-xs font-medium text-slate-600">{currentPage} / {totalPages || 1}</span>
-              <Button variant="outline" size="sm" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(prev => prev + 1)} className="h-8 px-2"><ChevronLeft className="h-4 w-4" /></Button>
+              <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)} className="h-8 px-2">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <div className="bg-white px-3 py-1 border rounded text-xs font-medium text-slate-600">
+                {currentPage} / {totalPages || 1}
+              </div>
+              <Button variant="outline" size="sm" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(prev => prev + 1)} className="h-8 px-2">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Dialog: Mobile-friendly width */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="sm:max-w-[420px]">
-          <DialogHeader><DialogTitle className="text-blue-700 text-center text-xl font-bold">إضافة منشأة طبية</DialogTitle></DialogHeader>
+        <DialogContent dir="rtl" className="max-w-[92vw] sm:max-w-[420px] rounded-lg">
+          <DialogHeader>
+            <DialogTitle className="text-blue-700 text-center text-lg md:text-xl font-bold">إضافة منشأة طبية</DialogTitle>
+          </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-400 mr-1">نوع المنشأة</label>
-                <select value={hospitalType} onChange={e => {setHospitalType(e.target.value); setHospitalName(''); setErrors({});}} className={`w-full border rounded-md p-2 text-sm outline-none ${errors.hospitalType ? 'border-red-500' : 'border-slate-200'}`}>
+                <select value={hospitalType} onChange={e => {setHospitalType(e.target.value); setHospitalName(''); setErrors({});}} className={`w-full border rounded-md p-2 text-sm outline-none bg-white ${errors.hospitalType ? 'border-red-500' : 'border-slate-200'}`}>
                   <option value="">اختر النوع..</option>
                   {HOSPITAL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
@@ -257,7 +281,7 @@ export default function HospitalsPage() {
             </div>
             <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-400 mr-1">الاسم</label>
-                <select value={hospitalName} onChange={e => {setHospitalName(e.target.value); setErrors({});}} disabled={!hospitalType} className={`w-full border rounded-md p-2 text-sm outline-none disabled:bg-slate-50 ${errors.hospitalName ? 'border-red-500' : 'border-slate-200'}`}>
+                <select value={hospitalName} onChange={e => {setHospitalName(e.target.value); setErrors({});}} disabled={!hospitalType} className={`w-full border rounded-md p-2 text-sm outline-none disabled:bg-slate-50 bg-white ${errors.hospitalName ? 'border-red-500' : 'border-slate-200'}`}>
                   <option value="">اختر الاسم..</option>
                   {(MASTER_DATA[hospitalType] || []).map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
@@ -270,7 +294,7 @@ export default function HospitalsPage() {
             </div>
           </div>
           
-          <DialogFooter className="flex flex-row gap-3 sm:justify-start">
+          <DialogFooter className="flex flex-row gap-3 sm:justify-start pt-2">
             <Button onClick={onAdd} disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 transition-all">
               {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : 'حفظ'}
             </Button>

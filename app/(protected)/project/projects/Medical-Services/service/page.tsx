@@ -91,97 +91,101 @@ export default function ServicesPage() {
   useEffect(() => { setCurrentPage(1) }, [q])
 
   return (
-    <div className="w-full px-4 py-6 text-right font-sans" dir="rtl">
-      {/* العنوان الخارجي فقط */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">سجل الخدمات الطبية</h1>
+    <div className="w-full px-2 md:px-4 py-6 text-right font-sans" dir="rtl">
+      {/* العنوان الخارجي - متجاوب */}
+      <div className="mb-6 px-2">
+        <h1 className="text-xl md:text-2xl font-bold text-slate-900">سجل الخدمات الطبية</h1>
       </div>
 
       <Card className="overflow-hidden border-slate-200 shadow-sm rounded-xl bg-white">
         <CardContent className="p-0">
           
-          {/* تعديل: شريط البحث وزر الإضافة داخل الكارد وقبال بعض */}
-          <div className="p-4 border-b bg-slate-50/50 flex flex-row justify-between items-center gap-4">
-            <div className="relative w-full max-w-xs">
+          {/* شريط البحث وزر الإضافة - يتحول لعمودي في الجوال */}
+          <div className="p-4 border-b bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="relative w-full sm:max-w-xs">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input 
                 value={q} 
                 onChange={(e) => setQ(e.target.value)} 
                 placeholder="ابحث عن خدمة..." 
-                className="pr-10 bg-white border-slate-200 h-10 rounded-lg text-sm" 
+                className="pr-10 bg-white border-slate-200 h-10 rounded-lg text-sm w-full" 
               />
             </div>
 
             <Button 
               onClick={() => { resetForm(); setAddOpen(true); }} 
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg h-10 px-6 shadow-sm shrink-0"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg h-10 px-6 shadow-sm w-full sm:w-auto shrink-0"
             >
               <Plus className="ml-2 h-4 w-4" /> إضافة خدمة جديدة
             </Button>
           </div>
 
-          {/* حاوية الجدول مع السكرول */}
-          <div className="w-full overflow-x-auto overflow-y-auto max-h-[420px] scrollbar-thin scrollbar-thumb-slate-200">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b font-bold text-slate-600 text-right sticky top-0 z-10">
-                <tr>
-                  <th className="p-4">الخدمة الطبية</th>
-                  <th className="p-4">التكلفة</th>
-                  <th className="p-4">الحالة</th>
-                  <th className="p-4 text-center">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loading ? (
-                  <tr><td colSpan={4} className="p-10 text-center"><Loader2 className="animate-spin mx-auto text-slate-300" /></td></tr>
-                ) : paginatedItems.map((item: any) => (
-                  <tr key={item.id} className={editId === item.id ? "bg-blue-50/50" : "hover:bg-slate-50"}>
-                    <td className="p-4 font-medium">
-                      {editId === item.id ? (
-                        <select className="w-full border rounded p-1 text-sm bg-white outline-none" value={serviceName} onChange={e => setServiceName(e.target.value)}>
-                          {AVAILABLE_MEDICAL_SERVICES.map(ser => <option key={ser} value={ser}>{ser}</option>)}
-                        </select>
-                      ) : item.serviceName}
-                    </td>
-                    <td className="p-4 font-mono font-semibold">
-                      {editId === item.id ? (
-                        <Input className="w-24 h-8" type="number" value={cost} onChange={e => setCost(e.target.value)} />
-                      ) : <span className="text-blue-600">${item.cost}</span>}
-                    </td>
-                    <td className="p-4">
-                      {editId === item.id ? (
-                        <select className="border rounded p-1 text-xs bg-white outline-none" value={status} onChange={e => setStatus(e.target.value)}>
-                          <option value="متاحة">متاحة</option>
-                          <option value="غير متوفرة">غير متوفرة</option>
-                        </select>
-                      ) : (
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${item.status === 'متاحة' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                          {item.status}
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-4 text-center">
-                      <div className="flex justify-center gap-2">
-                        {editId === item.id ? (
-                          <>
-                            <Check onClick={onSave} className="w-5 h-5 text-green-600 cursor-pointer hover:bg-green-100 rounded p-0.5" />
-                            <X onClick={resetForm} className="w-5 h-5 text-red-600 cursor-pointer hover:bg-red-100 rounded p-0.5" />
-                          </>
-                        ) : (
-                          <Button variant="ghost" size="sm" onClick={() => startInPlaceEdit(item)}>
-                            <Pencil className="w-4 h-4 text-slate-400 hover:text-blue-600" />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* حاوية الجدول مع دعم السكرول الأفقي للشاشات الصغيرة */}
+          <div className="w-full overflow-x-auto">
+            <div className="inline-block min-w-full align-middle">
+              <div className="overflow-y-auto max-h-[420px] scrollbar-thin scrollbar-thumb-slate-200">
+                <table className="w-full text-sm min-w-[600px]">
+                  <thead className="bg-slate-50 border-b font-bold text-slate-600 text-right sticky top-0 z-10">
+                    <tr>
+                      <th className="p-4">الخدمة الطبية</th>
+                      <th className="p-4">التكلفة</th>
+                      <th className="p-4">الحالة</th>
+                      <th className="p-4 text-center">الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {loading ? (
+                      <tr><td colSpan={4} className="p-10 text-center"><Loader2 className="animate-spin mx-auto text-slate-300" /></td></tr>
+                    ) : paginatedItems.map((item: any) => (
+                      <tr key={item.id} className={editId === item.id ? "bg-blue-50/50" : "hover:bg-slate-50"}>
+                        <td className="p-4 font-medium">
+                          {editId === item.id ? (
+                            <select className="w-full border rounded p-1 text-sm bg-white outline-none" value={serviceName} onChange={e => setServiceName(e.target.value)}>
+                              {AVAILABLE_MEDICAL_SERVICES.map(ser => <option key={ser} value={ser}>{ser}</option>)}
+                            </select>
+                          ) : item.serviceName}
+                        </td>
+                        <td className="p-4 font-mono font-semibold">
+                          {editId === item.id ? (
+                            <Input className="w-24 h-8" type="number" value={cost} onChange={e => setCost(e.target.value)} />
+                          ) : <span className="text-blue-600">${item.cost}</span>}
+                        </td>
+                        <td className="p-4">
+                          {editId === item.id ? (
+                            <select className="border rounded p-1 text-xs bg-white outline-none" value={status} onChange={e => setStatus(e.target.value)}>
+                              <option value="متاحة">متاحة</option>
+                              <option value="غير متوفرة">غير متوفرة</option>
+                            </select>
+                          ) : (
+                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold whitespace-nowrap ${item.status === 'متاحة' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                              {item.status}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4 text-center">
+                          <div className="flex justify-center gap-2">
+                            {editId === item.id ? (
+                              <>
+                                <Check onClick={onSave} className="w-5 h-5 text-green-600 cursor-pointer hover:bg-green-100 rounded p-0.5" />
+                                <X onClick={resetForm} className="w-5 h-5 text-red-600 cursor-pointer hover:bg-red-100 rounded p-0.5" />
+                              </>
+                            ) : (
+                              <Button variant="ghost" size="sm" onClick={() => startInPlaceEdit(item)}>
+                                <Pencil className="w-4 h-4 text-slate-400 hover:text-blue-600" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
-          {/* Footer الترقيم */}
-          <div className="p-4 border-t flex items-center justify-between bg-slate-50/30">
+          {/* Footer الترقيم - متجاوب */}
+          <div className="p-4 border-t flex flex-col md:flex-row items-center justify-between bg-slate-50/30 gap-4">
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500 font-bold">عرض:</span>
               <select 
@@ -196,7 +200,7 @@ export default function ServicesPage() {
 
             <div className="flex items-center gap-3">
               <Button 
-                variant="outline" size="sm" className="text-xs px-3 h-8"
+                variant="outline" size="sm" className="text-xs px-2 md:px-3 h-8"
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
               >
@@ -210,7 +214,7 @@ export default function ServicesPage() {
               </div>
 
               <Button 
-                variant="outline" size="sm" className="text-xs px-3 h-8"
+                variant="outline" size="sm" className="text-xs px-2 md:px-3 h-8"
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages || totalPages === 0}
               >
@@ -221,9 +225,9 @@ export default function ServicesPage() {
         </CardContent>
       </Card>
 
-      {/* Dialog إضافة خدمة */}
+      {/* Dialog إضافة خدمة - متجاوب العرض */}
       <Dialog open={addOpen} onOpenChange={(val) => { if(!val) resetForm(); setAddOpen(val); }}>
-        <DialogContent dir="rtl" className="max-w-md">
+        <DialogContent dir="rtl" className="max-w-[90vw] sm:max-w-md rounded-xl">
           <DialogHeader><DialogTitle className="text-right font-bold">إضافة خدمة طبية جديدة</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4 text-right">
             <div className="space-y-1">
@@ -245,7 +249,7 @@ export default function ServicesPage() {
               </select>
             </div>
           </div>
-          <DialogFooter className="flex-row-reverse gap-2">
+          <DialogFooter className="flex flex-row-reverse gap-2">
             <Button onClick={onSave} disabled={submitting} className="flex-1 bg-blue-600 font-bold">
               {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : "حفظ البيانات"}
             </Button>

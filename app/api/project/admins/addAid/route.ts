@@ -1,15 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma  from '@/lib/prisma' // تأكد من مسار بريزما عندك
-
-function normalizeStatus(status?: string | null) {
-  if (!status) return 'pending'
-  const s = status.toUpperCase()
-  if (s === 'PENDING') return 'pending'
-  if (s === 'APPROVED') return 'approved'
-  if (s === 'DELIVERED') return 'delivered'
-  if (s === 'REJECTED') return 'rejected'
-  return 'pending'
-}
+import prisma from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,34 +10,36 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'رقم الهوية مطلوب' }, { status: 400 })
     }
 
-    // البحث في جدول aidRequest بناءً على رقم الهوية
-    const request = await prisma.aidRequest.findFirst({
-      where: { nationalId: nationalId },
-      orderBy: { createdAt: 'desc' }, // جلب أحدث طلب للمواطن
+    // 1. البحث في جدول Citizens (لاحظ استخدام idNumber بدلاً من nationalId)
+    const citizen = await prisma.citizens.findFirst({
+      where: { idNumber: nationalId }
     })
 
-    if (!request) {
-      return NextResponse.json({ found: false, message: 'رقم الهوية هذا غير موجود في كشوفات المساعدات' }, { status: 200 })
+    if (!citizen) {
+      return NextResponse.json({ 
+        found: false, 
+        message: 'رقم الهوية هذا غير مسجل في نظام المواطنين' 
+      }, { status: 200 })
     }
 
-    // إرجاع البيانات كما يتوقعها الفرونت إند
+    // 2. البحث في جدول RequestAid (تأكد من كتابة الاسم كما في الموديل تماماً)
+    const request = await prisma.requestAid.findFirst({
+      where: { nationalId: nationalId },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    // 3. دمج البيانات وإرسالها
     return NextResponse.json({
       found: true,
-      beneficiaryName: request.fullName,
-      nationalId: request.nationalId,
-      phone: request.phone,
-      aidType: request.aidType,
-      numberOfFamily: request.familyCount,
-      address: request.address,
-      notes: request.notes,
-      status: normalizeStatus(request.status),
-      requestNumber: request.id,
-      distributionDate: null, // يمكن إضافتها لاحقاً من قاعدة البيانات
-      pickupLocation: null,   // يمكن إضافتها لاحقاً من قاعدة البيانات
+      beneficiaryName: citizen.name, // الحقل في موديل Citizens اسمه name
+      address: request?.address || citizen.area || "غير محدد", 
+      status: request ? request.status.toLowerCase() : 'no_request',
+      notes: request?.notes || (request ? "لا توجد ملاحظات" : "لا يوجد طلب مقدم"),
+      aidType: request?.aidType || 'N/A'
     }, { status: 200 })
 
   } catch (error) {
-    console.error('Search Aid Error:', error)
-    return NextResponse.json({ message: 'حدث خطأ أثناء فحص البيانات' }, { status: 500 })
+    console.error('Search Error:', error)
+    return NextResponse.json({ message: 'حدث خطأ في السيرفر' }, { status: 500 })
   }
 }

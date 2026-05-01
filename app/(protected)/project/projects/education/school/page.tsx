@@ -18,7 +18,9 @@ import {
   Loader2, 
   Check, 
   X, 
-  AlertCircle 
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 
 const LOCATIONS = ['شمال', 'جنوب', 'شرق', 'غرب']
@@ -52,6 +54,10 @@ export default function SchoolsPage() {
   const [items, setItems] = useState<School[]>([])
   const [loading, setLoading] = useState(true)
 
+  // --- حالات الترقيم (Pagination) ---
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(5)
+
   const [editingRowId, setEditingRowId] = useState<string | null>(null)
   const [editData, setEditData] = useState<Partial<School>>({})
 
@@ -72,12 +78,20 @@ export default function SchoolsPage() {
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => fetchSchools(), 300)
+    const timer = setTimeout(() => {
+        fetchSchools()
+        setCurrentPage(1) // العودة للصفحة الأولى عند البحث
+    }, 300)
     return () => clearTimeout(timer)
   }, [q])
 
-  // --- شروط التحقق الصارمة ---
-  
+  // --- منطق الترقيم ---
+  const totalPages = Math.ceil(items.length / pageSize)
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return items.slice(start, start + pageSize)
+  }, [items, currentPage, pageSize])
+
   // فحص حقول الإضافة
   const isNewSchoolComplete = useMemo(() => {
     return Object.values(newSchool).every(value => value.trim() !== '')
@@ -89,15 +103,12 @@ export default function SchoolsPage() {
     return fields.every(field => data[field as keyof School]?.trim() !== '')
   }
 
-  // --- العمليات ---
-
   const startEditing = (school: School) => {
     setEditingRowId(school.id)
     setEditData(school)
   }
 
   const saveInlineEdit = async (id: string) => {
-    // شرط صارم: لا ترسل الطلب إذا كانت الحقول ناقصة
     if (!isEditDataComplete(editData)) {
       alert("يرجى إكمال جميع الحقول قبل الحفظ")
       return
@@ -118,7 +129,6 @@ export default function SchoolsPage() {
   }
 
   const onAdd = async () => {
-    // شرط صارم: لا ترسل الطلب إذا كانت الحقول ناقصة
     if (!isNewSchoolComplete) return
 
     setSubmitting(true)
@@ -165,100 +175,151 @@ export default function SchoolsPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse text-sm">
-              <thead className="bg-slate-50 border-b border-slate-100 font-bold text-slate-600">
-                <tr>
-                  <th className="p-4">اسم المدرسة</th>
-                  <th className="p-4">الموقع</th>
-                  <th className="p-4">المنطقة</th>
-                  <th className="p-4">المرحلة</th>
-                  <th className="p-4">أيام الدراسة</th>
-                  <th className="p-4">التوقيت</th>
-                  <th className="p-4 text-center">الرسوم</th>
-                  <th className="p-4 text-center">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loading ? (
-                  <tr><td colSpan={8} className="p-10 text-center"><Loader2 className="animate-spin mx-auto w-6 h-6 text-slate-300" /></td></tr>
-                ) : items.map((item) => (
-                  <tr key={item.id} className={`hover:bg-slate-50 transition-colors ${editingRowId === item.id ? 'bg-blue-50/30' : ''}`}>
-                    {editingRowId === item.id ? (
-                      <>
-                        <td className="p-2"><Input className={inlineInputClass} value={editData.schoolName} onChange={e => setEditData({...editData, schoolName: e.target.value})} /></td>
-                        <td className="p-2">
-                          <select className="w-full h-9 text-xs border border-slate-200 rounded-md" value={editData.location} onChange={e => setEditData({...editData, location: e.target.value, area: ''})}>
-                            <option value="">اختر..</option>
-                            {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-2">
-                          <select className="w-full h-9 text-xs border border-slate-200 rounded-md" value={editData.area} onChange={e => setEditData({...editData, area: e.target.value})} disabled={!editData.location}>
-                            <option value="">اختر..</option>
-                            {editData.location && AREAS_BY_LOCATION[editData.location].map(a => <option key={a} value={a}>{a}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-2">
-                          <select className="w-full h-9 text-xs border border-slate-200 rounded-md" value={editData.stage} onChange={e => setEditData({...editData, stage: e.target.value})}>
-                            <option value="">اختر..</option>
-                            {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-2">
-                          <select className="w-full h-9 text-xs border border-slate-200 rounded-md" value={editData.studyDays} onChange={e => setEditData({...editData, studyDays: e.target.value})}>
-                            <option value="">اختر..</option>
-                            {STUDY_DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-2">
-                          <select className="w-full h-9 text-xs border border-slate-200 rounded-md" value={editData.shift} onChange={e => setEditData({...editData, shift: e.target.value})}>
-                            <option value="">اختر..</option>
-                            {SHIFTS.map(sh => <option key={sh} value={sh}>{sh}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-2">
-                          <select className="w-full h-9 text-xs border border-slate-200 rounded-md" value={editData.feesStatus} onChange={e => setEditData({...editData, feesStatus: e.target.value})}>
-                            <option value="">اختر..</option>
-                            {FEES_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-4 flex items-center justify-center gap-2">
-                          <Button 
-                            size="icon" 
-                            variant="ghost" 
-                            className={`h-8 w-8 ${isEditDataComplete(editData) ? 'text-green-600 hover:bg-green-50' : 'text-slate-300 cursor-not-allowed'}`}
-                            onClick={() => isEditDataComplete(editData) && saveInlineEdit(item.id)}
-                            disabled={!isEditDataComplete(editData) || submitting}
-                          >
-                            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => setEditingRowId(null)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="p-4 font-bold text-slate-700">{item.schoolName}</td>
-                        <td className="p-4 text-slate-600">{item.location}</td>
-                        <td className="p-4 text-slate-600">{item.area}</td>
-                        <td className="p-4">{item.stage}</td>
-                        <td className="p-4 text-slate-500 text-[11px]">{item.studyDays}</td>
-                        <td className="p-4 font-medium">{item.shift}</td>
-                        <td className="p-4 text-center">
-                          <span className={`px-2 py-1 rounded text-[10px] font-bold ${item.feesStatus === 'فى رسوم' ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'}`}>
-                            {item.feesStatus}
-                          </span>
-                        </td>
-                        <td className="p-4 text-center">
-                          <Pencil onClick={() => startEditing(item)} className="w-4 h-4 mx-auto text-slate-400 cursor-pointer hover:text-blue-600" />
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {/* إضافة سكرول في حال زاد الارتفاع (أكثر من 5 صفوف تقريباً) */}
+            <div className="max-h-[450px] overflow-y-auto">
+                <table className="w-full text-right border-collapse text-sm relative">
+                <thead className="bg-slate-50 border-b border-slate-100 font-bold text-slate-600 sticky top-0 z-10">
+                    <tr>
+                    <th className="p-4">اسم المدرسة</th>
+                    <th className="p-4">الموقع</th>
+                    <th className="p-4">المنطقة</th>
+                    <th className="p-4">المرحلة</th>
+                    <th className="p-4">أيام الدراسة</th>
+                    <th className="p-4">التوقيت</th>
+                    <th className="p-4 text-center">الرسوم</th>
+                    <th className="p-4 text-center">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                    {loading ? (
+                    <tr><td colSpan={8} className="p-10 text-center"><Loader2 className="animate-spin mx-auto w-6 h-6 text-slate-300" /></td></tr>
+                    ) : paginatedItems.map((item) => (
+                    <tr key={item.id} className={`hover:bg-slate-50 transition-colors ${editingRowId === item.id ? 'bg-blue-50/30' : ''}`}>
+                        {editingRowId === item.id ? (
+                        <>
+                            <td className="p-2"><Input className={inlineInputClass} value={editData.schoolName} onChange={e => setEditData({...editData, schoolName: e.target.value})} /></td>
+                            <td className="p-2">
+                            <select className="w-full h-9 text-xs border border-slate-200 rounded-md" value={editData.location} onChange={e => setEditData({...editData, location: e.target.value, area: ''})}>
+                                <option value="">اختر..</option>
+                                {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
+                            </select>
+                            </td>
+                            <td className="p-2">
+                            <select className="w-full h-9 text-xs border border-slate-200 rounded-md" value={editData.area} onChange={e => setEditData({...editData, area: e.target.value})} disabled={!editData.location}>
+                                <option value="">اختر..</option>
+                                {editData.location && AREAS_BY_LOCATION[editData.location].map(a => <option key={a} value={a}>{a}</option>)}
+                            </select>
+                            </td>
+                            <td className="p-2">
+                            <select className="w-full h-9 text-xs border border-slate-200 rounded-md" value={editData.stage} onChange={e => setEditData({...editData, stage: e.target.value})}>
+                                <option value="">اختر..</option>
+                                {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                            </td>
+                            <td className="p-2">
+                            <select className="w-full h-9 text-xs border border-slate-200 rounded-md" value={editData.studyDays} onChange={e => setEditData({...editData, studyDays: e.target.value})}>
+                                <option value="">اختر..</option>
+                                {STUDY_DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                            </select>
+                            </td>
+                            <td className="p-2">
+                            <select className="w-full h-9 text-xs border border-slate-200 rounded-md" value={editData.shift} onChange={e => setEditData({...editData, shift: e.target.value})}>
+                                <option value="">اختر..</option>
+                                {SHIFTS.map(sh => <option key={sh} value={sh}>{sh}</option>)}
+                            </select>
+                            </td>
+                            <td className="p-2">
+                            <select className="w-full h-9 text-xs border border-slate-200 rounded-md" value={editData.feesStatus} onChange={e => setEditData({...editData, feesStatus: e.target.value})}>
+                                <option value="">اختر..</option>
+                                {FEES_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+                            </select>
+                            </td>
+                            <td className="p-4 flex items-center justify-center gap-2">
+                            <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className={`h-8 w-8 ${isEditDataComplete(editData) ? 'text-green-600 hover:bg-green-50' : 'text-slate-300 cursor-not-allowed'}`}
+                                onClick={() => isEditDataComplete(editData) && saveInlineEdit(item.id)}
+                                disabled={!isEditDataComplete(editData) || submitting}
+                            >
+                                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => setEditingRowId(null)}>
+                                <X className="h-4 w-4" />
+                            </Button>
+                            </td>
+                        </>
+                        ) : (
+                        <>
+                            <td className="p-4 font-bold text-slate-700">{item.schoolName}</td>
+                            <td className="p-4 text-slate-600">{item.location}</td>
+                            <td className="p-4 text-slate-600">{item.area}</td>
+                            <td className="p-4">{item.stage}</td>
+                            <td className="p-4 text-slate-500 text-[11px]">{item.studyDays}</td>
+                            <td className="p-4 font-medium">{item.shift}</td>
+                            <td className="p-4 text-center">
+                            <span className={`px-2 py-1 rounded text-[10px] font-bold ${item.feesStatus === 'فى رسوم' ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'}`}>
+                                {item.feesStatus}
+                            </span>
+                            </td>
+                            <td className="p-4 text-center">
+                            <Pencil onClick={() => startEditing(item)} className="w-4 h-4 mx-auto text-slate-400 cursor-pointer hover:text-blue-600" />
+                            </td>
+                        </>
+                        )}
+                    </tr>
+                    ))}
+                </tbody>
+                </table>
+            </div>
+          </div>
+
+          {/* --- قسم الترقيم (Pagination) المضاف --- */}
+          <div className="p-4 border-t flex flex-row items-center justify-between bg-slate-50/50">
+            {/* يمين: قائمة اختيار العدد */}
+            <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">عرض صفوف:</span>
+                <select 
+                    className="h-8 text-xs border border-slate-200 rounded-md px-1 bg-white outline-none focus:ring-1 focus:ring-blue-500"
+                    value={pageSize}
+                    onChange={(e) => {
+                        setPageSize(Number(e.target.value))
+                        setCurrentPage(1)
+                    }}
+                >
+                    {[5, 10, 15, 20].map(val => (
+                        <option key={val} value={val}>{val}</option>
+                    ))}
+                </select>
+                <span className="text-xs text-slate-400 mr-2">
+                    إجمالي: {items.length}
+                </span>
+            </div>
+
+            {/* يسار: التنقل */}
+            <div className="flex items-center gap-2">
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 px-3 text-xs flex items-center gap-1"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                >
+                    <ChevronRight className="h-3 w-3" /> السابق
+                </Button>
+                <div className="text-xs font-bold px-2">
+                    {currentPage} من {totalPages || 1}
+                </div>
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 px-3 text-xs flex items-center gap-1"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                >
+                    التالي <ChevronLeft className="h-3 w-3" />
+                </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

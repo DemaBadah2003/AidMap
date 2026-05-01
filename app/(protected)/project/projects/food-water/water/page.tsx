@@ -63,6 +63,11 @@ export default function WaterPointsPage() {
     pointName: '', waterType: '', status: '', region: '', location: ''
   })
 
+  // دالة التحقق من الحقول
+  const isFormValid = (data: Omit<WaterPoint, 'id'>) => {
+    return Object.values(data).every(value => value.trim() !== '');
+  }
+
   // 1. جلب البيانات
   const fetchPoints = async () => {
     setLoading(true)
@@ -81,7 +86,7 @@ export default function WaterPointsPage() {
 
   // 2. إضافة نقطة جديدة
   const handleAddSubmit = async () => {
-    if (!addFormData.pointName || !addFormData.region) return
+    if (!isFormValid(addFormData)) return
     setSubmitting(true)
     try {
       const res = await fetch(BASE_URL, {
@@ -111,6 +116,7 @@ export default function WaterPointsPage() {
 
   // 4. حفظ التعديل
   const handleSaveEdit = async (id: string) => {
+    if (!isFormValid(editFormData)) return
     setSubmitting(true)
     try {
       const res = await fetch(BASE_URL, {
@@ -137,32 +143,33 @@ export default function WaterPointsPage() {
     )
   }, [q, items])
 
-  // منطق الترقيم بناءً على نتائج البحث
+  // منطق الترقيم
   const totalPages = Math.ceil(filtered.length / pageSize)
   const paginatedItems = useMemo(() => {
     const start = (currentPage - 1) * pageSize
     return filtered.slice(start, start + pageSize)
   }, [filtered, currentPage, pageSize])
 
-  // إعادة الترقيم للصفحة 1 عند البحث
   useEffect(() => { 
     setCurrentPage(1) 
   }, [q, pageSize])
 
   return (
-    <div className="w-full px-4 py-6" dir="rtl">
-      <div className="mb-6 flex items-center justify-start gap-2">
-        <Droplets className="w-8 h-8 text-blue-600" />
+    <div className="w-full px-2 sm:px-4 py-6" dir="rtl">
+      {/* Header Section */}
+      <div className="mb-6 flex items-center justify-start gap-3">
+        <Droplets className="w-7 h-7 sm:w-8 sm:h-8 text-blue-600" />
         <div>
-           <h1 className="text-2xl font-bold text-slate-900">إدارة نقاط توزيع المياه</h1>
-           <p className="text-slate-500 text-xs">تتبع حالة وتوفر مصادر المياه في المناطق المختلفة</p>
+           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">إدارة نقاط توزيع المياه</h1>
+           <p className="text-slate-500 text-[10px] sm:text-xs">تتبع حالة وتوفر مصادر المياه في المناطق المختلفة</p>
         </div>
       </div>
 
       <Card className="overflow-hidden border-slate-200 shadow-sm rounded-xl bg-white">
         <CardContent className="p-0">
-          <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b">
-            <div className="relative w-full max-w-xs">
+          {/* Search & Add Button */}
+          <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b bg-white">
+            <div className="relative w-full sm:max-w-xs">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 value={q}
@@ -174,15 +181,16 @@ export default function WaterPointsPage() {
 
             <Button
               onClick={() => setIsAddDialogOpen(true)}
-              className="bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 rounded-lg mr-auto shadow-sm font-bold text-xs"
+              className="w-full sm:w-auto bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 rounded-lg sm:mr-auto shadow-sm font-bold text-xs"
             >
               <Plus className="h-4 w-4 ml-2" />
               إضافة نقطة مياه
             </Button>
           </div>
 
-          <div className="overflow-x-auto" style={{ maxHeight: '500px', overflowY: 'auto' }}>
-            <table className="w-full text-right border-collapse text-sm">
+          {/* Table */}
+          <div className="overflow-x-auto max-h-[500px]">
+            <table className="w-full text-right border-collapse text-sm min-w-[700px]">
               <thead className="bg-slate-50/80 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
                   <th className="p-4 text-slate-500 font-bold">الموقع (الاتجاه)</th>
@@ -197,7 +205,7 @@ export default function WaterPointsPage() {
                 {loading ? (
                   <tr><td colSpan={6} className="p-20 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600" /></td></tr>
                 ) : paginatedItems.length === 0 ? (
-                  <tr><td colSpan={6} className="p-10 text-center text-slate-400">لا توجد نتائج مطابقة للبحث</td></tr>
+                  <tr><td colSpan={6} className="p-10 text-center text-slate-400 font-bold">لا توجد نتائج مطابقة للبحث</td></tr>
                 ) : paginatedItems.map((s) => (
                   <tr key={s.id} className={`transition-colors ${editingId === s.id ? 'bg-orange-50/30' : 'hover:bg-slate-50/50'}`}>
                     {editingId === s.id ? (
@@ -241,7 +249,7 @@ export default function WaterPointsPage() {
                         </td>
                         <td className="p-2 text-center">
                           <div className="flex justify-center gap-2">
-                            <Button size="sm" variant="ghost" className="text-green-600 hover:bg-green-50" onClick={() => handleSaveEdit(s.id)} disabled={submitting}>
+                            <Button size="sm" variant="ghost" className="text-green-600 hover:bg-green-50" onClick={() => handleSaveEdit(s.id)} disabled={submitting || !isFormValid(editFormData)}>
                               {submitting ? <Loader2 className="w-3 h-3 animate-spin"/> : <Check className="w-4 h-4"/>}
                             </Button>
                             <Button size="sm" variant="ghost" className="text-red-400 hover:bg-red-50" onClick={() => setEditingId(null)}><X className="w-4 h-4"/></Button>
@@ -276,13 +284,14 @@ export default function WaterPointsPage() {
             </table>
           </div>
 
-          <div className="p-4 border-t flex items-center justify-between bg-slate-50/50">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500">عرض:</span>
+          {/* Pagination */}
+          <div className="p-4 border-t flex flex-col sm:flex-row items-center justify-between bg-slate-50/50 gap-4">
+            <div className="flex items-center gap-2 order-2 sm:order-1">
+              <span className="text-xs text-slate-500 font-bold">عرض:</span>
               <select 
                 value={pageSize} 
                 onChange={(e) => setPageSize(Number(e.target.value))}
-                className="h-8 rounded border border-slate-200 bg-white text-xs outline-none px-1"
+                className="h-8 rounded border border-slate-200 bg-white text-xs outline-none px-2 font-bold"
               >
                 {[5, 10, 15, 20].map(size => (
                   <option key={size} value={size}>{size}</option>
@@ -290,8 +299,8 @@ export default function WaterPointsPage() {
               </select>
             </div>
 
-            <div className="flex items-center gap-4">
-              <span className="text-xs text-slate-500">صفحة {currentPage} من {totalPages || 1}</span>
+            <div className="flex items-center gap-4 order-1 sm:order-2">
+              <span className="text-xs text-slate-500 font-bold">صفحة {currentPage} من {totalPages || 1}</span>
               <div className="flex gap-1">
                 <Button variant="outline" size="sm" className="h-8 w-20 text-xs gap-1 font-bold" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}>
                    <ChevronRight className="h-3 w-3" /> السابق
@@ -305,8 +314,9 @@ export default function WaterPointsPage() {
         </CardContent>
       </Card>
 
+      {/* Add Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent dir="rtl" className="max-w-md rounded-2xl">
+        <DialogContent dir="rtl" className="w-[95vw] sm:max-w-md rounded-2xl p-4 sm:p-6 overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="text-right text-lg font-bold text-blue-800 flex items-center gap-2">
               <MapPin className="w-5 h-5 text-blue-600" /> تسجيل نقطة مياه جديدة
@@ -368,11 +378,22 @@ export default function WaterPointsPage() {
             </div>
           </div>
           
-          <DialogFooter className="flex gap-2">
-            <Button onClick={handleAddSubmit} disabled={submitting || !addFormData.pointName || !addFormData.region} className="flex-1 bg-blue-600 hover:bg-blue-700 h-11 rounded-xl font-bold">
+          {/* تم تعديل ترتيب الأزرار هنا */}
+          <DialogFooter className="flex flex-row gap-2 mt-4">
+            <Button 
+              onClick={handleAddSubmit} 
+              disabled={submitting || !isFormValid(addFormData)} 
+              className="flex-1 bg-blue-600 hover:bg-blue-700 h-11 rounded-xl font-bold"
+            >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : "حفظ بيانات النقطة"}
             </Button>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="flex-1 h-11 rounded-xl font-bold">إلغاء</Button>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsAddDialogOpen(false)} 
+              className="flex-1 h-11 rounded-xl font-bold"
+            >
+              إلغاء
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
