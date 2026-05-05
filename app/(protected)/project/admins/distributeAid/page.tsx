@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -103,7 +103,7 @@ export default function RequestAidPage() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-80px)] items-center justify-center bg-slate-50 p-4" dir="rtl">
+    <div className="flex min-h-[calc(100vh-80px)] items-center justify-center bg-slate-50 p-4">
       <div className="w-full max-w-2xl">
         
         <div className="mb-5 text-center">

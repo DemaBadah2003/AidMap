@@ -62,11 +62,12 @@ function I18nProvider({ children }: I18nProviderProps) {
       setIsI18nInitialized(true);
     }
 
-    // Update document direction when language changes
+    // Update document direction and lang when language changes
     const handleLanguageChange = (lng: string) => {
       const language = I18N_LANGUAGES.find((lang) => lang.code === lng);
-      if (language?.direction) {
+      if (language) {
         document.documentElement.setAttribute('dir', language.direction);
+        document.documentElement.setAttribute('lang', language.code);
       }
     };
 
@@ -83,13 +84,22 @@ function I18nProvider({ children }: I18nProviderProps) {
     };
   }, []);
 
-  // Get current language for direction
-  const currentLanguage = I18N_LANGUAGES.find((lang) => lang.code === (i18n.language || 'en')) || I18N_LANGUAGES[0];
+  const [direction, setDirection] = useState<'ltr' | 'rtl'>('rtl');
+
+  useEffect(() => {
+    const updateDir = (lng: string) => {
+      const lang = I18N_LANGUAGES.find((l) => l.code === lng);
+      if (lang) setDirection(lang.direction);
+    };
+    updateDir(i18n.language || 'ar');
+    i18n.on('languageChanged', updateDir);
+    return () => { i18n.off('languageChanged', updateDir); };
+  }, []);
 
   // Don't render until i18n is initialized
   if (!isI18nInitialized) {
     return (
-      <RadixDirectionProvider dir="ltr">
+      <RadixDirectionProvider dir="rtl">
         {children}
       </RadixDirectionProvider>
     );
@@ -97,7 +107,7 @@ function I18nProvider({ children }: I18nProviderProps) {
 
   return (
     <I18nextProvider i18n={i18n}>
-      <RadixDirectionProvider dir={currentLanguage.direction}>
+      <RadixDirectionProvider dir={direction}>
         {children}
       </RadixDirectionProvider>
     </I18nextProvider>

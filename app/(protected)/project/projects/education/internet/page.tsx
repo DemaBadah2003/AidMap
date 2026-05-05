@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent } from '../../../../../../components/ui/card'
@@ -117,7 +117,7 @@ export default function WifiPointsPage() {
   const rangeEnd = Math.min(currentPage * itemsPerPage, filtered.length)
 
   return (
-    <div className="w-full px-4 py-6" dir="rtl">
+    <div className="w-full px-4 py-6">
       <div className="mb-6 text-right">
         <h1 className="text-2xl font-bold text-slate-900">نقاط الإنترنت للدراسة</h1>
         <p className="text-sm text-slate-500 mt-1 font-normal">الرئيسية &gt; خدمات الطلاب &gt; نقاط الإنترنت</p>
@@ -214,7 +214,7 @@ export default function WifiPointsPage() {
 
       {/* Add Modal */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="max-w-md shadow-2xl border-none rounded-2xl font-arabic">
+        <DialogContent className="max-w-md shadow-2xl border-none rounded-2xl font-arabic">
           <DialogHeader>
             <DialogTitle className="text-right text-lg font-bold text-emerald-700">تسجيل نقطة إنترنت جديدة</DialogTitle>
           </DialogHeader>

@@ -1,61 +1,31 @@
 'use client';
 
-import { generalSettings } from '@/config/general.config';
+import Link from 'next/link';
+import { MapPin } from 'lucide-react';
 import { Container } from '@/components/common/container';
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="footer">
+    <footer className="footer border-t border-border bg-background">
       <Container>
-        <div className="flex flex-col md:flex-row justify-center md:justify-between items-center gap-3 py-5">
-          <div className="flex order-2 md:order-1  gap-2 font-normal text-sm">
-            <span className="text-muted-foreground">{currentYear} &copy;</span>
-            <a
-              href="https://keenthemes.com"
-              target="_blank"
-              className="text-secondary-foreground hover:text-primary"
-            >
-              Keenthemes Inc.
-            </a>
+        <div className="flex flex-col items-center justify-between gap-3 py-4 md:flex-row" dir="rtl">
+          {/* Brand */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground order-2 md:order-1">
+            <MapPin className="size-3.5 text-blue-600" />
+            <span className="font-semibold text-slate-700">AidMap</span>
+            <span className="text-slate-400">—</span>
+            <span>نظام الإغاثة الموحد</span>
+            <span className="text-slate-300">|</span>
+            <span>{currentYear} ©</span>
           </div>
-          <nav className="flex order-1 md:order-2 gap-4 font-normal text-sm text-muted-foreground">
-            <a
-              href={generalSettings.docsLink}
-              target="_blank"
-              className="hover:text-primary"
-            >
-              Docs
-            </a>
-            <a
-              href={generalSettings.purchaseLink}
-              target="_blank"
-              className="hover:text-primary"
-            >
-              Purchase
-            </a>
-            <a
-              href={generalSettings.faqLink}
-              target="_blank"
-              className="hover:text-primary"
-            >
-              FAQ
-            </a>
-            <a
-              href="https://devs.keenthemes.com"
-              target="_blank"
-              className="hover:text-primary"
-            >
-              Support
-            </a>
-            <a
-              href={generalSettings.licenseLink}
-              target="_blank"
-              className="hover:text-primary"
-            >
-              License
-            </a>
+
+          {/* Nav links */}
+          <nav className="flex order-1 md:order-2 gap-5 text-sm text-muted-foreground">
+            <Link href="/dashboard" className="hover:text-primary transition-colors">لوحة التحكم</Link>
+            <Link href="/project/MapPreview" className="hover:text-primary transition-colors">الخريطة</Link>
+            <Link href="/profile-page" className="hover:text-primary transition-colors">الملف الشخصي</Link>
           </nav>
         </div>
       </Container>

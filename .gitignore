@@ -61,3 +61,6 @@ dist-ssr
 
 .env
 .env.*
+.claude/
+package-lock.json
+nul

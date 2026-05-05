@@ -1,41 +1,30 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronFirst } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { MapPin } from 'lucide-react'
+import { useEffect } from 'react'
 import { useSettings } from '@/providers/settings-provider'
-import { Button } from '@/components/ui/button'
 
 export function SidebarHeader() {
   const { settings, storeOption } = useSettings()
 
-  const handleToggleClick = () => {
-    storeOption(
-      'layouts.demo1.sidebarCollapse',
-      !settings.layouts.demo1.sidebarCollapse,
-    )
-  }
+  useEffect(() => {
+    if (settings.layouts.demo1.sidebarCollapse) {
+      storeOption('layouts.demo1.sidebarCollapse', false)
+    }
+  }, [])
 
   return (
-    <div className="sidebar-header hidden lg:flex items-center relative justify-between px-3 lg:px-6 shrink-0">
-      <Link href="/" className="text-lg font-bold text-mono">
-        Relief System
+    <div className="sidebar-header hidden lg:flex items-center px-3 lg:px-6 shrink-0">
+      <Link href="/dashboard" className="flex items-center gap-2.5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shrink-0">
+          <MapPin className="size-4" />
+        </div>
+        <div className="leading-tight">
+          <p className="text-sm font-extrabold text-foreground">AidMap</p>
+          <p className="text-[10px] text-muted-foreground">نظام الإغاثة</p>
+        </div>
       </Link>
-
-      <Button
-        onClick={handleToggleClick}
-        size="sm"
-        mode="icon"
-        variant="outline"
-        className={cn(
-          'size-7 absolute start-full top-2/4 rtl:translate-x-2/4 -translate-x-2/4 -translate-y-2/4',
-          settings.layouts.demo1.sidebarCollapse
-            ? 'ltr:rotate-180'
-            : 'rtl:rotate-180',
-        )}
-      >
-        <ChevronFirst className="size-4!" />
-      </Button>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent } from '../../../../../../components/ui/card'
@@ -94,7 +94,7 @@ export default function EnterpriseProductsPage() {
   }
 
   return (
-    <div className="w-full px-2 py-3 lg:px-6" dir="rtl">
+    <div className="w-full px-2 py-3 lg:px-6">
       <div className="mb-6 text-right">
         <div className="text-xl font-bold text-slate-800 lg:text-2xl">منتجات المؤسسات</div>
         <div className="text-sm text-slate-400 mt-1">الرئيسية {'>'} إدارة منتجات المؤسسات</div>
@@ -223,7 +223,7 @@ export default function EnterpriseProductsPage() {
       </Card>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="sm:max-w-[425px] rounded-2xl bg-white" dir="rtl">
+        <DialogContent className="sm:max-w-[425px] rounded-2xl bg-white">
           <DialogHeader className="text-right border-b pb-4">
             <DialogTitle className="text-xl font-bold text-slate-800">إضافة منتج مؤسسة</DialogTitle>
           </DialogHeader>

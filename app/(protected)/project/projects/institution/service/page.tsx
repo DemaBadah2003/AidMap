@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -132,7 +132,7 @@ export default function ServicesPage() {
   }
 
   return (
-    <div className="w-full min-h-screen px-4 py-6" dir="rtl">
+    <div className="w-full min-h-screen px-4 py-6">
       <div className="w-full mb-6 text-right">
         <h1 className="text-2xl font-bold text-slate-800">إدارة الخدمات</h1>
         <p className="text-sm text-muted-foreground mt-1">الرئيسية {'>'} الخدمات</p>
@@ -267,7 +267,7 @@ export default function ServicesPage() {
 
       {/* نافذة الإضافة */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="sm:max-w-[480px]">
+        <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle className="text-right">إضافة خدمة جديدة</DialogTitle>
             <DialogDescription className="text-right">أدخل تفاصيل الخدمة أدناه ليتم حفظها في النظام.</DialogDescription>

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -126,7 +126,7 @@ export default function MyAidPage() {
 
         {/* Search Card */}
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <form onSubmit={handleSearch} className="space-y-4" dir="rtl">
+          <form onSubmit={handleSearch} className="space-y-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-slate-700">
                 رقم الهوية
@@ -163,7 +163,7 @@ export default function MyAidPage() {
         {/* Result Card */}
         {result && (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-5 text-right" dir="rtl">
+            <div className="mb-5 text-right">
               <h2 className="text-base font-semibold text-slate-900">
                 نتيجة الفحص
               </h2>
@@ -172,7 +172,7 @@ export default function MyAidPage() {
               </p>
             </div>
 
-            <div dir="rtl">
+            <div>
               {result.found ? (
                 <div className="space-y-4">
                   <div className="flex flex-col gap-1.5">

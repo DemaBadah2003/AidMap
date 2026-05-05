@@ -34,7 +34,7 @@ export default function RootLayout({
   return (
     <html
       lang="ar"
-      dir="rtl" // التأكد من تفعيل الاتجاه العربي
+      dir="rtl"
       suppressHydrationWarning
       className="h-full w-full"
     >
@@ -51,7 +51,7 @@ export default function RootLayout({
                 <I18nProvider>
                   <TooltipsProvider>
                     <ModulesProvider>
-                      <div className="h-screen w-screen overflow-hidden">
+                      <div className="flex min-h-screen flex-col">
                         {/* استخدام Suspense لضمان تجربة مستخدم سلسة أثناء التحميل */}
                         <Suspense fallback={null}>{children}</Suspense>
                       </div>

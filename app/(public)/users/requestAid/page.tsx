@@ -1,8 +1,9 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-// تم حذف استيراد requireCitizen من هنا
+import { CheckCircle, AlertCircle, Loader2, Send } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 type FormErrors = {
   fullName?: string
@@ -11,19 +12,39 @@ type FormErrors = {
   aidType?: string
   familyCount?: string
   address?: string
-  notes?: string
 }
 
 const phoneRegex = /^(056|059)\d{7}$/
 const nationalIdRegex = /^\d{9}$/
 const repeatedDigitsRegex = /^(\d)\1+$/
 
+const AID_TYPES = [
+  { value: 'food', label: 'مساعدة غذائية' },
+  { value: 'medical', label: 'مساعدة طبية' },
+  { value: 'financial', label: 'مساعدة مالية' },
+  { value: 'shelter', label: 'مساعدة سكن' },
+]
+
+function FieldError({ msg }: { msg?: string }) {
+  if (!msg) return null
+  return (
+    <p className="mt-1 flex items-center gap-1 text-xs text-red-500">
+      <AlertCircle className="size-3 shrink-0" />
+      {msg}
+    </p>
+  )
+}
+
+function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <label className="mb-1.5 block text-sm font-semibold text-foreground">
+      {children}
+      {required && <span className="mr-0.5 text-red-500">*</span>}
+    </label>
+  )
+}
+
 export default function RequestAidPage() {
-  const router = useRouter()
-
-  // تم حذف الـ useEffect الذي كان يحتوي على requireCitizen(router)
-  // الآن يمكن لأي شخص الوصول للصفحة بمجرد تحميلها
-
   const [fullName, setFullName] = useState('')
   const [nationalId, setNationalId] = useState('')
   const [phone, setPhone] = useState('')
@@ -32,47 +53,37 @@ export default function RequestAidPage() {
   const [address, setAddress] = useState('')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
-  const [successMessage, setSuccessMessage] = useState('')
-  const [errorMessage, setErrorMessage] = useState('')
+  const [success, setSuccess] = useState(false)
+  const [serverError, setServerError] = useState('')
   const [errors, setErrors] = useState<FormErrors>({})
 
-  const validateField = (name: string, value: string) => {
-    switch (name) {
-      case 'fullName': return !value.trim() ? 'الاسم مطلوب' : ''
-      case 'nationalId':
-        if (!value) return 'رقم الهوية مطلوب'
-        if (!nationalIdRegex.test(value)) return 'يجب أن يتكون رقم الهوية من 9 أرقام'
-        if (repeatedDigitsRegex.test(value)) return 'رقم هوية غير صالح (أرقام مكررة)'
-        return ''
-      case 'phone':
-        if (!value) return 'رقم الجوال مطلوب'
-        if (!phoneRegex.test(value)) return 'يجب أن يبدأ بـ 056 أو 059'
-        return ''
-      case 'aidType': return !value ? 'يرجى اختيار نوع المساعدة' : ''
-      case 'familyCount':
-        const num = Number(value)
-        if (!value || num < 1 || num > 20) return 'العدد يجب أن يكون بين 1 و 20'
-        return ''
-      case 'address': return !value.trim() ? 'العنوان مطلوب' : ''
-      default: return ''
-    }
-  }
+  const validate = (): FormErrors => ({
+    fullName: !fullName.trim() ? 'الاسم مطلوب' : undefined,
+    nationalId: !nationalId
+      ? 'رقم الهوية مطلوب'
+      : !nationalIdRegex.test(nationalId)
+        ? 'يجب أن يتكون من 9 أرقام'
+        : repeatedDigitsRegex.test(nationalId)
+          ? 'رقم هوية غير صالح'
+          : undefined,
+    phone: !phone
+      ? 'رقم الجوال مطلوب'
+      : !phoneRegex.test(phone)
+        ? 'يجب أن يبدأ بـ 056 أو 059'
+        : undefined,
+    aidType: !aidType ? 'يرجى اختيار نوع المساعدة' : undefined,
+    familyCount: !familyCount || Number(familyCount) < 1 || Number(familyCount) > 20
+      ? 'العدد يجب أن يكون بين 1 و 20'
+      : undefined,
+    address: !address.trim() ? 'العنوان مطلوب' : undefined,
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSuccessMessage(''); setErrorMessage('')
-
-    const newErrors: FormErrors = {
-      fullName: validateField('fullName', fullName),
-      nationalId: validateField('nationalId', nationalId),
-      phone: validateField('phone', phone),
-      aidType: validateField('aidType', aidType),
-      familyCount: validateField('familyCount', familyCount),
-      address: validateField('address', address),
-    }
-
-    setErrors(newErrors)
-    if (Object.values(newErrors).some(Boolean)) return
+    setServerError('')
+    const errs = validate()
+    setErrors(errs)
+    if (Object.values(errs).some(Boolean)) return
 
     setLoading(true)
     try {
@@ -89,136 +100,181 @@ export default function RequestAidPage() {
           notes: notes.trim(),
         }),
       })
-
-      if (!res.ok) throw new Error('فشل في إرسال الطلب')
-      setSuccessMessage('تم إرسال طلبك بنجاح.')
-      setFullName(''); setNationalId(''); setPhone(''); setAidType('');
-      setFamilyCount(''); setAddress(''); setNotes(''); setErrors({});
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'حدث خطأ أثناء الإرسال')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setServerError(data?.message || 'فشل في إرسال الطلب، يرجى المحاولة مرة أخرى.')
+      } else {
+        setSuccess(true)
+        setFullName(''); setNationalId(''); setPhone(''); setAidType('')
+        setFamilyCount(''); setAddress(''); setNotes(''); setErrors({})
+      }
+    } catch {
+      setServerError('تعذر الاتصال بالخادم، يرجى المحاولة لاحقاً.')
     } finally {
       setLoading(false)
     }
   }
 
+  if (success) {
+    return (
+      <div className="flex min-h-[calc(100vh-80px)] items-center justify-center p-4">
+        <div className="w-full max-w-md text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+            <CheckCircle className="size-8 text-green-600" />
+          </div>
+          <h2 className="text-xl font-bold text-foreground">تم إرسال طلبك بنجاح!</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            سيتم مراجعة طلبك من قِبل الفريق المختص والتواصل معك قريباً.
+          </p>
+          <button
+            onClick={() => setSuccess(false)}
+            className="mt-6 text-sm font-semibold text-blue-600 hover:text-blue-700 underline underline-offset-2"
+          >
+            تقديم طلب آخر
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex min-h-[calc(100vh-80px)] items-center justify-center bg-slate-50 p-4" dir="rtl">
-      <div className="w-full max-w-2xl">
-        
-        <div className="mb-5 text-center">
-          <h1 className="text-2xl font-bold text-slate-800">طلب مساعدة إغاثية</h1>
-          <p className="mt-1 text-sm text-slate-500 font-normal">يرجى إدخال بياناتك بدقة لضمان وصول المساعدة في أسرع وقت ممكن</p>
+    <div className="min-h-[calc(100vh-80px)] bg-muted/30 px-4 py-10">
+      <div className="mx-auto w-full max-w-xl">
+
+        {/* Header */}
+        <div className="mb-8 text-center">
+          <h1 className="text-2xl font-bold text-foreground">طلب مساعدة إغاثية</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            يرجى إدخال بياناتك بدقة لضمان وصول المساعدة في أسرع وقت ممكن
+          </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/40 md:p-10">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-normal text-slate-600 mr-1">الاسم الكامل (رباعي)</label>
-              <input
-                type="text"
-                placeholder="مثال: محمد أحمد محمود علي"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
-              />
-              {errors.fullName && <span className="text-[10px] text-red-500 mr-1">{errors.fullName}</span>}
-            </div>
+        {/* Form card */}
+        <div className="rounded-2xl border bg-card p-6 shadow-sm sm:p-8">
+          <form onSubmit={handleSubmit} className="space-y-5">
 
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-normal text-slate-600 mr-1">رقم الهوية</label>
-              <input
-                type="text"
-                maxLength={9}
-                placeholder="9xxxxxxx"
-                value={nationalId}
-                onChange={(e) => setNationalId(e.target.value.replace(/\D/g, ''))}
-                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500"
-              />
-              {errors.nationalId && <span className="text-[10px] text-red-500 mr-1">{errors.nationalId}</span>}
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-normal text-slate-600 mr-1">رقم الجوال</label>
-              <input
-                type="text"
-                maxLength={10}
-                placeholder="05xxxxxxx"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500"
-              />
-              {errors.phone && <span className="text-[10px] text-red-500 mr-1">{errors.phone}</span>}
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-normal text-slate-600 mr-1">نوع المساعدة</label>
-              <select
-                value={aidType}
-                onChange={(e) => setAidType(e.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500 bg-white"
-              >
-                <option value="">اختر النوع...</option>
-                <option value="food">مساعدة غذائية</option>
-                <option value="medical">مساعدة طبية</option>
-                <option value="financial">مساعدة مالية</option>
-                <option value="shelter">مساعدة سكن</option>
-              </select>
-              {errors.aidType && <span className="text-[10px] text-red-500 mr-1">{errors.aidType}</span>}
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-normal text-slate-600 mr-1">عدد أفراد الأسرة</label>
-              <input
-                type="number"
-                placeholder="مثال: 5"
-                value={familyCount}
-                onChange={(e) => setFamilyCount(e.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500"
-              />
-              {errors.familyCount && <span className="text-[10px] text-red-500 mr-1">{errors.familyCount}</span>}
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-normal text-slate-600 mr-1">العنوان بالتفصيل</label>
-              <input
-                type="text"
-                placeholder="المدينة، الحي، الشارع"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500"
-              />
-              {errors.address && <span className="text-[10px] text-red-500 mr-1">{errors.address}</span>}
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-normal text-slate-600 mr-1">ملاحظات أو احتياجات خاصة</label>
-              <textarea
-                rows={2}
-                placeholder="أي معلومات إضافية تود ذكرها..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal outline-none focus:border-blue-500 resize-none"
-              />
-            </div>
-
-            {(successMessage || errorMessage) && (
-              <div className={`rounded-lg p-3 text-xs text-center ${successMessage ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-                {successMessage || errorMessage}
+            {serverError && (
+              <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+                <AlertCircle className="size-4 shrink-0" />
+                {serverError}
               </div>
             )}
 
-            <div className="flex justify-center pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="h-11 w-full max-w-[280px] rounded-xl bg-blue-600 text-[15px] font-normal text-white shadow-md transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-50"
-              >
-                {loading ? 'جارٍ الإرسال...' : 'إرسال طلب المساعدة'}
-              </button>
+            {/* Name */}
+            <div>
+              <Label required>الاسم الكامل (رباعي)</Label>
+              <Input
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+                placeholder="مثال: محمد أحمد محمود علي"
+                className={errors.fullName ? 'border-red-400' : ''}
+              />
+              <FieldError msg={errors.fullName} />
             </div>
+
+            {/* Two column row */}
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div>
+                <Label required>رقم الهوية</Label>
+                <Input
+                  inputMode="numeric"
+                  maxLength={9}
+                  value={nationalId}
+                  onChange={e => setNationalId(e.target.value.replace(/\D/g, ''))}
+                  placeholder="9 أرقام"
+                  className={errors.nationalId ? 'border-red-400' : ''}
+                />
+                <FieldError msg={errors.nationalId} />
+              </div>
+              <div>
+                <Label required>رقم الجوال</Label>
+                <Input
+                  inputMode="numeric"
+                  maxLength={10}
+                  value={phone}
+                  onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
+                  placeholder="05xxxxxxxx"
+                  className={errors.phone ? 'border-red-400' : ''}
+                />
+                <FieldError msg={errors.phone} />
+              </div>
+            </div>
+
+            {/* Aid type + family count */}
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div>
+                <Label required>نوع المساعدة</Label>
+                <select
+                  value={aidType}
+                  onChange={e => setAidType(e.target.value)}
+                  className={`h-10 w-full rounded-md border bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${errors.aidType ? 'border-red-400' : 'border-input'}`}
+                >
+                  <option value="">اختر النوع...</option>
+                  {AID_TYPES.map(t => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+                <FieldError msg={errors.aidType} />
+              </div>
+              <div>
+                <Label required>عدد أفراد الأسرة</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={familyCount}
+                  onChange={e => setFamilyCount(e.target.value)}
+                  placeholder="مثال: 5"
+                  className={errors.familyCount ? 'border-red-400' : ''}
+                />
+                <FieldError msg={errors.familyCount} />
+              </div>
+            </div>
+
+            {/* Address */}
+            <div>
+              <Label required>العنوان بالتفصيل</Label>
+              <Input
+                value={address}
+                onChange={e => setAddress(e.target.value)}
+                placeholder="المدينة، الحي، الشارع"
+                className={errors.address ? 'border-red-400' : ''}
+              />
+              <FieldError msg={errors.address} />
+            </div>
+
+            {/* Notes */}
+            <div>
+              <Label>ملاحظات أو احتياجات خاصة</Label>
+              <textarea
+                rows={3}
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="أي معلومات إضافية تود ذكرها..."
+                className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              />
+            </div>
+
+            {/* Submit */}
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full gap-2 bg-blue-600 text-white hover:bg-blue-700"
+            >
+              {loading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Send className="size-4" />
+              )}
+              {loading ? 'جارٍ الإرسال...' : 'إرسال طلب المساعدة'}
+            </Button>
+
           </form>
         </div>
+
+        <p className="mt-8 text-center text-xs text-muted-foreground">
+          نظام الإغاثة الموحد — AidMap {new Date().getFullYear()}
+        </p>
       </div>
     </div>
   )

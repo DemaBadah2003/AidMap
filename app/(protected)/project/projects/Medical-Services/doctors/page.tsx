@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -121,7 +121,7 @@ export default function DoctorsPage() {
   }
 
   return (
-    <div className="w-full px-4 py-8 sm:px-10 font-arabic" dir="rtl">
+    <div className="w-full px-4 py-8 sm:px-10 font-arabic">
       <div className="mb-8 text-right px-2">
         <h1 className="text-3xl font-extrabold text-slate-900">إدارة سجل الأطباء</h1>
         <p className="text-sm text-muted-foreground mt-1">إضافة وتعديل بيانات الأطباء والمنشآت والمواعيد</p>
@@ -146,7 +146,7 @@ export default function DoctorsPage() {
       </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="text-right sm:max-w-[500px] rounded-2xl font-arabic overflow-y-auto max-h-[90vh]">
+        <DialogContent className="text-right sm:max-w-[500px] rounded-2xl font-arabic overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-slate-900 flex items-center justify-center gap-2 border-b pb-4">
                إضافة طبيب جديد

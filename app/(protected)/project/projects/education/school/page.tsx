@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent } from '../../../../../../components/ui/card'
@@ -108,7 +108,7 @@ export default function SchoolsPage() {
   }
 
   return (
-    <div className="w-full px-4 py-6" dir="rtl">
+    <div className="w-full px-4 py-6">
       <div className="mb-6 text-right">
         <h1 className="text-2xl font-bold text-slate-900 font-arabic">إدارة المدارس</h1>
         <p className="text-sm text-slate-500 mt-1 font-normal font-arabic">الرئيسية &gt; جدول المدارس</p>
@@ -169,7 +169,7 @@ export default function SchoolsPage() {
       </Card>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="max-w-md font-arabic rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md font-arabic rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="text-right text-lg font-bold">إضافة مدرسة جديدة</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-4 py-4 text-right">
             

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
@@ -196,7 +196,7 @@ export default function AdminBeneficiaryPage() {
   }
 
   return (
-    <div className="w-full py-10" dir="rtl">
+    <div className="w-full py-10">
       <div className="mx-auto w-full max-w-[800px] px-4 sm:px-6 space-y-6">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-slate-900">إضافة مستفيد جديد</h1>

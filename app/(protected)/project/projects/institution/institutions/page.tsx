@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useMemo, useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -179,7 +179,7 @@ export default function InstitutionsPage() {
   }
 
   return (
-    <div className="w-full flex flex-col min-h-screen bg-slate-50/50 px-4 py-8" dir="rtl">
+    <div className="w-full flex flex-col min-h-screen bg-slate-50/50 px-4 py-8">
       <div className="mb-6 text-right">
           <h1 className="text-2xl font-bold text-slate-800">إدارة المؤسسات</h1>
           <p className="text-sm text-slate-500 font-normal mt-1">الرئيسية &gt; إدارة المؤسسات</p>
@@ -305,7 +305,7 @@ export default function InstitutionsPage() {
           </div>
 
           {/* Pagination Area - تم تعديلها لتطابق التصميم المطلوب */}
-          <div className="p-4 border-t flex items-center justify-between bg-slate-50/30 font-arabic" dir="rtl">
+          <div className="p-4 border-t flex items-center justify-between bg-slate-50/30 font-arabic">
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <span>عرض صفوف:</span>
               <select 
@@ -350,7 +350,7 @@ export default function InstitutionsPage() {
 
       {/* Add Modal */}
       <Dialog open={addOpen} onOpenChange={(val) => { setAddOpen(val); if(!val) setFieldErrors({}); }}>
-        <DialogContent className="max-w-md shadow-2xl border-none rounded-2xl font-arabic" dir="rtl">
+        <DialogContent className="max-w-md shadow-2xl border-none rounded-2xl font-arabic">
           <DialogHeader className="text-right">
             <DialogTitle className="text-lg font-bold">إضافة مؤسسة جديدة</DialogTitle>
           </DialogHeader>

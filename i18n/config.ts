@@ -16,4 +16,11 @@ export const I18N_LANGUAGES: Language[] = [
     direction: 'rtl',
     flag: '/media/flags/saudi-arabia.svg',
   },
+  {
+    code: 'en',
+    name: 'English',
+    shortName: 'EN',
+    direction: 'ltr',
+    flag: '/media/flags/united-states.svg',
+  },
 ];

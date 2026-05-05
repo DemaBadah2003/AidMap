@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -51,7 +51,7 @@ export default function AdvancedReliefSystem() {
   }
 
   return (
-    <div className="w-full px-4 py-8 sm:px-10 font-arabic" dir="rtl">
+    <div className="w-full px-4 py-8 sm:px-10 font-arabic">
       <div className="mb-8 text-center">
         <h1 className="text-3xl font-black text-blue-900 tracking-tight flex items-center justify-center gap-3">
            نظام الاستعلام المتطور - AidMap

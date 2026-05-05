@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent } from '../../../../../../components/ui/card'
@@ -89,7 +89,7 @@ export default function ServicesPage() {
   )
 
   return (
-    <div className="w-full px-4 py-6" dir="rtl">
+    <div className="w-full px-4 py-6">
       <div className="mb-6 text-right font-arabic">
         <h1 className="text-2xl font-bold text-slate-900 text-right">سجل الخدمات الطبية</h1>
       </div>
@@ -147,7 +147,7 @@ export default function ServicesPage() {
       </Card>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="max-w-md font-arabic rounded-2xl max-h-[90vh] overflow-visible shadow-2xl">
+        <DialogContent className="max-w-md font-arabic rounded-2xl max-h-[90vh] overflow-visible shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-right text-lg font-bold border-b pb-2">إضافة بيانات الخدمة</DialogTitle>
           </DialogHeader>

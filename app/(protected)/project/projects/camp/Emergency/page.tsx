@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useMemo, useState, useEffect } from 'react'
 import { Card, CardContent } from '../../../../../../components/ui/card'
@@ -122,7 +122,7 @@ export default function EmergencyPage() {
   const rangeEnd = Math.min(currentPage * itemsPerPage, filtered.length)
 
   return (
-    <div className="w-full px-4 py-8 sm:px-10" dir="rtl">
+    <div className="w-full px-4 py-8 sm:px-10">
       <div className="mb-8 text-right px-2">
         <h1 className="text-3xl font-extrabold text-slate-900">إدارة حالات الطوارئ</h1>
         <p className="text-sm text-muted-foreground mt-1 font-normal">الرئيسية {'>'} متابعة البلاغات والتعديل المباشر</p>
@@ -274,7 +274,7 @@ export default function EmergencyPage() {
 
       {/* مودال الإضافة */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="text-right sm:max-w-[450px] rounded-2xl">
+        <DialogContent className="text-right sm:max-w-[450px] rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-slate-900 text-center pb-2">إضافة بلاغ طوارئ جديد</DialogTitle>
           </DialogHeader>

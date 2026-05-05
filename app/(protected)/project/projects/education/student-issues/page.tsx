@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent } from '../../../../../../components/ui/card'
@@ -126,7 +126,7 @@ export default function EducationCasesPage() {
   }, [filtered, currentPage, itemsPerPage])
 
   return (
-    <div className="w-full px-4 py-6" dir="rtl">
+    <div className="w-full px-4 py-6">
       {/* العنوان على اليمين */}
       <div className="mb-6 flex items-center justify-start gap-2 font-arabic">
         <GraduationCap className="w-6 h-6 text-blue-600" />
@@ -221,7 +221,7 @@ export default function EducationCasesPage() {
 
       {/* النافذة المنبثقة للإضافة */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="max-w-md font-arabic rounded-2xl shadow-2xl border-none">
+        <DialogContent className="max-w-md font-arabic rounded-2xl shadow-2xl border-none">
           <DialogHeader>
             <DialogTitle className="text-right text-lg font-bold">إضافة قضية تعليمية جديدة</DialogTitle>
           </DialogHeader>

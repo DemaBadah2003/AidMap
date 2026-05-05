@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent } from '../../../../../../components/ui/card'
@@ -117,7 +117,7 @@ export default function TherapyCentersPage() {
   const rangeEnd = Math.min(currentPage * itemsPerPage, filtered.length)
 
   return (
-    <div className="w-full px-4 py-6" dir="rtl">
+    <div className="w-full px-4 py-6">
       <div className="mb-6 text-right">
         <h1 className="text-2xl font-bold text-slate-900">إدارة مراكز الدعم النفسي</h1>
         <p className="text-sm text-slate-500 mt-1 font-normal">الرئيسية &gt; مراكز الدعم</p>
@@ -201,7 +201,7 @@ export default function TherapyCentersPage() {
 
       {/* Add Modal */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="max-w-md shadow-2xl border-none rounded-2xl font-arabic overflow-y-auto max-h-[90vh]">
+        <DialogContent className="max-w-md shadow-2xl border-none rounded-2xl font-arabic overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="text-right text-lg font-bold text-purple-700">إضافة مركز دعم نفسي</DialogTitle>
           </DialogHeader>

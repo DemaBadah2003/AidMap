@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -93,7 +93,7 @@ export default function InstitutionServicesPage() {
   }
 
   return (
-    <div className="w-full min-h-screen px-6 py-8 bg-slate-50 text-right" dir="rtl">
+    <div className="w-full min-h-screen px-6 py-8 bg-slate-50 text-right">
       <div className="mb-6"><h1 className="text-2xl font-bold text-slate-800">إدارة خدمات المؤسسات</h1></div>
 
       <Card className="shadow-sm border-none bg-white">
@@ -225,7 +225,7 @@ export default function InstitutionServicesPage() {
 
       {/* Pop-up الإضافة */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle className="text-right font-sans">إضافة ربط جديد</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-4 text-right font-sans">
             <div>

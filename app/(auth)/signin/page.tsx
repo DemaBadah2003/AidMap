@@ -1,11 +1,10 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { RiErrorWarningFill } from '@remixicon/react';
-import { AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, LoaderCircle, MapPin } from 'lucide-react';
 import { signIn } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { Alert, AlertIcon, AlertTitle } from '@/components/ui/alert';
@@ -20,12 +19,8 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { LoaderCircleIcon } from 'lucide-react';
-import { Icons } from '@/components/common/icons';
-import { getSigninSchema, SigninSchemaType } from '../forms/signin-schema';
-
-// ✅ استيراد مساعد حفظ بيانات المستخدم
 import { saveCurrentUser } from '@/app/api/project/helpers/helpers';
+import { getSigninSchema, SigninSchemaType } from '../forms/signin-schema';
 
 export default function Page() {
   const router = useRouter();
@@ -56,18 +51,18 @@ export default function Page() {
 
       if (response?.error) {
         try {
-            const errorData = JSON.parse(response.error);
-            setError(errorData.message);
+          const errorData = JSON.parse(response.error);
+          setError(errorData.message);
         } catch {
-            setError('خطأ في البريد الإلكتروني أو كلمة المرور');
+          setError('بريد إلكتروني أو كلمة مرور غير صحيحة');
         }
       } else {
         const session = await fetch('/api/auth/session').then((r) => r.json());
 
-        let role: 'admin' | 'user' = 'user';
-        if (session?.user?.roleId === '8bec7f4f-e5a1-42d3-b001-8bbd5059fffd') {
-          role = 'admin';
-        }
+        const roleSlug = session?.user?.roleSlug ?? '';
+        const roleName = session?.user?.roleName ?? '';
+        const role: 'admin' | 'user' =
+          roleSlug === 'admin' || roleName?.toLowerCase() === 'admin' ? 'admin' : 'user';
 
         saveCurrentUser({
           id: session.user.id,
@@ -79,9 +74,7 @@ export default function Page() {
       }
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.',
+        err instanceof Error ? err.message : 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.',
       );
     } finally {
       setIsProcessing(false);
@@ -93,42 +86,18 @@ export default function Page() {
       <form
         onSubmit={form.handleSubmit(onSubmit)}
         className="block w-full space-y-5"
-        dir="rtl"
+       
       >
-        {/* العنوان باللون الأسود */}
-        <div className="space-y-1.5 pb-6">
-          <h1 className="text-3xl font-bold tracking-tight text-center text-black">
-            نظام الإغاثة
-          </h1>
-        </div>
-
-        <Alert size="sm" close={false}>
-          <AlertIcon>
-            <RiErrorWarningFill className="text-primary" />
-          </AlertIcon>
-          <AlertTitle className="text-accent-foreground text-right">
-            استخدم البريد <span className="text-mono font-semibold">demo@kt.com</span>{' '}
-            وكلمة المرور{' '}
-            <span className="text-mono font-semibold">demo123</span> للدخول التجريبي.
-          </AlertTitle>
-        </Alert>
-
-        <div className="flex flex-col gap-3.5">
-          <Button
-            variant="outline"
-            type="button"
-            onClick={() => signIn('google', { callbackUrl: '/' })}
-          >
-            <Icons.googleColorful className="ml-2 size-5! opacity-100!" /> تسجيل الدخول بواسطة Google
-          </Button>
-        </div>
-
-        <div className="relative py-1.5">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
+        {/* Logo + title */}
+        <div className="flex flex-col items-center gap-3 pb-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md">
+            <MapPin className="size-5" />
           </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">أو من خلال</span>
+          <div className="text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              تسجيل الدخول
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">نظام الإغاثة الموحد — AidMap</p>
           </div>
         </div>
 
@@ -148,7 +117,13 @@ export default function Page() {
             <FormItem className="text-right">
               <FormLabel>البريد الإلكتروني</FormLabel>
               <FormControl>
-                <Input placeholder="أدخل بريدك الإلكتروني" {...field} className="text-right" />
+                <Input
+                  placeholder="أدخل بريدك الإلكتروني"
+                  type="email"
+                  autoComplete="email"
+                  {...field}
+                  className="text-right"
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -160,11 +135,11 @@ export default function Page() {
           name="password"
           render={({ field }) => (
             <FormItem className="text-right">
-              <div className="flex justify-between items-center gap-2.5">
+              <div className="flex items-center justify-between gap-2.5">
                 <FormLabel>كلمة المرور</FormLabel>
                 <Link
                   href="/reset-password"
-                  className="text-sm font-semibold text-foreground hover:text-primary"
+                  className="text-sm font-semibold text-blue-600 hover:text-blue-700"
                 >
                   نسيت كلمة المرور؟
                 </Link>
@@ -173,6 +148,7 @@ export default function Page() {
                 <Input
                   placeholder="أدخل كلمة المرور"
                   type={passwordVisible ? 'text' : 'password'}
+                  autoComplete="current-password"
                   {...field}
                   className="text-right pl-10"
                 />
@@ -183,6 +159,7 @@ export default function Page() {
                   size="sm"
                   onClick={() => setPasswordVisible(!passwordVisible)}
                   className="absolute left-0 top-1/2 -translate-y-1/2 h-7 w-7 ms-1.5 bg-transparent!"
+                  aria-label={passwordVisible ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
                 >
                   {passwordVisible ? (
                     <EyeOff className="text-muted-foreground" />
@@ -196,42 +173,38 @@ export default function Page() {
           )}
         />
 
-        <div className="flex items-center space-x-2 space-x-reverse justify-start">
-          <FormField
-            control={form.control}
-            name="rememberMe"
-            render={({ field }) => (
-              <>
-                <Checkbox
-                  id="remember-me"
-                  checked={field.value}
-                  onCheckedChange={(checked) => field.onChange(!!checked)}
-                />
-                <label
-                  htmlFor="remember-me"
-                  className="text-sm leading-none text-muted-foreground mr-2"
-                >
-                  تذكرني على هذا الجهاز
-                </label>
-              </>
-            )}
-          />
-        </div>
+        <FormField
+          control={form.control}
+          name="rememberMe"
+          render={({ field }) => (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="remember-me"
+                checked={field.value}
+                onCheckedChange={(checked) => field.onChange(!!checked)}
+              />
+              <label
+                htmlFor="remember-me"
+                className="text-sm leading-none text-muted-foreground cursor-pointer"
+              >
+                تذكرني على هذا الجهاز
+              </label>
+            </div>
+          )}
+        />
 
-        <div className="flex flex-col gap-2.5">
-          <Button type="submit" disabled={isProcessing} className="w-full">
-            {isProcessing ? (
-              <LoaderCircleIcon className="ml-2 size-4 animate-spin" />
-            ) : null}
-            تسجيل الدخول
-          </Button>
-        </div>
+        <Button type="submit" disabled={isProcessing} className="w-full">
+          {isProcessing ? (
+            <LoaderCircle className="ml-2 size-4 animate-spin" />
+          ) : null}
+          {isProcessing ? 'جارٍ التحقق...' : 'تسجيل الدخول'}
+        </Button>
 
         <p className="text-sm text-muted-foreground text-center">
           ليس لديك حساب؟{' '}
           <Link
             href="/signup"
-            className="text-sm font-semibold text-foreground hover:text-primary"
+            className="font-semibold text-blue-600 hover:text-blue-700"
           >
             إنشاء حساب جديد
           </Link>

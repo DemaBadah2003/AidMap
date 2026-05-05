@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent } from '../../../../../../components/ui/card'
@@ -166,7 +166,7 @@ export default function ClinicsPage() {
   }
 
   return (
-    <div className="w-full px-2 py-3 sm:px-4 sm:py-5 lg:px-6" dir="rtl">
+    <div className="w-full px-2 py-3 sm:px-4 sm:py-5 lg:px-6">
       <div className="mb-6 text-right">
         <div className="text-xl font-semibold text-foreground lg:text-2xl font-sans">العيادات</div>
         <div className="text-sm text-muted-foreground">الرئيسية {'>'} <span className="text-foreground">إدارة العيادات</span></div>
@@ -309,7 +309,7 @@ export default function ClinicsPage() {
 
       {/* Add Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="text-right sm:max-w-[425px] rounded-2xl border-none shadow-2xl">
+        <DialogContent className="text-right sm:max-w-[425px] rounded-2xl border-none shadow-2xl">
           <DialogHeader><DialogTitle className="text-xl font-bold text-slate-800 text-right">إضافة عيادة جديدة</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-1.5">

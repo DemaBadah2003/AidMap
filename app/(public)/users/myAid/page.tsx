@@ -1,114 +1,210 @@
-'use client'
-import { useEffect, useState } from 'react'
+﻿'use client'
+import { useState } from 'react'
+import { Search, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react'
+
+type AidResult = {
+  found: boolean
+  beneficiaryName?: string
+  nationalId?: string
+  phone?: string
+  aidType?: string
+  numberOfFamily?: number
+  address?: string
+  notes?: string
+  status?: string
+  requestNumber?: string
+}
+
+function StatusBadge({ status }: { status: string }) {
+  switch (status) {
+    case 'done':
+      return (
+        <div className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-2.5 font-semibold text-green-700">
+          <CheckCircle className="size-4 shrink-0" />
+          <span>تمت الموافقة</span>
+        </div>
+      )
+    case 'canceled':
+      return (
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 font-semibold text-red-700">
+          <XCircle className="size-4 shrink-0" />
+          <span>مرفوض</span>
+        </div>
+      )
+    default:
+      return (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 font-semibold text-amber-700">
+          <Clock className="size-4 shrink-0" />
+          <span>قيد المراجعة</span>
+        </div>
+      )
+  }
+}
+
+const AID_TYPE_LABELS: Record<string, string> = {
+  food: 'مساعدة غذائية',
+  medical: 'مساعدة طبية',
+  financial: 'مساعدة مالية',
+  shelter: 'مساعدة سكن',
+}
 
 export default function MyAidPage() {
   const [nationalId, setNationalId] = useState('')
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<AidResult | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSearch = async (e: any) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-    // محاكاة جلب البيانات للتوضيح
-    setTimeout(() => {
-      setResult({ 
-        found: true, 
-        beneficiaryName: 'أحمد محمود علي', 
-        status: 'pending', // يمكن أن تكون 'approved' أو 'rejected'
-        address: 'غزة - الرمال - شارع الشهداء', 
-        notes: 'يرجى إحضار الهوية الأصلية عند الاستلام وتجنب الازدحام.' 
-      })
-      setLoading(false)
-    }, 500)
-  }
+    const trimmed = nationalId.trim()
 
-  // دالة لتحديد نص ولون الحالة
-  const getStatusDisplay = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return { text: 'قيد المراجعة', color: 'text-amber-600 bg-amber-50 border-amber-100' };
-      case 'approved':
-        return { text: 'تمت الموافقة', color: 'text-green-600 bg-green-50 border-green-100' };
-      default:
-        return { text: 'تحت الفحص', color: 'text-slate-600 bg-slate-50 border-slate-100' };
+    if (!trimmed) {
+      setError('يرجى إدخال رقم الهوية')
+      return
+    }
+    if (!/^\d{9}$/.test(trimmed)) {
+      setError('رقم الهوية يجب أن يتكون من 9 أرقام')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    setResult(null)
+
+    try {
+      const res = await fetch(`/api/project/users/myAid?nationalId=${encodeURIComponent(trimmed)}`)
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data?.message || 'حدث خطأ أثناء الاستعلام')
+        return
+      }
+
+      setResult(data)
+    } catch {
+      setError('تعذر الاتصال بالخادم. يرجى المحاولة مرة أخرى.')
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen w-full bg-slate-100 pb-32" dir="rtl">
-      <div className="mx-auto max-w-4xl px-4 py-12">
-        
-        <div className="mb-10 text-center">
-          <h1 className="text-3xl font-bold text-slate-900">مساعدتي</h1>
-          <p className="mt-2 text-slate-500">تأكد من حالة طلبك وتفاصيل المساعدة من خلال رقم الهوية</p>
+    <div className="min-h-screen w-full bg-slate-50 pb-20">
+      <div className="mx-auto max-w-2xl px-4 py-10">
+
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white">
+            <Search className="size-6" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900">مساعداتي</h1>
+          <p className="mt-1.5 text-sm text-slate-500">
+            أدخل رقم هويتك للاطلاع على حالة طلب المساعدة
+          </p>
         </div>
 
-        {/* كارد البحث */}
-        <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <form onSubmit={handleSearch} className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="flex-1 space-y-1.5">
-              <label className="text-sm font-bold text-slate-700 mr-1">رقم الهوية</label>
-              <input
-                type="text"
-                value={nationalId}
-                onChange={(e) => setNationalId(e.target.value)}
-                className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all"
-                placeholder="أدخل رقم الهوية هنا..."
-              />
-            </div>
-            <button className="h-12 rounded-xl bg-blue-600 px-10 font-bold text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700 active:scale-95">
-              {loading ? 'جارٍ الفحص...' : 'فحص الحالة'}
+        {/* Search card */}
+        <form
+          onSubmit={handleSearch}
+          className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+        >
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
+            رقم الهوية الوطنية
+          </label>
+          <div className="flex gap-3">
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={9}
+              value={nationalId}
+              onChange={(e) => {
+                setNationalId(e.target.value.replace(/\D/g, ''))
+                setError('')
+              }}
+              placeholder="9 أرقام"
+              className={`h-11 flex-1 rounded-xl border px-4 text-sm outline-none transition-all focus:ring-4 ${
+                error
+                  ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
+                  : 'border-slate-200 bg-slate-50 focus:border-blue-500 focus:bg-white focus:ring-blue-100'
+              }`}
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="h-11 rounded-xl bg-blue-600 px-6 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-60"
+            >
+              {loading ? 'جارٍ البحث...' : 'بحث'}
             </button>
-          </form>
-        </div>
+          </div>
+          {error && (
+            <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600">
+              <AlertCircle className="size-3.5 shrink-0" />
+              {error}
+            </p>
+          )}
+        </form>
 
-        {/* كارد النتائج المعدل */}
-        {result && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md md:p-10 animate-in fade-in zoom-in duration-300">
-            <h2 className="mb-8 text-xl font-bold text-slate-800 border-b border-slate-100 pb-4">تفاصيل النتيجة</h2>
-            
-            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-              
-              {/* حقل اسم المستفيد */}
-              <div className="space-y-2">
-                <span className="text-sm font-bold text-slate-400 mr-1">اسم المستفيد</span>
-                <div className="flex h-12 items-center rounded-xl border border-slate-100 bg-slate-50 px-4 font-bold text-slate-700">
-                  {result.beneficiaryName}
-                </div>
+        {/* Not found */}
+        {result && !result.found && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+              <AlertCircle className="size-6 text-slate-400" />
+            </div>
+            <p className="font-semibold text-slate-700">لا توجد نتائج</p>
+            <p className="mt-1 text-sm text-slate-400">
+              لم يتم العثور على طلب مرتبط بهذا الرقم
+            </p>
+          </div>
+        )}
+
+        {/* Found */}
+        {result?.found && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+            <div className="mb-5 flex items-center justify-between border-b border-slate-100 pb-4">
+              <h2 className="font-bold text-slate-800">تفاصيل الطلب</h2>
+              {result.requestNumber && (
+                <span className="rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs text-slate-500">
+                  #{result.requestNumber.slice(-8).toUpperCase()}
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="اسم المستفيد" value={result.beneficiaryName} />
+              <div className="space-y-1.5">
+                <span className="text-xs font-semibold text-slate-400">حالة الطلب</span>
+                <StatusBadge status={result.status ?? 'pending'} />
               </div>
-
-              {/* حقل حالة الطلب - بجانب الاسم */}
-              <div className="space-y-2">
-                <span className="text-sm font-bold text-slate-400 mr-1">حالة الطلب</span>
-                <div className={`flex h-12 items-center rounded-xl border px-4 font-bold ${getStatusDisplay(result.status).color}`}>
-                  {getStatusDisplay(result.status).text}
-                </div>
+              <Field label="نوع المساعدة" value={AID_TYPE_LABELS[result.aidType ?? ''] ?? result.aidType} />
+              <Field label="عدد أفراد الأسرة" value={result.numberOfFamily?.toString()} />
+              <div className="sm:col-span-2">
+                <Field label="العنوان" value={result.address} />
               </div>
-
-              {/* حقل العنوان - يأخذ العرض كاملاً */}
-              <div className="md:col-span-2 space-y-2">
-                <span className="text-sm font-bold text-slate-400 mr-1">العنوان بالتفصيل</span>
-                <div className="flex min-h-[48px] items-center rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 font-bold text-slate-700">
-                  {result.address}
+              {result.notes && (
+                <div className="sm:col-span-2">
+                  <span className="mb-1.5 block text-xs font-semibold text-slate-400">ملاحظات الإدارة</span>
+                  <div className="min-h-[80px] rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">
+                    {result.notes}
+                  </div>
                 </div>
-              </div>
-
-              {/* حقل الملاحظات - يأخذ العرض كاملاً */}
-              <div className="md:col-span-2 space-y-2">
-                <span className="text-sm font-bold text-slate-400 mr-1">ملاحظات إضافية من الإدارة</span>
-                <div className="min-h-[120px] rounded-xl border border-slate-100 bg-slate-50 p-4 font-bold text-slate-700 whitespace-pre-wrap leading-relaxed">
-                  {result.notes}
-                </div>
-              </div>
-
+              )}
             </div>
           </div>
         )}
 
-        {/* تذييل الصفحة للتأكد من وجود مساحة سفلية */}
-        <div className="mt-12 text-center text-slate-400 text-sm">
-          نظام الإغاثة الموحد - 2026
-        </div>
+        <p className="mt-10 text-center text-xs text-slate-400">
+          نظام الإغاثة الموحد — AidMap {new Date().getFullYear()}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="space-y-1.5">
+      <span className="text-xs font-semibold text-slate-400">{label}</span>
+      <div className="flex h-11 items-center rounded-xl border border-slate-100 bg-slate-50 px-4 text-sm font-medium text-slate-700">
+        {value || '—'}
       </div>
     </div>
   )

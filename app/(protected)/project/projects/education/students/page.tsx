@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent } from '../../../../../../components/ui/card'
@@ -115,7 +115,7 @@ export default function StudentsPage() {
   const rangeEnd = Math.min(currentPage * itemsPerPage, filtered.length)
 
   return (
-    <div className="w-full px-4 py-6" dir="rtl">
+    <div className="w-full px-4 py-6">
       {/* العنوان على اليمين تماماً */}
       <div className="mb-6 flex items-center justify-start gap-2">
         <GraduationCap className="w-8 h-8 text-blue-600" />
@@ -196,7 +196,7 @@ export default function StudentsPage() {
 
       {/* نافذة إضافة طالب */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="max-w-md shadow-2xl border-none rounded-2xl font-arabic overflow-y-auto max-h-[90vh]">
+        <DialogContent className="max-w-md shadow-2xl border-none rounded-2xl font-arabic overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="text-right text-lg font-bold text-blue-800 flex items-center gap-2">
               <User className="w-5 h-5" />

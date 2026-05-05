@@ -43,7 +43,7 @@ export async function sendEmail({
                   <!-- Header -->
                   <tr>
                     <td align="center" style="background-color: #ffffff; color: #333; padding: 20px; text-align: center;">
-                      <h1 style="margin: 0; font-size: 20px;">Shoplit</h1>
+                      <h1 style="margin: 0; font-size: 20px;">AidMap</h1>
                     </td>
                   </tr>
                   <!-- Content -->
@@ -63,8 +63,8 @@ export async function sendEmail({
                       }
                       ${description ? `<p style="margin: 20px 0; font-size: 16px;">${description}</p>` : ''}
                       <p style="margin: 10px 0; font-size: 16px;">
-                        Thank you,<br />
-                        Shoplit Team
+                        شكراً لك،<br />
+                        فريق AidMap
                       </p>
                     </td>
                   </tr>
@@ -94,10 +94,6 @@ export async function sendEmail({
     html: emailHtml,
   };
 
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log(`Email sent to ${to}`);
-  } catch (error) {
-    console.error(`Error sending email: ${error}`);
-  }
+  await transporter.sendMail(mailOptions);
+  console.log(`Email sent to ${to}`);
 }

@@ -1,229 +1,219 @@
-'use client'
+﻿'use client'
 
 import { useState, type ChangeEvent } from 'react'
-import { Card, CardContent } from '../../../../components/ui/card'
-import { Button } from '../../../../components/ui/button'
-import { Input } from '../../../../components/ui/input'
+import { CheckCircle, AlertCircle, Loader2, UserPlus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
-// ملاحظة: تم إزالة requireAdmin و useEffect لفتح الصفحة للجميع بدون استثناء
+type FormData = { name: string; phone: string; numberOfFamily: string; campId: string }
+type FormErrors = { name?: string; phone?: string; numberOfFamily?: string }
 
-type FormData = {
-  name: string
-  phone: string
-  numberOfFamily: string
-  campId: string
-}
-
-type FormErrors = {
-  name?: string
-  phone?: string
-  numberOfFamily?: string
-  campId?: string
-  general?: string
-}
-
-const arabicNameRegex = /^[\u0600-\u06FF\s]+$/
+const arabicNameRegex = /^[؀-ۿ\s]+$/
 const phoneRegex = /^(056|059)\d{7}$/
-const familyRegex = /^\d{1,2}$/
 
-const gazaCampOptions = [
-  'مخيم جباليا', 'مخيم الشاطئ', 'مخيم النصيرات', 'مخيم البريج',
-  'مخيم المغازي', 'مخيم دير البلح', 'مخيم خان يونس', 'مخيم رفح',
-  'مخيم الشابورة', 'مخيم البرازيل', 'الشيخ رضوان', 'تل الهوى',
-  'الرمال', 'الشجاعية', 'الزيتون', 'بيت لاهيا', 'بيت حانون',
-  'دير البلح', 'خان يونس', 'رفح',
+const CAMP_OPTIONS = [
+  'مخيم جباليا','مخيم الشاطئ','مخيم النصيرات','مخيم البريج','مخيم المغازي',
+  'مخيم دير البلح','مخيم خان يونس','مخيم رفح','مخيم الشابورة','مخيم البرازيل',
+  'الشيخ رضوان','تل الهوى','الرمال','الشجاعية','الزيتون',
+  'بيت لاهيا','بيت حانون','دير البلح','خان يونس','رفح',
 ]
 
-export default function AdminBeneficiaryPage() {
-  const [form, setForm] = useState<FormData>({
-    name: '',
-    phone: '',
-    numberOfFamily: '',
-    campId: '',
-  })
+function FieldError({ msg }: { msg?: string }) {
+  if (!msg) return null
+  return (
+    <p className="mt-1 flex items-center gap-1 text-xs text-red-500">
+      <AlertCircle className="size-3 shrink-0" />{msg}
+    </p>
+  )
+}
 
+function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <label className="mb-1.5 block text-sm font-semibold text-foreground">
+      {children}
+      {required && <span className="mr-0.5 text-red-500">*</span>}
+    </label>
+  )
+}
+
+export default function RegisterBeneficiaryPage() {
+  const [form, setForm] = useState<FormData>({ name: '', phone: '', numberOfFamily: '', campId: '' })
   const [errors, setErrors] = useState<FormErrors>({})
   const [loading, setLoading] = useState(false)
-  const [successMsg, setSuccessMsg] = useState('')
-  const [errorMsg, setErrorMsg] = useState('')
+  const [success, setSuccess] = useState(false)
+  const [serverError, setServerError] = useState('')
 
-  const validateField = (name: keyof FormData, value: string) => {
-    switch (name) {
-      case 'name':
-        if (!value || value.trim().length === 0) return 'الاسم مطلوب'
-        if (value !== value.trim()) return 'الاسم لا يجب أن يبدأ أو ينتهي بمسافة'
-        if (!arabicNameRegex.test(value)) return 'الاسم يجب أن يكون باللغة العربية فقط'
-        if (/\s{2,}/.test(value)) return 'لا يمكن وضع أكثر من مسافة بين الكلمات'
-        return ''
-
-      case 'phone':
-        if (!value) return 'رقم الهاتف مطلوب'
-        if (!/^\d+$/.test(value)) return 'رقم الهاتف يجب أن يحتوي على أرقام فقط'
-        if (!phoneRegex.test(value)) return 'رقم الهاتف يجب أن يبدأ بـ 056 أو 059 وبعده 7 أرقام'
-        return ''
-
-      case 'numberOfFamily':
-        if (!value) return 'عدد أفراد الأسرة مطلوب'
-        if (!/^\d+$/.test(value)) return 'يجب إدخال أرقام فقط'
-        if (!familyRegex.test(value)) return 'يجب أن يكون من رقم أو رقمين فقط'
-        return ''
-
-      default:
-        return ''
-    }
-  }
-
-  const validateForm = () => {
-    const newErrors: FormErrors = {
-      name: validateField('name', form.name),
-      phone: validateField('phone', form.phone),
-      numberOfFamily: validateField('numberOfFamily', form.numberOfFamily),
-      campId: '',
-    }
-    setErrors(newErrors)
-    return !Object.values(newErrors).some(Boolean)
-  }
+  const validate = (): FormErrors => ({
+    name: !form.name.trim()
+      ? 'الاسم مطلوب'
+      : !arabicNameRegex.test(form.name)
+        ? 'الاسم يجب أن يكون باللغة العربية فقط'
+        : /\s{2,}/.test(form.name)
+          ? 'لا يمكن وضع أكثر من مسافة بين الكلمات'
+          : undefined,
+    phone: !form.phone
+      ? 'رقم الهاتف مطلوب'
+      : !phoneRegex.test(form.phone)
+        ? 'يجب أن يبدأ بـ 056 أو 059'
+        : undefined,
+    numberOfFamily: !form.numberOfFamily
+      ? 'عدد أفراد الأسرة مطلوب'
+      : Number(form.numberOfFamily) < 1 || Number(form.numberOfFamily) > 99
+        ? 'يجب أن يكون بين 1 و 99'
+        : undefined,
+  })
 
   const onChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
-    let nextValue = value
-
-    if (name === 'phone' || name === 'numberOfFamily') {
-      nextValue = value.replace(/\D/g, '')
-    }
-
-    setForm((prev) => ({ ...prev, [name]: nextValue }))
-    setErrors((prev) => ({
-      ...prev,
-      [name]: validateField(name as keyof FormData, nextValue),
-      general: '',
-    }))
-    setErrorMsg('')
-    setSuccessMsg('')
+    const next = (name === 'phone' || name === 'numberOfFamily') ? value.replace(/\D/g, '') : value
+    setForm(prev => ({ ...prev, [name]: next }))
+    setServerError('')
   }
 
-  const onSubmit = async () => {
-    if (!validateForm()) return;
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setServerError('')
+    const errs = validate()
+    setErrors(errs)
+    if (Object.values(errs).some(Boolean)) return
 
     setLoading(true)
-    setSuccessMsg('')
-    setErrorMsg('')
-
     try {
       const res = await fetch('/api/project/admins/adminBeneficiary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: form.name,
+          name: form.name.trim(),
           phone: form.phone,
           numberOfFamily: Number(form.numberOfFamily),
           campId: form.campId || null,
           role: 'CITIZEN',
         }),
       })
-
-      const data = await res.json().catch(() => ({ message: 'خطأ في معالجة البيانات' }))
-
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        throw new Error(data?.message || 'فشل في إضافة المستفيد')
+        setServerError(data?.message || 'فشل في تسجيل البيانات')
+      } else {
+        setSuccess(true)
+        setForm({ name: '', phone: '', numberOfFamily: '', campId: '' })
+        setErrors({})
       }
-
-      setSuccessMsg('تمت إضافة المستفيد بنجاح')
-      setForm({ name: '', phone: '', numberOfFamily: '', campId: '' })
-      setErrors({})
-    } catch (error: any) {
-      setErrorMsg(error.message || 'حدث خطأ غير متوقع')
+    } catch {
+      setServerError('تعذر الاتصال بالخادم، يرجى المحاولة لاحقاً.')
     } finally {
       setLoading(false)
     }
   }
 
+  if (success) {
+    return (
+      <div className="flex min-h-[calc(100vh-80px)] items-center justify-center p-4">
+        <div className="w-full max-w-md text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+            <CheckCircle className="size-8 text-green-600" />
+          </div>
+          <h2 className="text-xl font-bold text-foreground">تم التسجيل بنجاح!</h2>
+          <p className="mt-2 text-sm text-muted-foreground">تمت إضافة بيانات المستفيد إلى النظام.</p>
+          <button
+            onClick={() => setSuccess(false)}
+            className="mt-6 text-sm font-semibold text-blue-600 hover:text-blue-700 underline underline-offset-2"
+          >
+            تسجيل مستفيد آخر
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    // التعديل لضمان السكرول: py-10 مع min-h-screen و overflow-y-auto
-    <div className="w-full min-h-screen bg-slate-50 py-10 overflow-y-auto" dir="rtl">
-      <div className="mx-auto w-full max-w-[800px] px-4 sm:px-6 space-y-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-slate-900">تسجيل مستفيد جديد</h1>
-          <p className="text-sm text-slate-500 font-normal">نموذج متاح للجميع - يرجى تعبئة البيانات بدقة</p>
+    <div className="min-h-[calc(100vh-80px)] bg-muted/30 px-4 py-10">
+      <div className="mx-auto w-full max-w-xl">
+
+        <div className="mb-8 text-center">
+          <h1 className="text-2xl font-bold text-foreground">تسجيل مستفيد جديد</h1>
+          <p className="mt-2 text-sm text-muted-foreground">يرجى تعبئة البيانات بدقة لضمان وصول المساعدة</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <Card className="border-0 shadow-none bg-transparent">
-            <CardContent className="p-6 md:p-10">
-              <div className="mx-auto w-full max-w-[700px] space-y-5">
-                
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-700 mr-1">الاسم الكامل</label>
-                  <Input 
-                    name="name" 
-                    value={form.name} 
-                    onChange={onChange} 
-                    placeholder="مثال: علي أحمد" 
-                    className="text-right h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-100" 
-                  />
-                  {errors.name && <div className="text-xs text-red-600 mr-1">{errors.name}</div>}
-                </div>
+        <div className="rounded-2xl border bg-card p-6 shadow-sm sm:p-8">
+          <form onSubmit={onSubmit} className="space-y-5">
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-700 mr-1">رقم الهاتف</label>
-                  <Input 
-                    name="phone" 
-                    value={form.phone} 
-                    onChange={onChange} 
-                    placeholder="059XXXXXXX" 
-                    maxLength={10} 
-                    className="text-right h-11 border-slate-200 focus:border-blue-500" 
-                  />
-                  {errors.phone && <div className="text-xs text-red-600 mr-1">{errors.phone}</div>}
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-700 mr-1">عدد أفراد الأسرة</label>
-                  <Input 
-                    name="numberOfFamily" 
-                    value={form.numberOfFamily} 
-                    onChange={onChange} 
-                    placeholder="مثال: 5" 
-                    maxLength={2} 
-                    className="text-right h-11 border-slate-200 focus:border-blue-500" 
-                  />
-                  {errors.numberOfFamily && <div className="text-xs text-red-600 mr-1">{errors.numberOfFamily}</div>}
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-700 mr-1">المخيم / المنطقة</label>
-                  <select 
-                    name="campId" 
-                    value={form.campId} 
-                    onChange={onChange} 
-                    className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-right text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all cursor-pointer"
-                  >
-                    <option value="">اختر المخيم أو المنطقة (اختياري)</option>
-                    {gazaCampOptions.map((camp) => <option key={camp} value={camp}>{camp}</option>)}
-                  </select>
-                </div>
-
-                {(successMsg || errorMsg) && (
-                  <div className={`p-4 rounded-lg text-sm text-center border ${
-                    successMsg ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'
-                  }`}>
-                    {successMsg || errorMsg}
-                  </div>
-                )}
-
-                <div className="flex justify-center pt-4">
-                  <Button 
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-10 h-11 rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50" 
-                    onClick={onSubmit} 
-                    disabled={loading}
-                  >
-                    {loading ? 'جاري الإضافة...' : 'تسجيل البيانات الآن'}
-                  </Button>
-                </div>
+            {serverError && (
+              <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+                <AlertCircle className="size-4 shrink-0" />{serverError}
               </div>
-            </CardContent>
-          </Card>
+            )}
+
+            <div>
+              <Label required>الاسم الكامل</Label>
+              <Input
+                name="name"
+                value={form.name}
+                onChange={onChange}
+                placeholder="مثال: علي أحمد محمود"
+                className={errors.name ? 'border-red-400' : ''}
+              />
+              <FieldError msg={errors.name} />
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div>
+                <Label required>رقم الهاتف</Label>
+                <Input
+                  name="phone"
+                  inputMode="numeric"
+                  maxLength={10}
+                  value={form.phone}
+                  onChange={onChange}
+                  placeholder="059XXXXXXXX"
+                  className={errors.phone ? 'border-red-400' : ''}
+                />
+                <FieldError msg={errors.phone} />
+              </div>
+              <div>
+                <Label required>عدد أفراد الأسرة</Label>
+                <Input
+                  name="numberOfFamily"
+                  inputMode="numeric"
+                  maxLength={2}
+                  value={form.numberOfFamily}
+                  onChange={onChange}
+                  placeholder="مثال: 5"
+                  className={errors.numberOfFamily ? 'border-red-400' : ''}
+                />
+                <FieldError msg={errors.numberOfFamily} />
+              </div>
+            </div>
+
+            <div>
+              <Label>المخيم / المنطقة <span className="text-xs font-normal text-muted-foreground">(اختياري)</span></Label>
+              <select
+                name="campId"
+                value={form.campId}
+                onChange={onChange}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              >
+                <option value="">اختر المخيم أو المنطقة</option>
+                {CAMP_OPTIONS.map(camp => (
+                  <option key={camp} value={camp}>{camp}</option>
+                ))}
+              </select>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full gap-2 bg-blue-600 text-white hover:bg-blue-700"
+            >
+              {loading ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
+              {loading ? 'جارٍ التسجيل...' : 'تسجيل البيانات'}
+            </Button>
+
+          </form>
         </div>
+
+        <p className="mt-8 text-center text-xs text-muted-foreground">
+          نظام الإغاثة الموحد — AidMap {new Date().getFullYear()}
+        </p>
       </div>
     </div>
   )
