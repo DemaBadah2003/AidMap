@@ -1,20 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, Prisma } from '@prisma/client'
-// تم إيقاف استيراد requireAdminApi لفتح الصلاحيات للجميع
-
-const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient
-}
-
-const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ['error'],
-  })
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
+import { Prisma } from '@prisma/client'
+import prisma from '@/lib/prisma'
+import { requireStaffApi } from '@/lib/api/auth'
 
 type CreateBeneficiaryBody = {
   name?: unknown
@@ -61,9 +48,12 @@ function parseOptionalText(
   return normalized
 }
 
-// جلب المستفيدين (مفتوح للجميع حالياً)
+// جلب المستفيدين — فريق العمليات فقط
 export async function GET(req: NextRequest) {
   try {
+    const unauthorized = await requireStaffApi(req)
+    if (unauthorized) return unauthorized
+
     const { searchParams } = new URL(req.url)
     const campId = searchParams.get('campId')
 
@@ -105,14 +95,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// إضافة مستفيد جديد (تم إزالة قيود الأدمن)
+// تسجيل مستفيد — متاح بدون تسجيل دخول (نموذج المواطن العام)
 export async function POST(req: NextRequest) {
   try {
-    /* تم إزالة فحص الصلاحيات هنا:
-       const unauthorized = await requireAdminApi(req)
-       if (unauthorized) return unauthorized
-    */
-
     const body = (await req.json()) as CreateBeneficiaryBody
     const { name, phone, numberOfFamily, campId } = body
 

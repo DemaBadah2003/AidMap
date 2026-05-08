@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import prisma from '@/lib/prisma'
+import { requireStaffApi } from '@/lib/api/auth'
 
 type UiFillStatus = 'ممتلئ' | 'غير ممتلئ'
 type DbFillStatus = 'FULL' | 'NOT_FULL'
@@ -476,15 +477,12 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const unauthorized = await requireStaffApi(req)
+  if (unauthorized) return unauthorized
+
   const id = req.nextUrl.searchParams.get('id')
-  const all = req.nextUrl.searchParams.get('all')
 
   try {
-    if (all === 'true') {
-      await prisma.shelter.deleteMany({})
-      return NextResponse.json({ ok: true })
-    }
-
     if (!id) {
       return NextResponse.json({ message: 'معرّف مركز الإيواء مفقود' }, { status: 400 })
     }

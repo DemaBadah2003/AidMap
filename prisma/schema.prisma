@@ -225,6 +225,7 @@ model Doctor {
   name        String
   phone       String
   specialty   String
+  schedule    String? @db.Text
   description String? @db.Text
 
   hospitalId   String
@@ -337,6 +338,7 @@ model Aid {
   dateReceived  DateTime
   donor         String?
   status        String
+  notes         String?        @db.Text
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   distributions Distribution[]
@@ -489,8 +491,9 @@ model EnterpriseProduct {
 
 model VerificationToken {
   identifier String
-  token      String   @unique
+  token      String                   @unique
   expires    DateTime
+  purpose    VerificationTokenPurpose @default(EMAIL_VERIFY)
 
   @@unique([identifier, token])
 }
@@ -551,20 +554,30 @@ model DistributeAidForm {
 }
 
 model RequestAid {
-  id          String             @id @default(uuid())
-  fullName    String
-  nationalId  String
-  phone       String
-  aidType     String
-  familyCount Int
-  address     String
-  notes       String?
-  status      DistributionStatus @default(PENDING)
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  id            String             @id @default(uuid())
+  referenceCode String?            @unique
+  fullName      String
+  nationalId    String
+  phone         String
+  aidType       String
+  familyCount   Int
+  address       String
+  notes         String?
+  adminNotes    String?            @db.Text
+  status        DistributionStatus @default(PENDING)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([nationalId])
+  @@index([phone])
 }
 
 // --- Enums ---
+
+enum VerificationTokenPurpose {
+  EMAIL_VERIFY
+  PASSWORD_RESET
+}
 
 enum UserStatus {
   INACTIVE

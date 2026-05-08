@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { motion, MotionProps, useInView, UseInViewOptions, Variants } from 'motion/react';
+import { motion, MotionProps, useInView, UseInViewOptions, Variants } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 type AnimationVariant =

@@ -12,7 +12,7 @@ import {
   Plus, Search, Pencil, Save, X, Package, Loader2, ChevronDown, User,
 } from 'lucide-react'
 
-type DistributionStatus = 'PENDING' | 'COMPLETED' | 'CANCELLED'
+type DistributionStatus = 'PENDING' | 'DONE' | 'CANCELED'
 
 interface DistributionItem {
   id: string
@@ -34,8 +34,8 @@ export default function DistributionsPage() {
 
   const statusLabels = useMemo((): Record<DistributionStatus, string> => ({
     PENDING: t('common.labels.status'),
-    COMPLETED: t('common.labels.active'),
-    CANCELLED: t('common.labels.inactive'),
+    DONE: t('common.labels.active'),
+    CANCELED: t('common.labels.inactive'),
   }), [t])
 
   const [items, setItems] = useState<DistributionItem[]>([])
@@ -236,7 +236,7 @@ export default function DistributionsPage() {
                           {(Object.keys(statusLabels) as DistributionStatus[]).map(v => <option key={v} value={v}>{statusLabels[v]}</option>)}
                         </select>
                       ) : (
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${row.status === 'COMPLETED' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : row.status === 'CANCELLED' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'}`}>
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${row.status === 'DONE' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : row.status === 'CANCELED' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'}`}>
                           {statusLabels[row.status]}
                         </span>
                       )}

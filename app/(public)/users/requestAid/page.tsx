@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { CheckCircle, AlertCircle, Loader2, Send } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -54,6 +55,7 @@ export default function RequestAidPage() {
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [referenceCode, setReferenceCode] = useState<string | null>(null)
   const [serverError, setServerError] = useState('')
   const [errors, setErrors] = useState<FormErrors>({})
 
@@ -104,6 +106,12 @@ export default function RequestAidPage() {
         const data = await res.json().catch(() => ({}))
         setServerError(data?.message || 'فشل في إرسال الطلب، يرجى المحاولة مرة أخرى.')
       } else {
+        const data = await res.json().catch(() => ({}))
+        const code =
+          typeof data?.data?.referenceCode === 'string'
+            ? data.data.referenceCode
+            : null
+        setReferenceCode(code)
         setSuccess(true)
         setFullName(''); setNationalId(''); setPhone(''); setAidType('')
         setFamilyCount(''); setAddress(''); setNotes(''); setErrors({})
@@ -123,15 +131,32 @@ export default function RequestAidPage() {
             <CheckCircle className="size-8 text-green-600" />
           </div>
           <h2 className="text-xl font-bold text-foreground">تم إرسال طلبك بنجاح!</h2>
+          {referenceCode ? (
+            <p className="mt-4 rounded-xl bg-muted px-4 py-3 font-mono text-lg font-semibold tracking-wide text-foreground">
+              رقم الطلب: {referenceCode}
+            </p>
+          ) : null}
           <p className="mt-2 text-sm text-muted-foreground">
-            سيتم مراجعة طلبك من قِبل الفريق المختص والتواصل معك قريباً.
+            سيتم مراجعة طلبك من قِبل الفريق المختص والتواصل معك قريباً. احتفظ برقم الطلب لتتبع الحالة من صفحة &quot;مساعداتي&quot;.
           </p>
-          <button
-            onClick={() => setSuccess(false)}
-            className="mt-6 text-sm font-semibold text-blue-600 hover:text-blue-700 underline underline-offset-2"
-          >
-            تقديم طلب آخر
-          </button>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Link
+              href="/users/myAid"
+              className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              تتبع الطلب — مساعداتي
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setSuccess(false)
+                setReferenceCode(null)
+              }}
+              className="rounded-xl border px-4 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-50"
+            >
+              تقديم طلب آخر
+            </button>
+          </div>
         </div>
       </div>
     )

@@ -1,74 +1,70 @@
-// pages/api/auth/signup.ts
+import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
 import prisma from '@/lib/prisma';
-// import { verifyRecaptchaToken } from '@/lib/recaptcha';
 import { sendEmail } from '@/services/send-email';
 import {
   getSignupSchema,
   SignupSchemaType,
 } from '@/app/(auth)/forms/signup-schema';
-import { User, UserStatus } from '@/app/models/user';
+import { UserStatus, VerificationTokenPurpose } from '@prisma/client';
 
-// Helper function to generate a verification token and send the email.
-async function sendVerificationEmail(user: User) {
-  // Create a new verification token.
-  const token = await prisma.verificationToken.create({
-    data: {
-      identifier: user.id,
-      token: bcrypt.hashSync(user.id, 10),
-      expires: new Date(Date.now() + 1 * 60 * 60 * 1000), // 1 hour from now
-    },
-  });
+const VERIFY_TTL_MS = 60 * 60 * 1000;
 
-  // Construct the verification URL.
-  const verificationUrl = `${process.env.NEXTAUTH_URL}/verify-email?token=${token.token}`;
+async function sendVerificationEmail(
+  userId: string,
+  email: string,
+  name: string | null | undefined,
+  rawToken: string,
+) {
+  const base = process.env.NEXTAUTH_URL || '';
+  const verificationUrl = `${base}/verify-email?token=${encodeURIComponent(rawToken)}`;
 
-  // Send the verification email.
   await sendEmail({
-    to: user.email,
-    subject: 'Account Activation',
+    to: email,
+    subject: 'تفعيل الحساب — AidMap',
     content: {
-      title: `Hello, ${user.name}`,
+      title: `مرحبًا، ${name || 'مستخدم'}`,
       subtitle:
-        'Click the below link to verify your email address and activate your account.',
-      buttonLabel: 'Activate account',
+        'اضغط على الزر أدناه لتفعيل بريدك الإلكتروني وتفعيل الحساب.',
+      buttonLabel: 'تفعيل الحساب',
       buttonUrl: verificationUrl,
       description:
-        'This link is valid for 1 hour. If you did not request this email you can safely ignore it.',
+        'الرابط صالح لمدة ساعة. إن لم تطلب هذا الرسالة يمكن تجاهله.',
     },
   });
 }
 
+async function createVerificationTokenRow(
+  userId: string,
+  purpose: VerificationTokenPurpose,
+) {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const expires = new Date(Date.now() + VERIFY_TTL_MS);
+  await prisma.verificationToken.deleteMany({
+    where: { identifier: userId, purpose },
+  });
+  await prisma.verificationToken.create({
+    data: {
+      identifier: userId,
+      token: rawToken,
+      expires,
+      purpose,
+    },
+  });
+  return rawToken;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    // const recaptchaToken = req.headers.get('x-recaptcha-token');
-
-    // if (!recaptchaToken) {
-    //   return NextResponse.json(
-    //     { message: 'reCAPTCHA verification required' },
-    //     { status: 400 },
-    //   );
-    // }
-
-    // const isValidToken = await verifyRecaptchaToken(recaptchaToken);
-
-    // if (!isValidToken) {
-    //   return NextResponse.json(
-    //     { message: 'reCAPTCHA verification failed' },
-    //     { status: 400 },
-    //   );
-    // }
-
-    // Parse the request body as JSON.
     const body = await req.json();
-
-    // Validate the data using safeParse.
     const result = getSignupSchema().safeParse(body);
     if (!result.success) {
+      const fieldErrors = result.error.flatten().fieldErrors;
       return NextResponse.json(
         {
-          message: 'Invalid input. Please check your data and try again.',
+          message: 'البيانات غير صالحة.',
+          fieldErrors,
         },
         { status: 400 },
       );
@@ -76,7 +72,6 @@ export async function POST(req: NextRequest) {
 
     const { email, password, name }: SignupSchemaType = result.data;
 
-    // Check if a user with the given email already exists.
     const existingUser = await prisma.user.findUnique({
       where: { email },
       include: { role: true },
@@ -84,22 +79,25 @@ export async function POST(req: NextRequest) {
 
     if (existingUser) {
       if (existingUser.status === UserStatus.INACTIVE) {
-        // Resend verification email for inactive user.
-        await prisma.verificationToken.deleteMany({
-          where: { identifier: existingUser.id },
-        });
-        await sendVerificationEmail(existingUser);
+        const raw = await createVerificationTokenRow(
+          existingUser.id,
+          VerificationTokenPurpose.EMAIL_VERIFY,
+        );
+        await sendVerificationEmail(
+          existingUser.id,
+          existingUser.email,
+          existingUser.name,
+          raw,
+        );
         return NextResponse.json(
-          { message: 'Verification email resent. Please check your email.' },
+          { message: 'تمت إعادة إرسال رسالة التفعيل. تحقق من بريدك.' },
           { status: 200 },
         );
-      } else {
-        // User exists and is active.
-        return NextResponse.json(
-          { message: 'Email is already registered.' },
-          { status: 409 },
-        );
       }
+      return NextResponse.json(
+        { message: 'البريد الإلكتروني مسجّل بالفعل.' },
+        { status: 409 },
+      );
     }
 
     const defaultRole = await prisma.userRole.findFirst({
@@ -107,39 +105,101 @@ export async function POST(req: NextRequest) {
     });
 
     if (!defaultRole) {
-      throw new Error('Default role not found. Unable to create a new user.');
+      return NextResponse.json(
+        { message: 'إعداد الخادم ناقص: لا يوجد دور افتراضي للمستخدم.' },
+        { status: 500 },
+      );
     }
-    console.log('Default role found:', defaultRole.name);
 
-    // Hash the password.
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create a new user with INACTIVE status.
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name,
-        status: UserStatus.INACTIVE,
-        roleId: defaultRole.id,
-      },
-      include: { role: true },
-    });
+    let userId: string;
+    let emailAddr: string;
+    let dispName: string | null;
 
-    // Send the verification email.
-    await sendVerificationEmail(user);
+    try {
+      const created = await prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            email,
+            password: hashedPassword,
+            name,
+            status: UserStatus.INACTIVE,
+            roleId: defaultRole.id,
+          },
+          include: { role: true },
+        });
+        await tx.verificationToken.deleteMany({
+          where: {
+            identifier: user.id,
+            purpose: VerificationTokenPurpose.EMAIL_VERIFY,
+          },
+        });
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        await tx.verificationToken.create({
+          data: {
+            identifier: user.id,
+            token: rawToken,
+            expires: new Date(Date.now() + VERIFY_TTL_MS),
+            purpose: VerificationTokenPurpose.EMAIL_VERIFY,
+          },
+        });
+        return { userId: user.id, emailAddr: user.email, dispName: user.name };
+      });
+
+      ({ userId } = created);
+      ({ emailAddr } = created);
+      ({ dispName } = created);
+    } catch (e) {
+      console.error('Signup transaction:', e);
+      return NextResponse.json(
+        { message: 'فشل إنشاء الحساب.' },
+        { status: 500 },
+      );
+    }
+
+    try {
+      const tokenRow = await prisma.verificationToken.findFirst({
+        where: {
+          identifier: userId,
+          purpose: VerificationTokenPurpose.EMAIL_VERIFY,
+        },
+        select: { token: true },
+      });
+      if (tokenRow) {
+        await sendVerificationEmail(
+          userId,
+          emailAddr,
+          dispName,
+          tokenRow.token,
+        );
+      }
+    } catch (mailErr) {
+      console.error('Signup email:', mailErr);
+      await prisma.verificationToken.deleteMany({
+        where: {
+          identifier: userId,
+          purpose: VerificationTokenPurpose.EMAIL_VERIFY,
+        },
+      });
+      await prisma.user.delete({ where: { id: userId } }).catch(() => {});
+      return NextResponse.json(
+        { message: 'تعذر إرسال بريد التفعيل. أعد المحاولة لاحقًا.' },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json(
       {
         message:
-          'Registration successful. Check your email to verify your account.',
+          'تم التسجيل. تحقق من بريدك لتفعيل الحساب.',
       },
       { status: 200 },
     );
   } catch (error) {
-    console.error('Error during user registration:', error);
+    console.error('Signup:', error);
     return NextResponse.json(
-      { message: 'Registration failed. Please try again later.' },
+      { message: 'حدث خطأ أثناء التسجيل.' },
       { status: 500 },
     );
   }

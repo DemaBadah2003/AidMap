@@ -1,24 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, DistributeAidFormStatus } from '@prisma/client'
-import { requireAdminApi } from '@/app/api/project/helpers/api-guards'
-
-const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient
-}
-
-const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ['error'],
-  })
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
+import { DistributeAidFormStatus } from '@prisma/client'
+import prisma from '@/lib/prisma'
+import { requireStaffApi } from '@/lib/api/auth'
 
 export async function GET(req: NextRequest) {
   try {
-    const unauthorized = await requireAdminApi(req)
+    const unauthorized = await requireStaffApi(req)
     if (unauthorized) return unauthorized
 
     const data = await prisma.distributeAidForm.findMany({
@@ -49,7 +36,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const unauthorized = await requireAdminApi(req)
+    const unauthorized = await requireStaffApi(req)
     if (unauthorized) return unauthorized
 
     const body = await req.json()

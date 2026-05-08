@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { AnimatePresence, Easing, motion, useMotionValue, useSpring, useTransform } from 'motion/react';
+import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 type AnimationVariantType = 'spring' | 'tween' | 'inertia' | 'decay' | 'keyframes';
@@ -130,7 +130,7 @@ export function AvatarGroupItem({
         scale: 0.6,
         transition: {
           duration: 0.2,
-          ease: 'easeInOut' as Easing,
+          ease: 'easeInOut',
         },
       },
     },
@@ -150,14 +150,14 @@ export function AvatarGroupItem({
         rotateX: -90,
         transition: {
           duration: 0.3,
-          ease: 'easeInOut' as Easing,
+          ease: 'easeInOut',
         },
       },
     },
     reveal: {
       initial: { opacity: 0, scale: 0.95 },
-      animate: { opacity: 1, scale: 1, transition: { duration: 0.15, ease: 'easeOut' as Easing } },
-      exit: { opacity: 0, scale: 0.95, transition: { duration: 0.1, ease: 'easeIn' as Easing } },
+      animate: { opacity: 1, scale: 1, transition: { duration: 0.15, ease: 'easeOut' } },
+      exit: { opacity: 0, scale: 0.95, transition: { duration: 0.1, ease: 'easeIn' } },
     },
   };
 
@@ -169,7 +169,7 @@ export function AvatarGroupItem({
       onMouseEnter={() => setHoveredIndex(true)}
       onMouseLeave={() => setHoveredIndex(false)}
     >
-      <AnimatePresence mode="wait">
+      <>
         {hoveredIndex && tooltipContent && (
           <motion.div
             initial={selectedVariant.initial}
@@ -203,7 +203,7 @@ export function AvatarGroupItem({
             {animation === 'reveal' ? <StaggeredContent content={tooltipContent} /> : tooltipContent}
           </motion.div>
         )}
-      </AnimatePresence>
+      </>
 
       <motion.div
         className="relative cursor-pointer"

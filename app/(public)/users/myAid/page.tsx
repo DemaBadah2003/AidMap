@@ -4,13 +4,15 @@ import { Search, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react'
 
 type AidResult = {
   found: boolean
+  referenceCode?: string | null
   beneficiaryName?: string
   nationalId?: string
-  phone?: string
+  phone?: string | null
   aidType?: string
   numberOfFamily?: number
   address?: string
-  notes?: string
+  notes?: string | null
+  adminNotes?: string | null
   status?: string
   requestNumber?: string
 }
@@ -161,11 +163,18 @@ export default function MyAidPage() {
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
             <div className="mb-5 flex items-center justify-between border-b border-slate-100 pb-4">
               <h2 className="font-bold text-slate-800">تفاصيل الطلب</h2>
-              {result.requestNumber && (
-                <span className="rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs text-slate-500">
-                  #{result.requestNumber.slice(-8).toUpperCase()}
-                </span>
-              )}
+              <div className="flex flex-col items-end gap-1">
+                {result.referenceCode && (
+                  <span className="rounded-lg bg-blue-50 px-2.5 py-1 font-mono text-xs font-semibold text-blue-800">
+                    رقم الطلب: {result.referenceCode}
+                  </span>
+                )}
+                {result.requestNumber && (
+                  <span className="rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs text-slate-500">
+                    #{result.requestNumber.slice(-8).toUpperCase()}
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -176,17 +185,28 @@ export default function MyAidPage() {
               </div>
               <Field label="نوع المساعدة" value={AID_TYPE_LABELS[result.aidType ?? ''] ?? result.aidType} />
               <Field label="عدد أفراد الأسرة" value={result.numberOfFamily?.toString()} />
+              <Field label="رقم الهاتف" value={result.phone ?? undefined} />
               <div className="sm:col-span-2">
                 <Field label="العنوان" value={result.address} />
               </div>
-              {result.notes && (
+              {result.notes ? (
                 <div className="sm:col-span-2">
-                  <span className="mb-1.5 block text-xs font-semibold text-slate-400">ملاحظات الإدارة</span>
+                  <span className="mb-1.5 block text-xs font-semibold text-slate-400">ملاحظاتك</span>
                   <div className="min-h-[80px] rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">
                     {result.notes}
                   </div>
                 </div>
-              )}
+              ) : null}
+              {result.adminNotes ? (
+                <div className="sm:col-span-2">
+                  <span className="mb-1.5 block text-xs font-semibold text-slate-400">
+                    ملاحظات الفريق
+                  </span>
+                  <div className="min-h-[80px] rounded-xl border border-amber-100 bg-amber-50/80 p-4 text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">
+                    {result.adminNotes}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         )}

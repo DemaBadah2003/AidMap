@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { UserStatus, VerificationTokenPurpose } from '@prisma/client';
 
 export async function POST(req: NextRequest) {
-  const { token } = await req.json();
+  const body = await req.json();
+  const { token } = body;
 
-  if (!token) {
+  if (!token || typeof token !== 'string') {
     return NextResponse.json({ error: 'Token is missing' }, { status: 400 });
   }
 
-  // First, retrieve the verification token.
-  const verificationToken = await prisma.verificationToken.findUnique({
-    where: { token },
+  const verificationToken = await prisma.verificationToken.findFirst({
+    where: {
+      token,
+      purpose: VerificationTokenPurpose.EMAIL_VERIFY,
+    },
   });
 
   if (!verificationToken || verificationToken.expires < new Date()) {
@@ -21,15 +25,20 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Use a transaction so that the user update and token deletion occur together.
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: verificationToken.identifier },
-        data: { status: 'ACTIVE', emailVerifiedAt: new Date() },
+        data: {
+          status: UserStatus.ACTIVE,
+          emailVerifiedAt: new Date(),
+        },
       });
 
-      await tx.verificationToken.delete({
-        where: { token },
+      await tx.verificationToken.deleteMany({
+        where: {
+          identifier: verificationToken.identifier,
+          purpose: VerificationTokenPurpose.EMAIL_VERIFY,
+        },
       });
     });
 

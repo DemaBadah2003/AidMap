@@ -1,20 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, Prisma } from '@prisma/client'
-import { requireAdminApi } from '@/app/api/project/helpers/api-guards'
-
-const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient
-}
-
-const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ['error'],
-  })
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
+import { Prisma } from '@prisma/client'
+import prisma from '@/lib/prisma'
+import { requireAdminApi, requireStaffApi } from '@/lib/api/auth'
 
 type CreateBeneficiaryBody = {
   name?: unknown
@@ -63,6 +50,9 @@ function parseOptionalText(
 
 export async function GET(req: NextRequest) {
   try {
+    const unauthorized = await requireStaffApi(req)
+    if (unauthorized) return unauthorized
+
     const { searchParams } = new URL(req.url)
     const campId = searchParams.get('campId')
 

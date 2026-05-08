@@ -1,9 +1,11 @@
 'use client';
 
-import { JSX, useCallback } from 'react';
+import { JSX, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MENU_SIDEBAR } from '@/config/menu.config';
+import { useSession } from 'next-auth/react';
+import { getSidebarMenuByRole } from '@/config/menu.config';
+import { AppRole } from '@/config/types';
 import { MenuConfig, MenuItem } from '@/config/types';
 import { cn } from '@/lib/utils';
 import {
@@ -20,6 +22,17 @@ import { Badge } from '@/components/ui/badge';
 
 export function SidebarMenu() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+
+  const menuItems = useMemo(() => {
+    const slug = (
+      (session?.user as { roleSlug?: string } | undefined)?.roleSlug ?? ''
+    ).toLowerCase();
+    const roleSlug: AppRole | null =
+      slug === 'admin' ? 'admin' : slug.length > 0 ? 'user' : null;
+    return getSidebarMenuByRole(roleSlug);
+  }, [session?.user]);
+
 
   const matchPath = useCallback(
     (path: string): boolean =>
@@ -213,7 +226,7 @@ export function SidebarMenu() {
         collapsible
         classNames={classNames}
       >
-        {buildMenu(MENU_SIDEBAR)}
+        {buildMenu(menuItems)}
       </AccordionMenu>
     </div>
   );

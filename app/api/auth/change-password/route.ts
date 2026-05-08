@@ -6,6 +6,7 @@ import {
   ChangePasswordApiSchemaType,
   getChangePasswordApiSchema,
 } from '@/app/(auth)/forms/change-password-schema';
+import { VerificationTokenPurpose } from '@prisma/client';
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,8 +24,11 @@ export async function POST(req: NextRequest) {
     const { token, newPassword }: ChangePasswordApiSchemaType = parsedData.data;
 
     // Validate the token
-    const verificationToken = await prisma.verificationToken.findUnique({
-      where: { token },
+    const verificationToken = await prisma.verificationToken.findFirst({
+      where: {
+        token,
+        purpose: VerificationTokenPurpose.PASSWORD_RESET,
+      },
     });
 
     if (!verificationToken || verificationToken.expires < new Date()) {
@@ -53,8 +57,11 @@ export async function POST(req: NextRequest) {
     });
 
     // Delete the used verification token
-    await prisma.verificationToken.delete({
-      where: { token },
+    await prisma.verificationToken.deleteMany({
+      where: {
+        token,
+        purpose: VerificationTokenPurpose.PASSWORD_RESET,
+      },
     });
 
     // Send the email notification

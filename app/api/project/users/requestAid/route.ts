@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, Prisma, DistributionStatus } from '@prisma/client'
-
-const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient
-}
-
-const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ['error'],
-  })
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
+import { Prisma, DistributionStatus } from '@prisma/client'
+import prisma from '@/lib/prisma'
+import { generateAidReferenceCode } from '@/lib/reference-code'
 
 type CreateRequestAidBody = {
   fullName?: unknown
@@ -356,20 +344,40 @@ export async function POST(req: NextRequest) {
 
     const now = new Date()
 
-    const newRequest = await prisma.requestAid.create({
-      data: {
-        fullName: normalizedFullName,
-        nationalId,
-        phone,
-        aidType: aidType.trim(),
-        familyCount: parsedFamilyCount,
-        address: normalizedAddress,
-        notes: parsedNotes,
-        status: DistributionStatus.PENDING,
-        createdAt: now,
-        updatedAt: now,
-      },
-    })
+    let newRequest = null
+    const maxAttempts = 6
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const referenceCode = generateAidReferenceCode()
+      try {
+        newRequest = await prisma.requestAid.create({
+          data: {
+            referenceCode,
+            fullName: normalizedFullName,
+            nationalId,
+            phone,
+            aidType: aidType.trim(),
+            familyCount: parsedFamilyCount,
+            address: normalizedAddress,
+            notes: parsedNotes,
+            status: DistributionStatus.PENDING,
+            createdAt: now,
+            updatedAt: now,
+          },
+        })
+        break
+      } catch {
+        if (attempt === maxAttempts - 1) {
+          throw new Error('REQUEST_AID_CREATE_FAILED')
+        }
+      }
+    }
+
+    if (!newRequest) {
+      return NextResponse.json(
+        { success: false, message: 'تعذر إنشاء الطلب. حاول مرة أخرى.' },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json(
       {

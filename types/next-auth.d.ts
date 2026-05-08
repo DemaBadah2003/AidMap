@@ -9,7 +9,8 @@ declare module "next-auth" {
       avatar?: string | null;
       roleId?: string | null;
       roleName?: string | null;
-      status?: string; // ✅ كان required
+      roleSlug?: string | null;
+      status?: string;
     } & DefaultSession["user"];
   }
 
@@ -18,18 +19,20 @@ declare module "next-auth" {
     avatar?: string | null;
     roleId?: string | null;
     roleName?: string | null;
-    status?: string; // ✅ كان required
+    roleSlug?: string | null;
+    status?: string;
     // name/email موجودين أصلًا في NextAuth كاختياريين، مش لازم تعيد تعريفهم
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
-    id?: string; // ✅ خليه optional
+    id?: string;
     avatar?: string | null;
     roleId?: string | null;
     roleName?: string | null;
-    status?: string; // ✅ كان required
+    roleSlug?: string | null;
+    status?: string;
     // name/email موجودين أصلًا في JWT غالبًا، وممكن تسيبهم
   }
 }

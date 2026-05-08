@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyRecaptchaToken } from '@/lib/recaptcha';
 import { sendEmail } from '@/services/send-email';
+import { VerificationTokenPurpose } from '@prisma/client';
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,13 +27,11 @@ export async function POST(req: NextRequest) {
 
     const { email } = await req.json();
 
-    // Check if the user exists
     const user = await prisma.user.findUnique({
       where: { email },
     });
 
     if (!user) {
-      // Don't reveal that the email doesn't exist
       return NextResponse.json(
         {
           message:
@@ -42,22 +41,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Generate a secure reset token
     const token = crypto.randomBytes(32).toString('hex');
 
-    // Store the token in the database with an expiry of 1 hour
+    await prisma.verificationToken.deleteMany({
+      where: {
+        identifier: user.id,
+        purpose: VerificationTokenPurpose.PASSWORD_RESET,
+      },
+    });
+
     await prisma.verificationToken.create({
       data: {
         identifier: user.id,
         token,
-        expires: new Date(Date.now() + 1 * 60 * 60 * 1000), // 1 hour expiry
+        expires: new Date(Date.now() + 60 * 60 * 1000),
+        purpose: VerificationTokenPurpose.PASSWORD_RESET,
       },
     });
 
-    // Create reset URL
     const resetUrl = `${process.env.NEXTAUTH_URL}/change-password?token=${token}`;
 
-    // Send password reset email
     await sendEmail({
       to: email,
       subject: 'Password Reset Request',

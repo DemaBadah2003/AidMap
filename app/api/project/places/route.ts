@@ -1,18 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, PlaceType, PlaceStatus, Prisma } from '@prisma/client'
-
-// إعداد PrismaClient
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
-}
-
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ['error'],
-  })
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+import { PlaceType, PlaceStatus, Prisma } from '@prisma/client'
+import prisma from '@/lib/prisma'
+import { requireAdminApi } from '@/lib/api/auth'
 
 // --- أنواع البيانات والمساعدات ---
 type FrontPlaceType = 'shelter' | 'hospital' | 'water' | 'food'
@@ -121,11 +110,12 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// --- POST Method (تم إلغاء فحص الأدمن - متاحة للجميع) ---
+// --- POST Method (مسؤولون فقط) ---
 export async function POST(req: NextRequest) {
   try {
-    // تم حذف requireAdminApi لفتح الوصول للكل
-    
+    const unauthorized = await requireAdminApi(req)
+    if (unauthorized) return unauthorized
+
     const body = (await req.json()) as CreatePlaceBody
     const { name, type, latitude, longitude, description, operator, capacity, occupancy, availableBeds, statusText } = body
 

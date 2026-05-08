@@ -1,19 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient
-}
-
-const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ['error'],
-  })
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
+import prisma from '@/lib/prisma'
+import { requireStaffApi } from '@/lib/api/auth'
 
 const NATIONAL_ID_REGEX = /^\d{9}$/
 const REPEATED_DIGITS_REGEX = /^(\d)\1+$/
@@ -35,6 +22,9 @@ function normalizeStatus(status?: string | null) {
 
 export async function GET(req: NextRequest) {
   try {
+    const unauthorized = await requireStaffApi(req)
+    if (unauthorized) return unauthorized
+
     const { searchParams } = new URL(req.url)
     const nationalId = searchParams.get('nationalId')
 

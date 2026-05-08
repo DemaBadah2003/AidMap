@@ -16,7 +16,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { StoreClientTopbar } from '@/app/(protected)/store-client/components/common/topbar';
 import { Footer } from './components/footer';
 import { Header } from './components/header';
 import { Sidebar } from './components/sidebar';
@@ -58,7 +57,9 @@ const Demo10Layout = ({ children }: { children: ReactNode }) => {
                     <ToolbarHeading />
                     <ToolbarActions>
                       {pathname.startsWith('/store-client') ? (
-                        <StoreClientTopbar />
+                        <Button variant="outline" size="sm" type="button">
+                          Store
+                        </Button>
                       ) : (
                         <>
                           <Button variant="outline" asChild>

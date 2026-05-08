@@ -1,9 +1,13 @@
 import bcrypt from "bcrypt";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import prisma from "@/lib/prisma";
+import { UserStatus } from "@prisma/client";
+
+function parseRememberMe(raw: unknown): boolean {
+  return raw === true || raw === "true" || raw === "on" || raw === "1";
+}
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -26,10 +30,12 @@ export const authOptions: NextAuthOptions = {
           throw new Error(
             JSON.stringify({
               code: 400,
-              message: "Please enter both email and password.",
-            })
+              message: "يرجى إدخال البريد الإلكتروني وكلمة المرور.",
+            }),
           );
         }
+
+        const rememberMe = parseRememberMe(credentials.rememberMe);
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
@@ -40,22 +46,49 @@ export const authOptions: NextAuthOptions = {
           throw new Error(
             JSON.stringify({
               code: 404,
-              message: "User not found. Please register first.",
-            })
+              message: "المستخدم غير موجود. نرجو التسجيل أولًا.",
+            }),
           );
         }
 
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
-          user.password ?? ""
+          user.password ?? "",
         );
 
         if (!isPasswordValid) {
           throw new Error(
             JSON.stringify({
               code: 401,
-              message: "Invalid credentials. Incorrect password.",
-            })
+              message: "بيانات الدخول غير صحيحة.",
+            }),
+          );
+        }
+
+        if (user.isTrashed) {
+          throw new Error(
+            JSON.stringify({
+              code: 403,
+              message: "هذا الحساب غير متاح.",
+            }),
+          );
+        }
+
+        if (user.status === UserStatus.BLOCKED) {
+          throw new Error(
+            JSON.stringify({
+              code: 403,
+              message: "تم حظر هذا الحساب. تواصل مع الإدارة.",
+            }),
+          );
+        }
+
+        if (user.status === UserStatus.INACTIVE || !user.emailVerifiedAt) {
+          throw new Error(
+            JSON.stringify({
+              code: 403,
+              message: "يرجى تفعيل الحساب عبر الرابط المرسل إلى بريدك الإلكتروني قبل تسجيل الدخول.",
+            }),
           );
         }
 
@@ -73,45 +106,44 @@ export const authOptions: NextAuthOptions = {
           roleSlug: user.role?.slug ?? null,
           status: user.status,
           avatar: user.avatar,
+          emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
+          rememberMe,
         } as any;
       },
     }),
-
-    // GoogleProvider({
-    //   clientId: process.env.GOOGLE_CLIENT_ID!,
-    //   clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    //   allowDangerousEmailAccountLinking: true,
-    //
-    //   profile(profile) {
-    //     return {
-    //       id: profile.sub ?? profile.id,
-    //       name: profile.name,
-    //       email: profile.email,
-    //       image: profile.picture,
-    //     };
-    //   },
-    // }),
   ],
 
   session: {
     strategy: "jwt",
-    maxAge: 24 * 60 * 60,
+    maxAge: 30 * 24 * 60 * 60,
   },
 
   callbacks: {
     async jwt({ token, user, trigger, session }) {
-      if (trigger === "update" && session?.user) {
-        return { ...token, ...(session.user as any) };
+      if (trigger === "update" && session?.user && typeof session.user === "object") {
+        const s = session.user as Record<string, unknown>;
+        if (typeof s.avatar === "string") {
+          (token as any).avatar = s.avatar;
+        }
+        if (typeof s.name === "string") {
+          (token as any).name = s.name;
+        }
       }
 
       if (user) {
-        const u = user as any;
-        token.id = u.id ?? token.sub;
+        const u = user as Record<string, unknown>;
+        token.id = (u.id as string) ?? token.sub;
         (token as any).roleId = u.roleId;
         (token as any).roleName = u.roleName;
         (token as any).roleSlug = u.roleSlug;
         (token as any).status = u.status;
         (token as any).avatar = u.avatar;
+        (token as any).emailVerifiedAt = u.emailVerifiedAt;
+
+        const remember = parseRememberMe(u.rememberMe);
+        (token as any).rememberMe = remember;
+        const seconds = remember ? 30 * 24 * 60 * 60 : 24 * 60 * 60;
+        token.exp = Math.floor(Date.now() / 1000) + seconds;
       }
 
       return token;
@@ -119,12 +151,14 @@ export const authOptions: NextAuthOptions = {
 
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = (token as any).id;
-        (session.user as any).roleId = (token as any).roleId;
-        (session.user as any).roleName = (token as any).roleName;
-        (session.user as any).roleSlug = (token as any).roleSlug;
-        (session.user as any).status = (token as any).status;
-        (session.user as any).avatar = (token as any).avatar;
+        const t = token as Record<string, unknown>;
+        (session.user as any).id = t.id ?? t.sub;
+        (session.user as any).roleId = t.roleId;
+        (session.user as any).roleName = t.roleName;
+        (session.user as any).roleSlug = t.roleSlug;
+        (session.user as any).status = t.status;
+        (session.user as any).avatar = t.avatar;
+        (session.user as any).emailVerifiedAt = t.emailVerifiedAt;
       }
       return session;
     },

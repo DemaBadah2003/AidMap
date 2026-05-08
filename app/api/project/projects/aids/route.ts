@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-import { requireAdminApi } from '@/app/api/project/helpers/api-guards'
-
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
-}
-
-const prisma = globalForPrisma.prisma ?? new PrismaClient()
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
+import prisma from '@/lib/prisma'
+import { getAuthFromRequest, requireAdminApi } from '@/lib/api/auth'
+import { systemLog } from '@/services/system-log'
 
 const aidOptionsMap: Record<string, string[]> = {
   غذائية: ['سلة غذائية', 'طرد غذائي', 'دقيق', 'أرز', 'معلبات'],
@@ -28,7 +19,7 @@ const validStatuses = [
 ]
 
 export async function POST(req: NextRequest) {
-  const unauthorized = requireAdminApi(req)
+  const unauthorized = await requireAdminApi(req)
   if (unauthorized) return unauthorized
 
   try {
@@ -118,6 +109,17 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    const auth = await getAuthFromRequest(req)
+    if (auth) {
+      await systemLog({
+        event: 'AID_CREATED',
+        userId: auth.userId,
+        entityId: newAid.id,
+        entityType: 'Aid',
+        description: `${aidType} / ${aidName}`,
+      })
+    }
+
     return NextResponse.json(
       {
         message: 'تمت إضافة المساعدة بنجاح',
@@ -140,7 +142,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const unauthorized = requireAdminApi(req)
+  const unauthorized = await requireAdminApi(req)
   if (unauthorized) return unauthorized
 
   try {

@@ -32,7 +32,7 @@ type Shelter = {
   fillStatus: FillStatus
 }
 
-const BASE_URL = '/api/project/projects/shelter'
+const BASE_URL = '/api/project/camp/shelter'
 
 const selectClass = 'w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
 
@@ -62,11 +62,11 @@ export default function SheltersPage() {
 
   const shelterSchema = z.object({
     nameAr: z.string().trim().min(1, t('common.messages.required')),
-    areaAr: z.enum([...REGIONS_OPTIONS], { errorMap: () => ({ message: t('common.messages.required') }) }),
+    areaAr: z.enum(REGIONS_OPTIONS, { message: t('common.messages.required') }),
     supervisorAr: z.string().trim().min(1, t('common.messages.required')),
     phone: z.string().trim().min(1, t('common.messages.required')).regex(/^(056|059)\d{7}$/, t('common.messages.required')),
     capacity: z.coerce.number().gt(0, t('common.messages.required')),
-    fillStatus: z.enum([...STATUS_OPTIONS], { errorMap: () => ({ message: t('common.messages.required') }) }),
+    fillStatus: z.enum(STATUS_OPTIONS, { message: t('common.messages.required') }),
   })
 
   const fetchShelters = async () => {

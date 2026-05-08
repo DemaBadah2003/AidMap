@@ -67,7 +67,5 @@ export function saveCurrentUser(user: CurrentUser) {
     })
   );
 
-  // حفظ في cookies (مهم للـ guards)
-  document.cookie = `userRole=${encodeURIComponent(normalizedRole ?? user.role)}; path=/`;
-  document.cookie = `userId=${encodeURIComponent(user.id)}; path=/`;
+  // Role/identity for API authorization must come from the NextAuth JWT only — never from client cookies.
 }

@@ -1,19 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient
-}
-
-const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ['error'],
-  })
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
+import prisma from '@/lib/prisma'
+import { maskPhone } from '@/lib/phone-mask'
 
 const NATIONAL_ID_REGEX = /^\d{9}$/
 const REPEATED_DIGITS_REGEX = /^(\d)\1+$/
@@ -95,13 +82,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         found: true,
+        referenceCode: requestAid.referenceCode ?? null,
         beneficiaryName: requestAid.fullName,
         nationalId: requestAid.nationalId,
-        phone: requestAid.phone,
+        phone: maskPhone(requestAid.phone),
         aidType: requestAid.aidType,
         numberOfFamily: requestAid.familyCount,
         address: requestAid.address,
         notes: requestAid.notes,
+        adminNotes: requestAid.adminNotes,
         status: normalizeStatus(requestAid.status),
         requestNumber: requestAid.id,
         distributionDate: null,
