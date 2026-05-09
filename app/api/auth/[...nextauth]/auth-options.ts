@@ -83,15 +83,6 @@ export const authOptions: NextAuthOptions = {
           );
         }
 
-        if (user.status === UserStatus.INACTIVE || !user.emailVerifiedAt) {
-          throw new Error(
-            JSON.stringify({
-              code: 403,
-              message: "يرجى تفعيل الحساب عبر الرابط المرسل إلى بريدك الإلكتروني قبل تسجيل الدخول.",
-            }),
-          );
-        }
-
         await prisma.user.update({
           where: { id: user.id },
           data: { lastSignInAt: new Date() },
