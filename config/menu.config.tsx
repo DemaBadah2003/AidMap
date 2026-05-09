@@ -26,7 +26,6 @@ export const MENU_SIDEBAR: MenuConfig = [
             path: '/project/projects/Medical-Services/clinic',
             children: [
               { title: 'الصفحة الرئيسية', path: '/project/projects/Medical-Services/home' },
-              { title: 'جدول المرضى', path: '/project/projects/Medical-Services/patients' },
               { title: 'جدول المستشفيات', path: '/project/projects/Medical-Services/hospitals' },
             ],
           },
@@ -36,12 +35,7 @@ export const MENU_SIDEBAR: MenuConfig = [
             title: 'الخدمات التعليمية والطلاب',
             path: '/project/projects/education',
             children: [
-              { title: 'أماكن خيام التعليم', path: '/project/projects/education/camps' },
-              { title: 'مراكز الدعم النفسي', path: '/project/projects/education/psychological' },
-              { title: 'نقاط الإنترنت للدراسة', path: '/project/projects/education/internet' },
-              { title: 'قضايا الطلاب والتعليم', path: '/project/projects/education/student-issues' },
               { title: 'جدول المدارس', path: '/project/projects/education/school' },
-              { title: 'جدول الطلاب', path: '/project/projects/education/students' },
             ],
           },
 
