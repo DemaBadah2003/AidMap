@@ -46,14 +46,8 @@ export const MENU_SIDEBAR: MenuConfig = [
             path: '/project/projects/food-water',
             children: [
               { title: 'نقاط توزيع المياه', path: '/project/projects/food-water/water' },
-              { title: 'نقاط توزيع الطعام', path: '/project/projects/food-water/food' },
+              { title: 'نقاط توزيع المساعدات', path: '/project/projects/food-water/food' },
               { title: 'التوزيعات المؤسساتية', path: '/project/projects/food-water/Distributions' },
-              { title: 'المنتجات', path: '/project/projects/food-water/products' },
-               { title: 'المستفيد', path: '/project/projects/food-water/beneficiaries' },
-               
-
-
-
             ],
           },
 
@@ -62,8 +56,7 @@ export const MENU_SIDEBAR: MenuConfig = [
             title: 'المراكز الإيوائية',
             path: '/project/projects/camp',
             children: [
-              { title: 'جدول مركز الايواء', path: '/project/projects/camp/shelters' },
-              { title: 'جدول المشرفين', path: '/project/projects/camp/supervisior' },
+              { title: 'مراكز الإيواء والمشرفون', path: '/project/projects/camp/shelters' },
               { title: 'جدول الطوارئ', path: '/project/projects/camp/Emergency' },
             ],
           },

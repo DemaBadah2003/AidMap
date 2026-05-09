@@ -15,7 +15,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 
-const AREAS = ['north', 'south', 'east', 'west'] as const
+const AREAS = ['شمال', 'جنوب', 'شرق', 'غرب', 'وسط'] as const
 const PRIORITIES = ['urgent', 'high', 'medium', 'low'] as const
 
 type Priority = typeof PRIORITIES[number]
@@ -253,7 +253,7 @@ export default function BeneficiariesPage() {
                         {isEditing ? (
                           <select className={`${selectClass} h-9 border-blue-400`} value={editFormData.area} onChange={e => setEditFormData({ ...editFormData, area: e.target.value, campId: '' })}>
                             <option value="">{t('common.labels.all')}</option>
-                            {AREAS.map(a => <option key={a} value={a}>{t(`pages.shelters.regions.${a}`)}</option>)}
+                            {AREAS.map(a => <option key={a} value={a}>{a}</option>)}
                           </select>
                         ) : b.area}
                       </td>
@@ -343,7 +343,7 @@ export default function BeneficiariesPage() {
                 <label className="text-sm font-semibold text-foreground">{t('pages.beneficiaries.region')}</label>
                 <select className={`${selectClass} h-11 ${errors.area ? 'border-red-400' : ''}`} value={addFormData.area || ''} onChange={e => setAddFormData({ ...addFormData, area: e.target.value, campId: '' })}>
                   <option value="">{t('pages.beneficiaries.region')}</option>
-                  {AREAS.map(a => <option key={a} value={a}>{t(`pages.shelters.regions.${a}`)}</option>)}
+                  {AREAS.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
                 {errors.area && <p className="text-xs text-red-500">{errors.area}</p>}
               </div>

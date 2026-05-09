@@ -8,12 +8,13 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Pencil, Plus, Search, Loader2, AlertCircle, ChevronLeft } from 'lucide-react'
 
-const LOCATIONS = ['شمال', 'جنوب', 'شرق', 'غرب']
+const LOCATIONS = ['شمال', 'جنوب', 'شرق', 'غرب', 'وسط']
 const AREAS_BY_LOCATION: Record<string, string[]> = {
   'شمال': ['جباليا', 'بيت لاهيا', 'بيت حانون'],
   'جنوب': ['رفح', 'خانيونس'],
   'شرق': ['حي الشجاعية', 'الزيتون', 'التفاح'],
   'غرب': ['الرمال', 'مخيم الشاطئ', 'تل الهوى'],
+  'وسط': ['دير البلح', 'النصيرات', 'البريج', 'المغازي'],
 }
 const STAGES = ['روضة', 'ابتدائي', 'اعدادي', 'ثانوي']
 const SCHOOL_TYPES = ['حكومي', 'خاص', 'وكالة (أونروا)', 'دولي']

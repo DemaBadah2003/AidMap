@@ -39,6 +39,7 @@ export default function RootLayout({
       className="h-full w-full"
     >
       <body
+        suppressHydrationWarning
         className={cn(
           'h-full w-full m-0 p-0 antialiased text-base text-foreground bg-background',
           inter.className,
