@@ -1,24 +1,13 @@
 'use client';
 
-import { JSX, useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { getSidebarMenuByRole } from '@/config/menu.config';
 import { AppRole } from '@/config/types';
-import { MenuConfig, MenuItem } from '@/config/types';
+import { MenuItem, MenuConfig } from '@/config/types';
 import { cn } from '@/lib/utils';
-import {
-  AccordionMenu,
-  AccordionMenuClassNames,
-  AccordionMenuGroup,
-  AccordionMenuItem,
-  AccordionMenuLabel,
-  AccordionMenuSub,
-  AccordionMenuSubContent,
-  AccordionMenuSubTrigger,
-} from '@/components/ui/accordion-menu';
-import { Badge } from '@/components/ui/badge';
 
 export function SidebarMenu() {
   const pathname = usePathname();
@@ -33,201 +22,74 @@ export function SidebarMenu() {
     return getSidebarMenuByRole(roleSlug);
   }, [session?.user]);
 
-
-  const matchPath = useCallback(
-    (path: string): boolean =>
-      path === pathname || (path.length > 1 && pathname.startsWith(path)),
-    [pathname],
-  );
-
-  const classNames: AccordionMenuClassNames = {
-    root: 'lg:ps-1 space-y-3',
-    group: 'gap-px',
-    label:
-      'uppercase text-xs font-medium text-muted-foreground/70 pt-2.25 pb-px',
-    separator: '',
-    item: 'h-8 hover:bg-transparent text-accent-foreground hover:text-primary data-[selected=true]:text-primary data-[selected=true]:bg-muted data-[selected=true]:font-medium',
-    sub: '',
-    subTrigger:
-      'h-8 hover:bg-transparent text-accent-foreground hover:text-primary data-[selected=true]:text-primary data-[selected=true]:bg-muted data-[selected=true]:font-medium',
-    subContent: 'py-0',
-    indicator: '',
+  const isActive = (path?: string) => {
+    if (!path) return false;
+    return pathname === path || (path.length > 1 && pathname.startsWith(path));
   };
 
-  const buildMenu = (items: MenuConfig): JSX.Element[] => {
-    return items.map((item: MenuItem, index: number) => {
+  const renderItems = (items: MenuConfig, depth = 0) => {
+    return items.map((item: MenuItem, i: number) => {
       if (item.heading) {
-        return buildMenuHeading(item, index);
-      } else if (item.disabled) {
-        return buildMenuItemRootDisabled(item, index);
-      } else {
-        return buildMenuItemRoot(item, index);
+        return (
+          <div key={i} className="uppercase text-[10px] font-semibold text-muted-foreground/60 px-2 pt-4 pb-1 tracking-widest">
+            {item.heading}
+          </div>
+        );
       }
-    });
-  };
 
-  const buildMenuItemRoot = (item: MenuItem, index: number): JSX.Element => {
-    if (item.children) {
-      return (
-        <AccordionMenuSub key={index} value={item.path || `root-${index}`}>
-          <AccordionMenuSubTrigger className="text-sm font-medium">
-            {item.icon && <item.icon data-slot="accordion-menu-icon" />}
-            <span data-slot="accordion-menu-title">{item.title}</span>
-          </AccordionMenuSubTrigger>
-          <AccordionMenuSubContent
-            type="single"
-            collapsible
-            parentValue={item.path || `root-${index}`}
-            className="ps-6"
-          >
-            <AccordionMenuGroup>
-              {buildMenuItemChildren(item.children, 1)}
-            </AccordionMenuGroup>
-          </AccordionMenuSubContent>
-        </AccordionMenuSub>
-      );
-    } else {
-      return (
-        <AccordionMenuItem
-          key={index}
-          value={item.path || ''}
-          className="text-sm font-medium"
-        >
-          <Link
-            href={item.path || '#'}
-            className="flex items-center justify-between grow gap-2"
-          >
-            {item.icon && <item.icon data-slot="accordion-menu-icon" />}
-            <span data-slot="accordion-menu-title">{item.title}</span>
-          </Link>
-        </AccordionMenuItem>
-      );
-    }
-  };
+      const hasChildren = item.children && item.children.length > 0;
+      const active = isActive(item.path);
 
-  const buildMenuItemRootDisabled = (
-    item: MenuItem,
-    index: number,
-  ): JSX.Element => {
-    return (
-      <AccordionMenuItem
-        key={index}
-        value={`disabled-${index}`}
-        className="text-sm font-medium"
-      >
-        {item.icon && <item.icon data-slot="accordion-menu-icon" />}
-        <span data-slot="accordion-menu-title">{item.title}</span>
-        {item.disabled && (
-          <Badge variant="secondary" size="sm" className="ms-auto me-[-10px]">
-            Soon
-          </Badge>
-        )}
-      </AccordionMenuItem>
-    );
-  };
-
-  const buildMenuItemChildren = (
-    items: MenuConfig,
-    level: number = 0,
-  ): JSX.Element[] => {
-    return items.map((item: MenuItem, index: number) => {
-      if (item.disabled) {
-        return buildMenuItemChildDisabled(item, index, level);
-      } else {
-        return buildMenuItemChild(item, index, level);
-      }
-    });
-  };
-
-  const buildMenuItemChild = (
-    item: MenuItem,
-    index: number,
-    level: number = 0,
-  ): JSX.Element => {
-    if (item.children) {
-      return (
-        <AccordionMenuSub
-          key={index}
-          value={item.path || `child-${level}-${index}`}
-        >
-          <AccordionMenuSubTrigger className="text-[13px]">
-            {item.collapse ? (
-              <span className="text-muted-foreground">
-                <span className="hidden [[data-state=open]>span>&]:inline">
-                  {item.collapseTitle}
-                </span>
-                <span className="inline [[data-state=open]>span>&]:hidden">
-                  {item.expandTitle}
-                </span>
-              </span>
-            ) : (
-              item.title
-            )}
-          </AccordionMenuSubTrigger>
-          <AccordionMenuSubContent
-            type="single"
-            collapsible
-            parentValue={item.path || `child-${level}-${index}`}
-            className={cn('ps-4', !item.collapse && 'relative')}
-          >
-            <AccordionMenuGroup>
-              {buildMenuItemChildren(
-                item.children,
-                item.collapse ? level : level + 1,
+      if (hasChildren) {
+        return (
+          <div key={i}>
+            {/* Category label — not a link, just a header */}
+            <div
+              className={cn(
+                'flex items-center gap-2 px-2 py-1.5 rounded-md text-sm font-semibold select-none',
+                depth === 0 ? 'text-foreground/80 mt-2' : 'text-foreground/70',
+                depth > 0 && 'text-[13px]',
+                active && 'text-primary',
               )}
-            </AccordionMenuGroup>
-          </AccordionMenuSubContent>
-        </AccordionMenuSub>
-      );
-    } else {
+              style={{ paddingRight: depth > 0 ? `${(depth) * 12 + 8}px` : undefined }}
+            >
+              {item.icon && <item.icon className="w-4 h-4 shrink-0 text-muted-foreground" />}
+              {item.title}
+            </div>
+            {/* Children always visible */}
+            <div style={{ paddingRight: depth > 0 ? `${(depth) * 8}px` : undefined }}>
+              {renderItems(item.children!, depth + 1)}
+            </div>
+          </div>
+        );
+      }
+
+      // Leaf item — a real link
       return (
-        <AccordionMenuItem
-          key={index}
-          value={item.path || ''}
-          className="text-[13px]"
+        <Link
+          key={i}
+          href={item.path || '#'}
+          className={cn(
+            'flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] transition-colors',
+            'hover:bg-muted hover:text-primary',
+            active
+              ? 'bg-muted text-primary font-semibold'
+              : 'text-accent-foreground',
+          )}
+          style={{ paddingRight: `${depth * 12 + 8}px` }}
         >
-          <Link href={item.path || '#'}>{item.title}</Link>
-        </AccordionMenuItem>
+          {item.icon && <item.icon className="w-4 h-4 shrink-0" />}
+          {item.title}
+        </Link>
       );
-    }
-  };
-
-  const buildMenuItemChildDisabled = (
-    item: MenuItem,
-    index: number,
-    level: number = 0,
-  ): JSX.Element => {
-    return (
-      <AccordionMenuItem
-        key={index}
-        value={`disabled-child-${level}-${index}`}
-        className="text-[13px]"
-      >
-        <span data-slot="accordion-menu-title">{item.title}</span>
-        {item.disabled && (
-          <Badge variant="secondary" size="sm" className="ms-auto me-[-10px]">
-            Soon
-          </Badge>
-        )}
-      </AccordionMenuItem>
-    );
-  };
-
-  const buildMenuHeading = (item: MenuItem, index: number): JSX.Element => {
-    return <AccordionMenuLabel key={index}>{item.heading}</AccordionMenuLabel>;
+    });
   };
 
   return (
-    <div className="kt-scrollable-y-hover flex grow shrink-0 py-5 px-5 lg:max-h-[calc(100vh-5.5rem)]">
-      <AccordionMenu
-        selectedValue={pathname}
-        matchPath={matchPath}
-        type="single"
-        collapsible
-        classNames={classNames}
-      >
-        {buildMenu(menuItems)}
-      </AccordionMenu>
+    <div className="kt-scrollable-y-hover flex grow shrink-0 py-5 px-3 lg:max-h-[calc(100vh-5.5rem)]">
+      <div className="w-full space-y-0.5">
+        {renderItems(menuItems)}
+      </div>
     </div>
   );
 }

@@ -132,7 +132,7 @@ export async function GET(req: NextRequest) {
     if (!typeParam || typeParam === 'shelter') {
       const camps = await prisma.camps.findMany({
         where: { isTrashed: false },
-        select: { id: true, name: true, latitude: true, longitude: true, capacity: true, currentFamiliesCount: true, status: true },
+        select: { id: true, name: true, latitude: true, longitude: true, capacity: true, currentFamiliesCount: true, status: true, area: true },
       })
       for (const c of camps) {
         const lat = Number(c.latitude)
@@ -145,11 +145,35 @@ export async function GET(req: NextRequest) {
           name: c.name,
           type: 'shelter',
           lat, lng,
-          operator: '',
+          operator: c.area ?? '',
           capacity: c.capacity ?? 0,
           occupancy: c.currentFamiliesCount ?? 0,
           availableBeds: available,
           statusText: c.status === 'FULL' ? 'ممتلئ' : c.status === 'ALMOST_FULL' ? 'شبه ممتلئ' : 'متاح',
+        })
+      }
+    }
+
+    // 4. Schools table (has lat/lng)
+    if (!typeParam || typeParam === 'school' as any) {
+      const schools = await prisma.school.findMany({
+        where: { isTrashed: false },
+        select: { id: true, name: true, latitude: true, longitude: true, level: true, schoolType: true, totalCount: true, region: true },
+      })
+      for (const s of schools) {
+        const lat = Number(s.latitude)
+        const lng = Number(s.longitude)
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat === 0 || lng === 0) continue
+        allPlaces.push({
+          id: `school-${s.id}`,
+          name: s.name,
+          type: 'school' as any,
+          lat, lng,
+          operator: s.schoolType ?? '',
+          capacity: s.totalCount ?? 0,
+          occupancy: 0,
+          availableBeds: 0,
+          statusText: [s.level, s.region].filter(Boolean).join(' • '),
         })
       }
     }
