@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,7 +13,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Pencil, Plus, Search, Loader2, AlertCircle } from 'lucide-react'
+import { Pencil, Plus, Search, Loader2, AlertCircle, ChevronLeft } from 'lucide-react'
 
 type HospitalRecord = {
   id: string
@@ -98,6 +99,7 @@ function HospitalForm({
 
 export default function HospitalsPage() {
   const { t } = useTranslation()
+  const router = useRouter()
   const [q, setQ] = useState('')
   const [items, setItems] = useState<HospitalRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -219,15 +221,16 @@ export default function HospitalsPage() {
                   <th className="p-4 font-semibold text-muted-foreground">المنطقة</th>
                   <th className="p-4 font-semibold text-muted-foreground">{t('common.labels.phone')}</th>
                   <th className="p-4 text-center font-semibold text-muted-foreground">{t('common.labels.actions')}</th>
+                  <th className="p-4 text-center font-semibold text-muted-foreground">التفاصيل</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {loading ? (
-                  <tr><td colSpan={5} className="p-16 text-center text-muted-foreground">
+                  <tr><td colSpan={6} className="p-16 text-center text-muted-foreground">
                     <Loader2 className="animate-spin mx-auto mb-2 size-5" />{t('common.messages.loading')}
                   </td></tr>
                 ) : filteredItems.length === 0 ? (
-                  <tr><td colSpan={5} className="p-16 text-center text-muted-foreground italic">{t('common.messages.noData')}</td></tr>
+                  <tr><td colSpan={6} className="p-16 text-center text-muted-foreground italic">{t('common.messages.noData')}</td></tr>
                 ) : filteredItems.map(item => (
                   <tr key={item.id} className="transition-colors hover:bg-muted/30">
                     <td className="p-4 font-medium text-blue-600">{item.hospitalType}</td>
@@ -240,6 +243,14 @@ export default function HospitalsPage() {
                         className="rounded-md border p-2 text-muted-foreground transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/30"
                       >
                         <Pencil className="w-4 h-4" />
+                      </button>
+                    </td>
+                    <td className="p-4 text-center">
+                      <button
+                        onClick={() => router.push(`/project/projects/Medical-Services/hospitals/${item.id}`)}
+                        className="rounded-md border p-2 text-muted-foreground transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
                       </button>
                     </td>
                   </tr>

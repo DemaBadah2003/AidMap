@@ -8,7 +8,7 @@ import { Building2, Stethoscope, Users, Activity, MapPin, Compass, Loader2 } fro
 type Hospital = { id: string; name: string; region: string; phone: string }
 type Department = { id: string; name: string }
 type Service = { id: string; name: string; price: number; isAvailable: boolean }
-type Doctor = { id: string; name: string; specialty: string; schedule: string | null; phone: string }
+type Doctor = { id: string; name: string; specialty: string; workSchedule: string | null; phone: string }
 
 const REGIONS = [
   { value: 'NORTH', label: 'شمال' },
@@ -205,7 +205,7 @@ export default function AdvancedQueryPage() {
                     <div>
                       <p className="font-bold text-slate-700">{d.name}</p>
                       <p className="text-xs text-slate-500 mt-0.5">{d.specialty}</p>
-                      {d.schedule && <p className="text-xs text-blue-500 mt-0.5">{d.schedule}</p>}
+                      {d.workSchedule && <p className="text-xs text-blue-500 mt-0.5">{d.workSchedule}</p>}
                     </div>
                     <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full shrink-0">متوفر</span>
                   </div>

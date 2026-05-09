@@ -1,142 +1,177 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Card, CardContent } from '../../../../../../components/ui/card'
-import { Button } from '../../../../../../components/ui/button'
-import { Input } from '../../../../../../components/ui/input'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '../../../../../../components/ui/dialog'
-import { 
-  Pencil, 
-  Plus, 
-  Search, 
-  Loader2, 
-  AlertCircle
-} from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Pencil, Plus, Search, Loader2, AlertCircle } from 'lucide-react'
 
-const AVAILABLE_MEDICAL_SERVICES = [
-  'إنعاش قلبي رئوي', 'خياطة جروح عميقة', 'تثبيت كسور عاجل', 'إعطاء محاليل وريدية',
-  'استئصال زائدة دودية', 'استئصال مرارة بالمنظار', 'إصلاح فتق',
-  'فحص نمو', 'علاج نزلات معوية', 'متابعة سوء تغذية',
-  'تخطيط قلب ECG', 'تصوير قلب صدى (Echo)', 'غسيل كلى دموي',
-  'أشعة سينية X-Ray', 'أشعة مقطعية CT', 'رنين مغناطيسي MRI',
-  'فحص دم كامل CBC', 'تحليل وظائف كبد وكلى', 'زراعة مخبرية'
-]
-
+type Hospital = { id: string; hospitalName: string }
+type Department = { id: string; name: string; hospitalId: string }
 type ServiceRecord = {
-  id: string
-  serviceName: string
-  cost: string
-  status: string
+  id: string; name: string; price: number; isAvailable: boolean
+  departmentId: string; departmentName: string; hospitalId: string; hospitalName: string
 }
 
-const BASE_URL = '/api/project/projects/services'
-// إعادة التحديد باللون الأزرق
-const selectBaseClass = 'w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-right text-xs sm:text-sm outline-none focus:ring-2 focus:ring-blue-600 font-normal appearance-none'
+const sel = 'w-full rounded-lg border border-input bg-background px-3 h-11 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
+
+const blank = { name: '', price: '', isAvailable: true, hospitalId: '', departmentId: '' }
 
 export default function ServicesPage() {
   const [q, setQ] = useState('')
   const [items, setItems] = useState<ServiceRecord[]>([])
+  const [hospitals, setHospitals] = useState<Hospital[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
   const [loading, setLoading] = useState(true)
-  const [addOpen, setAddOpen] = useState(false)
-  const [serviceName, setServiceName] = useState('')
-  const [cost, setCost] = useState('')
-  const [status, setStatus] = useState('متاحة')
-  const [submitting, setSubmitting] = useState(false)
 
-  const fetchData = async () => {
+  const [addOpen, setAddOpen] = useState(false)
+  const [addForm, setAddForm] = useState(blank)
+  const [addSub, setAddSub] = useState(false)
+
+  const [editOpen, setEditOpen] = useState(false)
+  const [editId, setEditId] = useState('')
+  const [editForm, setEditForm] = useState(blank)
+  const [editSub, setEditSub] = useState(false)
+
+  const fetchAll = async () => {
     setLoading(true)
     try {
-      const res = await fetch(BASE_URL)
-      const data = await res.json()
-      setItems(Array.isArray(data) ? data : [])
-    } catch (err) { console.error('Fetch error:', err) } 
+      const [sRes, hRes, dRes] = await Promise.all([
+        fetch('/api/project/Medical-Services/services'),
+        fetch('/api/project/Medical-Services/hospitals'),
+        fetch('/api/project/Medical-Services/departments'),
+      ])
+      const [sData, hData, dData] = await Promise.all([sRes.json(), hRes.json(), dRes.json()])
+      setItems(Array.isArray(sData) ? sData : [])
+      setHospitals(Array.isArray(hData.hospitals) ? hData.hospitals : [])
+      setDepartments(Array.isArray(dData) ? dData : [])
+    } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchAll() }, [])
 
-  const isAddValid = useMemo(() => serviceName !== '', [serviceName])
+  const isValid = (f: typeof blank) => f.name.trim() !== '' && f.departmentId !== ''
+
+  const filteredDepts = (hospitalId: string) => departments.filter(d => d.hospitalId === hospitalId)
 
   const onAdd = async () => {
-    if (!isAddValid) return
-    setSubmitting(true)
+    if (!isValid(addForm)) return
+    setAddSub(true)
     try {
-      const res = await fetch(BASE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ serviceName, cost, status })
+      const res = await fetch('/api/project/Medical-Services/services', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(addForm),
       })
-      if (res.ok) {
-        await fetchData()
-        setAddOpen(false)
-        resetAddForm()
-      }
-    } finally { setSubmitting(false) }
+      if (res.ok) { await fetchAll(); setAddOpen(false); setAddForm(blank) }
+    } finally { setAddSub(false) }
   }
 
-  const resetAddForm = () => {
-    setServiceName(''); setCost(''); setStatus('متاحة');
+  const openEdit = (item: ServiceRecord) => {
+    setEditId(item.id)
+    setEditForm({ name: item.name, price: String(item.price), isAvailable: item.isAvailable, hospitalId: item.hospitalId, departmentId: item.departmentId })
+    setEditOpen(true)
   }
 
-  const filteredItems = items.filter(item => 
-    item.serviceName?.toLowerCase().includes(q.toLowerCase())
+  const onEdit = async () => {
+    if (!isValid(editForm)) return
+    setEditSub(true)
+    try {
+      const res = await fetch('/api/project/Medical-Services/services', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editId, ...editForm }),
+      })
+      if (res.ok) { await fetchAll(); setEditOpen(false) }
+    } finally { setEditSub(false) }
+  }
+
+  const filtered = useMemo(() =>
+    items.filter(i => i.name?.toLowerCase().includes(q.toLowerCase()) || i.hospitalName?.toLowerCase().includes(q.toLowerCase())),
+    [items, q]
+  )
+
+  const FormFields = ({ form, setForm }: { form: typeof blank; setForm: (v: typeof blank) => void }) => (
+    <div className="flex flex-col gap-4 py-2">
+      <div className="space-y-1.5">
+        <label className="text-sm font-semibold">المستشفى</label>
+        <select className={sel} value={form.hospitalId} onChange={e => setForm({ ...form, hospitalId: e.target.value, departmentId: '' })}>
+          <option value="">اختر المستشفى</option>
+          {hospitals.map(h => <option key={h.id} value={h.id}>{h.hospitalName}</option>)}
+        </select>
+      </div>
+      <div className="space-y-1.5">
+        <label className="text-sm font-semibold">القسم</label>
+        <select className={sel} value={form.departmentId} onChange={e => setForm({ ...form, departmentId: e.target.value })} disabled={!form.hospitalId}>
+          <option value="">{form.hospitalId ? 'اختر القسم' : 'اختر المستشفى أولاً'}</option>
+          {filteredDepts(form.hospitalId).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
+      </div>
+      <div className="space-y-1.5">
+        <label className="text-sm font-semibold">اسم الخدمة</label>
+        <Input className="h-11" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="اسم الخدمة الطبية" />
+      </div>
+      <div className="space-y-1.5">
+        <label className="text-sm font-semibold">التكلفة (₪)</label>
+        <Input className="h-11" type="number" min="0" step="any" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="0" />
+      </div>
+      <div className="space-y-1.5">
+        <label className="text-sm font-semibold">حالة التوفر</label>
+        <select className={sel} value={form.isAvailable ? 'true' : 'false'} onChange={e => setForm({ ...form, isAvailable: e.target.value === 'true' })}>
+          <option value="true">متاحة</option>
+          <option value="false">غير متوفرة</option>
+        </select>
+      </div>
+    </div>
   )
 
   return (
     <div className="w-full px-4 py-6">
-      <div className="mb-6 text-right font-arabic">
-        <h1 className="text-2xl font-bold text-slate-900 text-right">سجل الخدمات الطبية</h1>
-      </div>
+      <div className="mb-6"><h1 className="text-2xl font-bold">سجل الخدمات الطبية</h1></div>
 
-      <Card className="overflow-hidden border-slate-200 shadow-sm rounded-xl bg-white font-arabic">
+      <Card className="overflow-hidden rounded-xl border shadow-sm">
         <CardContent className="p-0">
           <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b">
             <div className="relative w-full max-w-xs">
-              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="ابحث عن خدمة..."
-                className="w-full pr-10 bg-slate-50 border-none h-10 rounded-lg text-sm"
-              />
+              <Search className="absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={q} onChange={e => setQ(e.target.value)} placeholder="ابحث..." className="h-10 pe-10" />
             </div>
-            {/* الزر باللون الأزرق */}
-            <Button onClick={() => setAddOpen(true)} className="bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 rounded-lg mr-auto font-bold shadow-sm transition-all">
-              <Plus className="h-4 w-4 ml-2" /> إضافة خدمة جديدة
+            <Button onClick={() => { setAddForm(blank); setAddOpen(true) }} className="bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 gap-2 sm:ms-auto">
+              <Plus className="h-4 w-4" /> إضافة خدمة
             </Button>
           </div>
-
           <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse text-sm">
-              <thead className="bg-slate-50 border-b border-slate-100 font-bold text-slate-600">
+            <table className="w-full text-start border-collapse text-sm">
+              <thead className="bg-muted/40 border-b">
                 <tr>
-                  <th className="p-4 text-right">الخدمة الطبية</th>
-                  <th className="p-4 text-right">التكلفة</th>
-                  <th className="p-4 text-right">الحالة</th>
-                  <th className="p-4 text-center">الإجراءات</th>
+                  <th className="p-4 font-semibold text-muted-foreground">المستشفى</th>
+                  <th className="p-4 font-semibold text-muted-foreground">القسم</th>
+                  <th className="p-4 font-semibold text-muted-foreground">الخدمة</th>
+                  <th className="p-4 font-semibold text-muted-foreground">التكلفة</th>
+                  <th className="p-4 font-semibold text-muted-foreground">الحالة</th>
+                  <th className="p-4 text-center font-semibold text-muted-foreground">الإجراءات</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
+              <tbody className="divide-y">
                 {loading ? (
-                  <tr><td colSpan={4} className="p-10 text-center"><Loader2 className="animate-spin mx-auto w-6 h-6 text-slate-300" /></td></tr>
-                ) : filteredItems.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4 font-bold text-slate-700">{item.serviceName}</td>
-                    {/* التكلفة باللون الأزرق */}
-                    <td className="p-4 font-mono text-blue-600 font-bold">{item.cost || '0'} $</td>
-                    <td className="p-4 text-right">
-                      <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${item.status === 'متاحة' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {item.status}
+                  <tr><td colSpan={6} className="p-16 text-center"><Loader2 className="animate-spin mx-auto size-5" /></td></tr>
+                ) : filtered.length === 0 ? (
+                  <tr><td colSpan={6} className="p-16 text-center text-muted-foreground italic">لا توجد بيانات</td></tr>
+                ) : filtered.map(item => (
+                  <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="p-4 font-medium text-blue-600">{item.hospitalName}</td>
+                    <td className="p-4 text-muted-foreground">{item.departmentName}</td>
+                    <td className="p-4 font-semibold">{item.name}</td>
+                    <td className="p-4 font-mono text-blue-600">{item.price > 0 ? `${item.price} ₪` : 'مجاني'}</td>
+                    <td className="p-4">
+                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${item.isAvailable ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                        {item.isAvailable ? 'متاحة' : 'غير متوفرة'}
                       </span>
                     </td>
                     <td className="p-4 text-center">
-                        <Pencil className="w-4 h-4 mx-auto text-slate-400 cursor-pointer hover:text-blue-600" />
+                      <button onClick={() => openEdit(item)} className="rounded-md border p-2 text-muted-foreground hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                        <Pencil className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -146,82 +181,32 @@ export default function ServicesPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-md font-arabic rounded-2xl max-h-[90vh] overflow-visible shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-right text-lg font-bold border-b pb-2">إضافة بيانات الخدمة</DialogTitle>
-          </DialogHeader>
-          
-          <div className="flex flex-col gap-5 py-6 text-right">
-            
-            <div className="space-y-2 text-right">
-              <label className="text-sm font-bold text-slate-800 block">اسم الخدمة الطبية</label>
-              <div className="relative">
-                <select 
-                  className={selectBaseClass + " h-12 bg-blue-50/30 border-blue-100 font-bold text-blue-700 focus:border-blue-600"} 
-                  value={serviceName} 
-                  onChange={e => setServiceName(e.target.value)}
-                >
-                  <option value="">اختر الخدمة الطبية من القائمة</option>
-                  {AVAILABLE_MEDICAL_SERVICES.map(ser => <option key={ser} value={ser}>{ser}</option>)}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-                  <svg className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2 text-right">
-                <label className="text-sm font-bold text-slate-800 block">التكلفة الإجمالية ($)</label>
-                <Input 
-                  type="number" 
-                  className="h-12 bg-slate-50 border-slate-200 focus-visible:ring-blue-600 focus-visible:border-blue-600 transition-all text-right" 
-                  value={cost} 
-                  onChange={e => setCost(e.target.value)} 
-                  placeholder="0.00" 
-                />
-            </div>
-
-            <div className="space-y-2 text-right">
-                <label className="text-sm font-bold text-slate-800 block">حالة توفر الخدمة</label>
-                <div className="relative">
-                  <select 
-                    className={selectBaseClass + " h-12 bg-slate-50 border-slate-200 text-slate-700"} 
-                    value={status} 
-                    onChange={e => setStatus(e.target.value)}
-                  >
-                      <option value="متاحة">متاحة الآن</option>
-                      <option value="غير متوفرة">غير متوفرة حالياً</option>
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-                    <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                  </div>
-                </div>
-            </div>
-
-            {!isAddValid && (
-              <div className="text-[12px] text-amber-700 flex items-center gap-2 bg-amber-50 p-3 rounded-xl border border-amber-200 mt-2">
-                <AlertCircle className="w-4 h-4 shrink-0"/> يرجى تحديد نوع الخدمة الطبية لإتمام عملية الحفظ.
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="flex flex-col sm:flex-row gap-3 pt-6 border-t">
-            {/* زر الحفظ بالأزرق */}
-            <Button 
-              onClick={onAdd} 
-              disabled={!isAddValid || submitting} 
-              className="w-full bg-blue-600 text-white font-bold h-12 rounded-xl shadow-lg hover:bg-blue-700 transition-all active:scale-95"
-            >
-              {submitting ? <Loader2 className="animate-spin ml-2 h-4 w-4" /> : null} حفظ البيانات
+      {/* Add */}
+      <Dialog open={addOpen} onOpenChange={open => { setAddOpen(open); if (!open) setAddForm(blank) }}>
+        <DialogContent className="max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="text-start text-lg font-bold">إضافة خدمة جديدة</DialogTitle></DialogHeader>
+          <FormFields form={addForm} setForm={setAddForm} />
+          {!isValid(addForm) && <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700"><AlertCircle className="w-3.5 h-3.5 shrink-0" /> يرجى تعبئة الحقول المطلوبة</div>}
+          <DialogFooter className="flex flex-row gap-3 mt-2">
+            <Button onClick={onAdd} disabled={!isValid(addForm) || addSub} className="flex-1 h-11 gap-2 bg-blue-600 text-white hover:bg-blue-700 rounded-xl">
+              {addSub && <Loader2 className="animate-spin size-4" />} حفظ
             </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => {setAddOpen(false); resetAddForm();}} 
-              className="w-full h-12 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50"
-            >
-              إلغاء
+            <Button variant="outline" onClick={() => setAddOpen(false)} className="flex-1 h-11 rounded-xl">إلغاء</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="text-start text-lg font-bold">تعديل الخدمة</DialogTitle></DialogHeader>
+          <FormFields form={editForm} setForm={setEditForm} />
+          {!isValid(editForm) && <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700"><AlertCircle className="w-3.5 h-3.5 shrink-0" /> يرجى تعبئة الحقول المطلوبة</div>}
+          <DialogFooter className="flex flex-row gap-3 mt-2">
+            <Button onClick={onEdit} disabled={!isValid(editForm) || editSub} className="flex-1 h-11 gap-2 bg-blue-600 text-white hover:bg-blue-700 rounded-xl">
+              {editSub && <Loader2 className="animate-spin size-4" />} حفظ
             </Button>
+            <Button variant="outline" onClick={() => setEditOpen(false)} className="flex-1 h-11 rounded-xl">إلغاء</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

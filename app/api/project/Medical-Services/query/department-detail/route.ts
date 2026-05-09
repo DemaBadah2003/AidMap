@@ -10,20 +10,39 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Get department to find hospitalId
+    const department = await prisma.department.findUnique({
+      where: { id: departmentId },
+      select: { hospitalId: true },
+    })
+
+    if (!department) {
+      return NextResponse.json({ error: 'Department not found' }, { status: 404 })
+    }
+
     const [services, doctors] = await Promise.all([
       prisma.service.findMany({
         where: { departmentId },
         select: { id: true, name: true, price: true, isAvailable: true },
         orderBy: { name: 'asc' },
       }),
+      // Return doctors assigned to this department OR doctors of the hospital with no department
       prisma.doctor.findMany({
-        where: { departmentId },
-        select: { id: true, name: true, specialty: true, schedule: true, phone: true },
+        where: {
+          hospitalId: department.hospitalId,
+          OR: [
+            { departmentId },
+            { departmentId: null },
+          ],
+        },
+        select: { id: true, name: true, specialty: true, workSchedule: true, phone: true },
         orderBy: { name: 'asc' },
       }),
     ])
+
     return NextResponse.json({ services, doctors })
-  } catch {
+  } catch (e) {
+    console.error('department-detail error:', e)
     return NextResponse.json({ error: 'Failed to fetch department detail' }, { status: 500 })
   }
 }

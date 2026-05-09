@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
       hospitalName: doc.hospital?.name || "غير محدد",
       hospitalId: doc.hospitalId,
       phone: doc.phone,
-      workSchedule: doc.schedule, // مطابقة schedule في السكيما مع workSchedule في الواجهة
+      workSchedule: doc.workSchedule,
       description: doc.description,
     }));
 
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
         name: body.name,
         specialty: body.specialization || "عام",
         phone: body.phone,
-        schedule: body.workSchedule || "غير محدد",
+        workSchedule: body.workSchedule || "غير محدد",
         description: body.description || "",
         hospitalId: body.hospitalId, // يجب أن يكون معرف UUID صحيح لمستشفى موجود
       },
@@ -84,7 +84,7 @@ export async function PATCH(req: NextRequest) {
         name: body.name,
         specialty: body.specialization,
         phone: body.phone,
-        schedule: body.workSchedule,
+        workSchedule: body.workSchedule,
         description: body.description,
         hospitalId: body.hospitalId,
       },
