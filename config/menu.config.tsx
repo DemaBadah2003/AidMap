@@ -27,12 +27,10 @@ export const MENU_SIDEBAR: MenuConfig = [
             children: [
                { title: 'الصفحة الرئيسية ', path: '/project/projects/Medical-Services/home' },
                 { title: 'جدول المرضى', path: '/project/projects/Medical-Services/patients' },
-               { title: 'جدول العناوين', path: '/project/projects/Medical-Services/Address' },
               { title: 'جدول المستشفيات', path: '/project/projects/Medical-Services/hospitals' },
               { title: 'جدول الأقسام', path: '/project/projects/Medical-Services/department' },
               { title: 'جدول الخدمات', path: '/project/projects/Medical-Services/service' },
               { title: 'جدول الاطباء', path: '/project/projects/Medical-Services/doctors' },
-              { title: 'جدول الصيدليات', path: '/project/projects/Medical-Services/pharmacies' },
             ],
           },
 

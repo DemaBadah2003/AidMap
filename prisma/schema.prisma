@@ -6,8 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-// --- قسم المستخدمين والصلاحيات ---
-
 model User {
   id              String      @id @default(uuid())
   email           String      @unique
@@ -90,8 +88,6 @@ model Account {
   @@unique([provider, providerAccountId], name: "provider_providerAccountId")
 }
 
-// --- قسم الإيواء والمخيمات ---
-
 model Shelter {
   id            String         @id @default(uuid())
   name          String
@@ -106,15 +102,8 @@ model Shelter {
   updatedAt     DateTime       @updatedAt
   isTrashed     Boolean        @default(false)
   isProtected   Boolean        @default(false)
-
-  supervisor Supervisor @relation(fields: [supervisorId], references: [id])
-  place      Place?     @relation("ShelterPlace", fields: [placeId], references: [id])
-
-  @@index([supervisorId])
-  @@index([fillStatus])
-  @@index([name])
-  @@index([area])
-  @@index([isTrashed])
+  place         Place?         @relation("ShelterPlace", fields: [placeId], references: [id])
+  supervisor    Supervisor     @relation(fields: [supervisorId], references: [id])
 }
 
 model Camps {
@@ -125,26 +114,19 @@ model Camps {
   capacity             Int            @default(0)
   currentFamiliesCount Int            @default(0)
   status               CampFillStatus @default(NOT_FULL)
-
-  latitude  Decimal? @db.Decimal(10, 7)
-  longitude Decimal? @db.Decimal(10, 7)
-
-  supervisorId String?
-  placeId      String? @unique
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  isTrashed   Boolean  @default(false)
-  isProtected Boolean  @default(false)
-
-  addresses     Address[]
-  beneficiaries Beneficiary[]
-  place         Place?        @relation("CampPlace", fields: [placeId], references: [id])
-  supervisor    Supervisor?   @relation(fields: [supervisorId], references: [id])
-  emergencies   Emergency[]
-
-  @@index([supervisorId])
-  @@index([status])
+  latitude             Decimal?       @db.Decimal(10, 7)
+  longitude            Decimal?       @db.Decimal(10, 7)
+  supervisorId         String?
+  placeId              String?        @unique
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  isTrashed            Boolean        @default(false)
+  isProtected          Boolean        @default(false)
+  addresses            Address[]
+  place                Place?         @relation("CampPlace", fields: [placeId], references: [id])
+  supervisor           Supervisor?    @relation(fields: [supervisorId], references: [id])
+  Citizens             Citizens[]
+  emergencies          Emergency[]
 }
 
 model Supervisor {
@@ -156,178 +138,114 @@ model Supervisor {
   updatedAt   DateTime      @updatedAt
   isTrashed   Boolean       @default(false)
   isProtected Boolean       @default(false)
+  area        String?
   camps       Camps[]
-  shelters    Shelter[]
   emergencies Emergency[]
-
-  @@index([status])
+  shelters    Shelter[]
 }
 
-// --- قسم المستشفيات والخدمات الطبية المحدث ---
-
 model Hospital {
-  id        String       @id @default(uuid())
-  type      HospitalType
-  name      String
-  region    Region
-  location  String
-  phone     String
-  latitude  Decimal?     @db.Decimal(10, 7)
-  longitude Decimal?     @db.Decimal(10, 7)
-
-  placeId String? @unique
-  place   Place?  @relation("HospitalPlace", fields: [placeId], references: [id])
-
-  departments Department[]
-  doctors     Doctor[]
-  patients    Patient[]
-  pharmacies  Pharmacy[]
-  addresses   Address[]
-
+  id            String         @id @default(uuid())
+  type          HospitalType
+  name          String
+  region        Region
+  phone         String
+  latitude      Decimal?       @db.Decimal(10, 7)
+  longitude     Decimal?       @db.Decimal(10, 7)
+  placeId       String?        @unique
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  addressId     String
+  departments   Department[]
   distributions Distribution[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([type])
-  @@index([region])
+  doctors       Doctor[]
+  Address       Address        @relation(fields: [addressId], references: [id])
+  place         Place?         @relation("HospitalPlace", fields: [placeId], references: [id])
+  patients      Patient[]
 }
 
 model Department {
-  id   String @id @default(uuid())
-  name String
-
-  hospitalId String
-  hospital   Hospital @relation(fields: [hospitalId], references: [id])
-
-  services Service[]
-  doctors  Doctor[]
-
-  createdAt DateTime @default(now())
+  id          String    @id @default(uuid())
+  name        String
+  hospitalId  String
+  createdAt   DateTime  @default(now())
+  deptType    String
+  description String?
+  status      String    @default("يعمل بكفاءة")
+  hospital    Hospital  @relation(fields: [hospitalId], references: [id])
+  doctors     Doctor[]
+  services    Service[]
 }
 
 model Service {
-  id          String  @id @default(uuid())
-  name        String
-  price       Float   @default(0.0)
-  isAvailable Boolean @default(true)
-
-  departmentId String
-  department   Department @relation(fields: [departmentId], references: [id])
-
+  id                  String               @id @default(uuid())
+  name                String
+  price               Float                @default(0.0)
+  isAvailable         Boolean              @default(true)
+  departmentId        String
+  createdAt           DateTime             @default(now())
   institutionServices InstitutionService[]
-
-  createdAt DateTime @default(now())
+  department          Department           @relation(fields: [departmentId], references: [id])
 }
 
 model Doctor {
-  id          String  @id @default(uuid())
-  name        String
-  phone       String
-  specialty   String
-  schedule    String? @db.Text
-  description String? @db.Text
-
+  id           String      @id @default(uuid())
+  name         String
+  phone        String
+  specialty    String
+  description  String?
   hospitalId   String
-  hospital     Hospital    @relation(fields: [hospitalId], references: [id])
   departmentId String?
+  createdAt    DateTime    @default(now())
+  workSchedule String
   department   Department? @relation(fields: [departmentId], references: [id])
-
-  createdAt DateTime @default(now())
+  hospital     Hospital    @relation(fields: [hospitalId], references: [id])
 }
 
 model Patient {
-  id          String @id @default(uuid())
+  id          String   @id @default(uuid())
   name        String
   phone       String
-  diseaseType String
-
-  hospitalId String
-  hospital   Hospital @relation(fields: [hospitalId], references: [id])
-
-  createdAt DateTime @default(now())
-}
-
-model Pharmacy {
-  id              String  @id @default(uuid())
-  name            String
-  phone           String
-  availableMeds   String? @db.Text
-  unavailableMeds String? @db.Text
-
-  hospitalId String
-  hospital   Hospital @relation(fields: [hospitalId], references: [id])
-
-  createdAt DateTime @default(now())
+  diseaseType String?
+  hospitalId  String
+  createdAt   DateTime @default(now())
+  address     String
+  age         String
+  nationalId  String   @unique
+  hospital    Hospital @relation(fields: [hospitalId], references: [id])
 }
 
 model Address {
-  id          String  @id @default(uuid())
+  id          String     @id @default(uuid())
   title       String
   description String?
-
-  hospitalId String?
-  hospital   Hospital? @relation(fields: [hospitalId], references: [id])
-
-  campId String?
-  camp   Camps?  @relation(fields: [campId], references: [id])
-
-  createdAt DateTime @default(now())
+  campId      String?
+  createdAt   DateTime   @default(now())
+  region      Region
+  camp        Camps?     @relation(fields: [campId], references: [id])
+  Hospital    Hospital[]
 }
 
-// --- قسم المؤسسات والمنتجات ---
-
 model Institution {
-  id          String         @id @default(uuid())
-  name        String
-  email       String?
-  serviceType String?
-  presence    PresenceStatus @default(AVAILABLE)
-  status      GeneralStatus  @default(ACTIVE)
-  latitude    Decimal?       @db.Decimal(10, 7)
-  longitude   Decimal?       @db.Decimal(10, 7)
-  placeId     String?        @unique
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  isTrashed   Boolean        @default(false)
-  isProtected Boolean        @default(false)
-
+  id                  String               @id @default(uuid())
+  name                String
+  email               String?
+  serviceType         String?
+  presence            PresenceStatus       @default(AVAILABLE)
+  status              GeneralStatus        @default(ACTIVE)
+  latitude            Decimal?             @db.Decimal(10, 7)
+  longitude           Decimal?             @db.Decimal(10, 7)
+  placeId             String?              @unique
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  isTrashed           Boolean              @default(false)
+  isProtected         Boolean              @default(false)
   contacts            Contact[]
   distributions       Distribution[]
   enterpriseProducts  EnterpriseProduct[]
   place               Place?               @relation("InstitutionPlace", fields: [placeId], references: [id])
   institutionProducts InstitutionProduct[]
   institutionServices InstitutionService[]
-
-  @@index([status])
-  @@index([presence])
-  @@index([isTrashed])
-}
-
-model Beneficiary {
-  id             String              @id @default(uuid())
-  name           String
-  phone          String              @unique
-  numberOfFamily Int                 @default(0)
-  priority       BeneficiaryPriority @default(NORMAL)
-  area           String?
-  campId         String?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  role           String              @default("CITIZEN")
-  isActive       Boolean             @default(true)
-  isTrashed      Boolean             @default(false)
-  isProtected    Boolean             @default(false)
-  camp           Camps?              @relation(fields: [campId], references: [id])
-  contacts       Contact[]
-  distributions  Distribution[]
-
-  @@index([campId])
-  @@index([area])
-  @@index([name])
-  @@index([phone])
-  @@index([isActive])
-  @@index([isTrashed])
 }
 
 model Aid {
@@ -338,7 +256,6 @@ model Aid {
   dateReceived  DateTime
   donor         String?
   status        String
-  notes         String?        @db.Text
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   distributions Distribution[]
@@ -346,7 +263,6 @@ model Aid {
 
 model Distribution {
   id            String             @id @default(uuid())
-  beneficiaryId String?
   institutionId String
   productId     String?
   quantity      Int                @default(0)
@@ -354,8 +270,9 @@ model Distribution {
   aidId         String?
   hospitalId    String?
   placeId       String?
+  citizenId     String?
   aid           Aid?               @relation(fields: [aidId], references: [id])
-  beneficiary   Beneficiary?       @relation(fields: [beneficiaryId], references: [id])
+  Citizens      Citizens?          @relation(fields: [citizenId], references: [id])
   hospital      Hospital?          @relation(fields: [hospitalId], references: [id])
   institution   Institution        @relation(fields: [institutionId], references: [id])
   place         Place?             @relation("PlaceDistribution", fields: [placeId], references: [id])
@@ -363,12 +280,11 @@ model Distribution {
 }
 
 model Product {
-  id       String        @id @default(uuid())
-  nameAr   String
-  price    Float         @default(0)
-  quantity Int           @default(0)
-  status   ProductStatus @default(GHAIR_MOJOUD)
-
+  id                  String               @id @default(uuid())
+  nameAr              String
+  price               Float                @default(0)
+  quantity            Int                  @default(0)
+  status              ProductStatus        @default(GHAIR_MOJOUD)
   distributions       Distribution[]
   enterpriseProducts  EnterpriseProduct[]
   institutionProducts InstitutionProduct[]
@@ -396,36 +312,31 @@ model InstitutionProduct {
 }
 
 model Place {
-  id            String      @id @default(uuid())
+  id            String         @id @default(uuid())
   name          String
   type          PlaceType
   description   String?
-  latitude      Decimal     @db.Decimal(10, 7)
-  longitude     Decimal     @db.Decimal(10, 7)
-  status        PlaceStatus @default(AVAILABLE)
-  isActive      Boolean     @default(true)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  isTrashed     Boolean     @default(false)
-  isProtected   Boolean     @default(false)
+  latitude      Decimal        @db.Decimal(10, 7)
+  longitude     Decimal        @db.Decimal(10, 7)
+  status        PlaceStatus    @default(AVAILABLE)
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  isTrashed     Boolean        @default(false)
+  isProtected   Boolean        @default(false)
   operator      String?
   capacity      Int?
   occupancy     Int?
   availableBeds Int?
   statusText    String?
-
-  camp        Camps?       @relation("CampPlace")
-  hospital    Hospital?    @relation("HospitalPlace")
-  shelter     Shelter?     @relation("ShelterPlace")
-  institution Institution? @relation("InstitutionPlace")
-
+  camp          Camps?         @relation("CampPlace")
   distributions Distribution[] @relation("PlaceDistribution")
-
-  @@index([type])
-  @@index([status])
-  @@index([isActive])
-  @@index([isTrashed])
-  @@index([name])
+  FoodPoint     FoodPoint?
+  hospital      Hospital?      @relation("HospitalPlace")
+  institution   Institution?   @relation("InstitutionPlace")
+  Internet      Internet?
+  shelter       Shelter?       @relation("ShelterPlace")
+  WaterPoint    WaterPoint?
 }
 
 model Session {
@@ -447,24 +358,18 @@ model SystemLog {
   ipAddress   String?
   meta        String?
   user        User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
 }
 
 model Contact {
   id            String        @id @default(uuid())
-  beneficiaryId String
   institutionId String
   type          String?
   date          DateTime      @default(now())
-  notes         String?       @db.Text
+  notes         String?
   status        ContactStatus @default(NOT_DONE)
-
-  beneficiary Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
-  institution Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-
-  @@index([beneficiaryId])
-  @@index([institutionId])
+  citizenId     String
+  Citizens      Citizens      @relation(fields: [citizenId], references: [id], onDelete: Cascade)
+  institution   Institution   @relation(fields: [institutionId], references: [id], onDelete: Cascade)
 }
 
 model Emergency {
@@ -491,9 +396,8 @@ model EnterpriseProduct {
 
 model VerificationToken {
   identifier String
-  token      String                   @unique
+  token      String   @unique
   expires    DateTime
-  purpose    VerificationTokenPurpose @default(EMAIL_VERIFY)
 
   @@unique([identifier, token])
 }
@@ -537,7 +441,6 @@ model SystemSetting {
 
 model DistributeAidForm {
   id               String                  @id @default(uuid())
-  beneficiaryName  String
   aidType          String
   quantity         Int
   status           DistributeAidFormStatus @default(SCHEDULED)
@@ -546,37 +449,141 @@ model DistributeAidForm {
   institutionId    String?
   notes            String?
   updatedAt        DateTime                @updatedAt
-
-  @@index([beneficiaryName])
-  @@index([aidType])
-  @@index([status])
-  @@index([distributionDate])
+  citizenName      String
 }
 
 model RequestAid {
-  id            String             @id @default(uuid())
-  referenceCode String?            @unique
-  fullName      String
-  nationalId    String
-  phone         String
-  aidType       String
-  familyCount   Int
-  address       String
-  notes         String?
-  adminNotes    String?            @db.Text
-  status        DistributionStatus @default(PENDING)
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-
-  @@index([nationalId])
-  @@index([phone])
+  id          String             @id @default(uuid())
+  fullName    String
+  nationalId  String
+  phone       String
+  aidType     String
+  familyCount Int
+  address     String
+  notes       String?
+  status      DistributionStatus @default(PENDING)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 }
 
-// --- Enums ---
+model Citizens {
+  id             String              @id
+  name           String
+  idNumber       String?             @unique
+  phone          String              @unique
+  numberOfFamily Int                 @default(0)
+  priority       BeneficiaryPriority @default(NORMAL)
+  area           String?
+  campId         String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime
+  role           String              @default("CITIZEN")
+  isActive       Boolean             @default(true)
+  isTrashed      Boolean             @default(false)
+  isProtected    Boolean             @default(false)
+  Camps          Camps?              @relation(fields: [campId], references: [id])
+  Contact        Contact[]
+  Distribution   Distribution[]
+}
 
-enum VerificationTokenPurpose {
-  EMAIL_VERIFY
-  PASSWORD_RESET
+model FoodPoint {
+  id          String          @id
+  name        String
+  serviceType FoodServiceType @default(HOT_MEALS)
+  status      FoodPointStatus @default(OPERATIONAL)
+  placeId     String?         @unique
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime
+  location    String?
+  region      String?
+  Place       Place?          @relation(fields: [placeId], references: [id])
+}
+
+model Internet {
+  id          String   @id
+  placeName   String
+  powerSource String
+  wifiQuality String
+  seatsCount  Int      @default(0)
+  isFree      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  isTrashed   Boolean  @default(false)
+  placeId     String?  @unique
+  Place       Place?   @relation(fields: [placeId], references: [id])
+
+  @@index([placeName])
+  @@index([wifiQuality])
+}
+
+model PsychologicalSupport {
+  id           String   @id
+  centerName   String
+  specialist   String
+  appointments String
+  serviceType  String
+  capacity     Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+  isTrashed    Boolean  @default(false)
+  currentCount Int      @default(0)
+  phoneNumber  String
+  status       String   @default("متاح")
+
+  @@index([centerName])
+  @@index([specialist])
+}
+
+model School {
+  id        String   @id
+  name      String
+  location  String?
+  region    String?
+  level     String?
+  studyDays String?
+  timing    String?
+  fees      Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  isTrashed Boolean  @default(false)
+}
+
+model Student {
+  id            String   @id
+  name          String
+  nationalId    String   @unique
+  level         String
+  birthDate     DateTime
+  guardianName  String
+  guardianPhone String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime
+  isTrashed     Boolean  @default(false)
+}
+
+model StudentIssue {
+  id          String   @id
+  issueType   String
+  level       String
+  studentName String
+  schoolName  String
+  status      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  isTrashed   Boolean  @default(false)
+
+  @@index([studentName])
+}
+
+model WaterPoint {
+  id        String           @id
+  name      String
+  type      WaterType        @default(SWEET)
+  status    WaterPointStatus @default(OPERATIONAL)
+  placeId   String?          @unique
+  createdAt DateTime         @default(now())
+  updatedAt DateTime
+  Place     Place?           @relation(fields: [placeId], references: [id])
 }
 
 enum UserStatus {
@@ -670,4 +677,25 @@ enum Region {
   SOUTH
   EAST
   WEST
+}
+
+enum FoodPointStatus {
+  OPERATIONAL
+  STOPPED
+}
+
+enum FoodServiceType {
+  HOT_MEALS
+  DRY_RATIONS
+  BAKERY
+}
+
+enum WaterPointStatus {
+  OPERATIONAL
+  STOPPED
+}
+
+enum WaterType {
+  SWEET
+  SALTY
 }
