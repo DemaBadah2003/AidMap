@@ -36,6 +36,7 @@ export const MENU_SIDEBAR: MenuConfig = [
             path: '/project/projects/education',
             children: [
               { title: 'جدول المدارس', path: '/project/projects/education/school' },
+              { title: 'فلترة المدارس', path: '/project/projects/education/school/query' },
             ],
           },
 

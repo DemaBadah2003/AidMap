@@ -535,17 +535,22 @@ model PsychologicalSupport {
 }
 
 model School {
-  id        String   @id
-  name      String
-  location  String?
-  region    String?
-  level     String?
-  studyDays String?
-  timing    String?
-  fees      Float    @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime
-  isTrashed Boolean  @default(false)
+  id           String   @id
+  name         String
+  location     String?
+  region       String?
+  level        String?
+  studyDays    String?
+  timing       String?
+  fees         Float    @default(0)
+  schoolType   String?
+  gender       String?
+  totalCount   Int      @default(0)
+  latitude     Float?
+  longitude    Float?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  isTrashed    Boolean  @default(false)
 }
 
 model Student {

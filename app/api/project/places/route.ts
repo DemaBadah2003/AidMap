@@ -74,36 +74,87 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const typeParam = searchParams.get('type')
 
-    const where: Prisma.PlaceWhereInput = {
-      isActive: true,
-      isTrashed: false,
+    const allPlaces: Array<{
+      id: string; name: string; type: string
+      lat: number; lng: number; operator: string
+      capacity: number; occupancy: number; availableBeds: number; statusText: string
+    }> = []
+
+    // 1. Place table
+    if (!typeParam || typeParam === 'shelter' || typeParam === 'hospital' || typeParam === 'water' || typeParam === 'food') {
+      const where: Prisma.PlaceWhereInput = { isActive: true, isTrashed: false }
+      if (typeParam && isValidFrontPlaceType(typeParam)) {
+        where.type = mapFrontTypeToPrismaType(typeParam)
+      }
+      const places = await prisma.place.findMany({ where, orderBy: { createdAt: 'desc' } })
+      for (const p of places) {
+        const lat = Number(p.latitude)
+        const lng = Number(p.longitude)
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat === 0 || lng === 0) continue
+        allPlaces.push({
+          id: p.id,
+          name: p.name,
+          type: p.type === PlaceType.SHELTER ? 'shelter' : p.type === PlaceType.MEDICAL ? 'hospital' : p.type === PlaceType.WATER_POINT ? 'water' : 'food',
+          lat, lng,
+          operator: p.operator ?? '',
+          capacity: p.capacity ?? 0,
+          occupancy: p.occupancy ?? 0,
+          availableBeds: p.availableBeds ?? 0,
+          statusText: p.statusText ?? '',
+        })
+      }
     }
 
-    if (typeParam && isValidFrontPlaceType(typeParam)) {
-      where.type = mapFrontTypeToPrismaType(typeParam)
+    // 2. Hospitals table (has direct lat/lng)
+    if (!typeParam || typeParam === 'hospital') {
+      const hospitals = await prisma.hospital.findMany({
+        select: { id: true, name: true, latitude: true, longitude: true, phone: true, type: true },
+      })
+      for (const h of hospitals) {
+        const lat = Number(h.latitude)
+        const lng = Number(h.longitude)
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat === 0 || lng === 0) continue
+        // avoid duplicates if already linked via placeId
+        if (allPlaces.some(p => p.id === h.id)) continue
+        allPlaces.push({
+          id: `hospital-${h.id}`,
+          name: h.name,
+          type: 'hospital',
+          lat, lng,
+          operator: h.phone ?? '',
+          capacity: 0, occupancy: 0, availableBeds: 0,
+          statusText: 'مستشفى',
+        })
+      }
     }
 
-    const places = await prisma.place.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-    })
+    // 3. Camps table (has direct lat/lng)
+    if (!typeParam || typeParam === 'shelter') {
+      const camps = await prisma.camps.findMany({
+        where: { isTrashed: false },
+        select: { id: true, name: true, latitude: true, longitude: true, capacity: true, currentFamiliesCount: true, status: true },
+      })
+      for (const c of camps) {
+        const lat = Number(c.latitude)
+        const lng = Number(c.longitude)
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat === 0 || lng === 0) continue
+        if (allPlaces.some(p => p.id === `camp-${c.id}`)) continue
+        const available = Math.max((c.capacity ?? 0) - (c.currentFamiliesCount ?? 0), 0)
+        allPlaces.push({
+          id: `camp-${c.id}`,
+          name: c.name,
+          type: 'shelter',
+          lat, lng,
+          operator: '',
+          capacity: c.capacity ?? 0,
+          occupancy: c.currentFamiliesCount ?? 0,
+          availableBeds: available,
+          statusText: c.status === 'FULL' ? 'ممتلئ' : c.status === 'ALMOST_FULL' ? 'شبه ممتلئ' : 'متاح',
+        })
+      }
+    }
 
-    const mappedPlaces = places.map((place) => ({
-      id: place.id,
-      name: place.name,
-      type: place.type === PlaceType.SHELTER ? 'shelter' : 
-            place.type === PlaceType.MEDICAL ? 'hospital' : 
-            place.type === PlaceType.WATER_POINT ? 'water' : 'food',
-      lat: Number(place.latitude) || 0,
-      lng: Number(place.longitude) || 0,
-      operator: place.operator ?? '',
-      capacity: place.capacity ?? 0,
-      occupancy: place.occupancy ?? 0,
-      availableBeds: place.availableBeds ?? 0,
-      statusText: place.statusText ?? '',
-    }))
-
-    return NextResponse.json({ success: true, count: mappedPlaces.length, data: mappedPlaces })
+    return NextResponse.json({ success: true, count: allPlaces.length, data: allPlaces })
   } catch (error) {
     console.error('GET Error:', error)
     return NextResponse.json({ success: false, message: 'فشل في جلب البيانات' }, { status: 500 })

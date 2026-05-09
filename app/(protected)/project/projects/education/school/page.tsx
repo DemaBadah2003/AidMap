@@ -1,165 +1,166 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Card, CardContent } from '../../../../../../components/ui/card'
-import { Button } from '../../../../../../components/ui/button'
-import { Input } from '../../../../../../components/ui/input'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '../../../../../../components/ui/dialog'
-import { 
-  Pencil, 
-  Plus, 
-  Search, 
-  Loader2, 
-  AlertCircle 
-} from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Pencil, Plus, Search, Loader2, AlertCircle, ChevronLeft } from 'lucide-react'
 
-// البيانات الثابتة للقوائم المنسدلة
 const LOCATIONS = ['شمال', 'جنوب', 'شرق', 'غرب']
 const AREAS_BY_LOCATION: Record<string, string[]> = {
   'شمال': ['جباليا', 'بيت لاهيا', 'بيت حانون'],
   'جنوب': ['رفح', 'خانيونس'],
   'شرق': ['حي الشجاعية', 'الزيتون', 'التفاح'],
-  'غرب': ['الرمال', 'مخيم الشاطئ', 'تل الهوى']
+  'غرب': ['الرمال', 'مخيم الشاطئ', 'تل الهوى'],
 }
-const STAGES = ['ابتدائي', 'اعدادى', 'ثانوى']
-const STUDY_DAYS = ['السبت الاثنين الاربعاء', 'الاحد الثلاثاء الخميس']
-const FEES_OPTIONS = ['فى رسوم', 'لا يوجد رسوم']
-const SHIFTS = ['صباحى', 'مسائي']
+const STAGES = ['روضة', 'ابتدائي', 'اعدادي', 'ثانوي']
+const SCHOOL_TYPES = ['حكومي', 'خاص', 'وكالة (أونروا)', 'دولي']
+const GENDERS = ['ذكور', 'إناث', 'مشترك']
+const STUDY_DAYS = ['السبت الاثنين الأربعاء', 'الأحد الثلاثاء الخميس', 'يومي']
+const SHIFTS = ['صباحي', 'مسائي', 'ثنائي']
+const FEES_OPTIONS = ['مجاني', 'برسوم']
 
 type School = {
   id: string
-  schoolName: string
-  location: string
-  area: string
-  stage: string
-  studyDays: string
-  feesStatus: string
-  shift: string
+  name: string
+  location: string | null
+  region: string | null
+  level: string | null
+  studyDays: string | null
+  timing: string | null
+  fees: number
+  schoolType: string | null
+  gender: string | null
+  totalCount: number
+  latitude: number | null
+  longitude: number | null
 }
 
-const BASE_URL = '/api/project/projects/medical/schools' 
-const selectBaseClass = 'w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-right text-xs sm:text-sm outline-none focus:ring-2 focus:ring-slate-100 font-normal'
+const emptyForm = {
+  name: '', location: '', region: '', level: '', studyDays: '', timing: '',
+  fees: 0, feesStatus: 'مجاني', schoolType: '', gender: '', totalCount: 0, latitude: '', longitude: '',
+}
+
+const sel = 'w-full h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-right text-sm outline-none focus:ring-2 focus:ring-blue-200'
 
 export default function SchoolsPage() {
+  const router = useRouter()
   const [q, setQ] = useState('')
   const [items, setItems] = useState<School[]>([])
   const [loading, setLoading] = useState(true)
-
-  // حقول الإضافة المحدثة
-  const [addOpen, setAddOpen] = useState(false)
-  const [schoolName, setSchoolName] = useState('')
-  const [location, setLocation] = useState('')
-  const [area, setArea] = useState('')
-  const [stage, setStage] = useState('')
-  const [studyDays, setStudyDays] = useState('')
-  const [feesStatus, setFeesStatus] = useState('')
-  const [shift, setShift] = useState('')
+  const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState<School | null>(null)
+  const [form, setForm] = useState(emptyForm)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
-  const fetchSchools = async () => {
+  const fetchData = () => {
     setLoading(true)
+    fetch('/api/project/education/schools')
+      .then(r => r.json())
+      .then(d => setItems(Array.isArray(d.schools) ? d.schools : []))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false))
+  }
+  useEffect(() => { fetchData() }, [])
+
+  const filtered = useMemo(() =>
+    items.filter(s => s.name.toLowerCase().includes(q.toLowerCase()) || (s.location || '').includes(q) || (s.region || '').includes(q)),
+    [items, q]
+  )
+
+  const openAdd = () => { setEditing(null); setForm(emptyForm); setError(''); setOpen(true) }
+  const openEdit = (s: School) => {
+    setEditing(s)
+    setForm({
+      name: s.name, location: s.location || '', region: s.region || '',
+      level: s.level || '', studyDays: s.studyDays || '', timing: s.timing || '',
+      fees: s.fees, feesStatus: s.fees > 0 ? 'برسوم' : 'مجاني',
+      schoolType: s.schoolType || '', gender: s.gender || '',
+      totalCount: s.totalCount, latitude: s.latitude?.toString() || '', longitude: s.longitude?.toString() || '',
+    })
+    setError(''); setOpen(true)
+  }
+
+  const isValid = form.name.trim() !== '' && form.schoolType !== '' && form.gender !== '' && form.level !== ''
+
+  const handleSave = async () => {
+    if (!isValid) { setError('يرجى تعبئة الحقول المطلوبة'); return }
+    setSaving(true)
+    const payload = { ...form, fees: form.feesStatus === 'مجاني' ? 0 : form.fees }
     try {
-      const res = await fetch(BASE_URL)
-      const data = await res.json()
-      setItems(data)
-    } catch (err) { console.error('Fetch error:', err) } 
-    finally { setLoading(false) }
+      const url = editing ? `/api/project/education/schools?id=${editing.id}` : '/api/project/education/schools'
+      const res = await fetch(url, { method: editing ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      if (!res.ok) { const d = await res.json(); setError(d.error || 'خطأ'); return }
+      setOpen(false); fetchData()
+    } finally { setSaving(false) }
   }
 
-  useEffect(() => { fetchSchools() }, [])
-
-  const isAddValid = useMemo(() => {
-    return (
-      schoolName.trim() !== '' &&
-      location !== '' &&
-      area !== '' &&
-      stage !== '' &&
-      studyDays !== '' &&
-      feesStatus !== '' &&
-      shift !== ''
-    )
-  }, [schoolName, location, area, stage, studyDays, feesStatus, shift])
-
-  const onAdd = async () => {
-    if (!isAddValid) return
-    setSubmitting(true)
-    try {
-      const res = await fetch(BASE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ schoolName, location, area, stage, studyDays, feesStatus, shift })
-      })
-      if (res.ok) {
-        await fetchSchools()
-        setAddOpen(false)
-        resetAddForm()
-      }
-    } finally { setSubmitting(false) }
-  }
-
-  const resetAddForm = () => {
-    setSchoolName(''); setLocation(''); setArea(''); setStage(''); setStudyDays(''); setFeesStatus(''); setShift('');
-  }
+  const [saving, setSaving] = useState(false)
+  const f = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm(p => ({ ...p, [key]: e.target.value }))
 
   return (
-    <div className="w-full px-4 py-6">
-      <div className="mb-6 text-right">
-        <h1 className="text-2xl font-bold text-slate-900 font-arabic">إدارة المدارس</h1>
-        <p className="text-sm text-slate-500 mt-1 font-normal font-arabic">الرئيسية &gt; جدول المدارس</p>
+    <div className="w-full px-4 py-6 font-arabic" dir="rtl">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">إدارة المدارس</h1>
+          <p className="text-sm text-slate-500 mt-1">الرئيسية &gt; جدول المدارس</p>
+        </div>
+        <Button variant="outline" onClick={() => router.push('/project/projects/education/school/query')} className="gap-2">
+          <Search className="w-4 h-4" /> نظام الفلترة
+        </Button>
       </div>
 
-      <Card className="overflow-hidden border-slate-200 shadow-sm rounded-xl bg-white font-arabic">
+      <Card className="overflow-hidden border-slate-200 shadow-sm rounded-xl bg-white">
         <CardContent className="p-0">
           <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b">
             <div className="relative w-full max-w-xs">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="ابحث عن مدرسة..."
-                className="w-full pr-10 bg-slate-50 border-none h-10 rounded-lg text-sm"
-              />
+              <Input value={q} onChange={e => setQ(e.target.value)} placeholder="ابحث بالاسم أو المنطقة..." className="w-full pr-10 bg-slate-50 border-none h-10 rounded-lg text-sm" />
             </div>
-            <Button onClick={() => setAddOpen(true)} className="bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 rounded-lg mr-auto font-bold shadow-sm">
-              <Plus className="h-4 w-4 ml-2" /> إضافة مدرسة
+            <Button onClick={openAdd} className="bg-blue-600 hover:bg-blue-700 h-10 px-4 rounded-lg font-bold shadow-sm mr-auto gap-2">
+              <Plus className="h-4 w-4" /> إضافة مدرسة
             </Button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse text-sm">
-              <thead className="bg-slate-50 border-b border-slate-100 font-bold text-slate-600">
+            <table className="w-full text-right text-sm">
+              <thead className="bg-slate-50 border-b font-bold text-slate-600">
                 <tr>
-                  <th className="p-4">اسم المدرسة</th>
-                  <th className="p-4">الموقع / المنطقة</th>
-                  <th className="p-4">المرحلة</th>
-                  <th className="p-4">أيام الدراسة</th>
-                  <th className="p-4">التوقيت</th>
-                  <th className="p-4 text-center">الرسوم</th>
-                  <th className="p-4 text-center">الإجراءات</th>
+                  {['اسم المدرسة', 'الموقع / المنطقة', 'النوع', 'الجنس', 'المرحلة', 'عدد الطلاب', 'التوقيت', 'الرسوم', ''].map(h => (
+                    <th key={h} className="p-4">{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
-                  <tr><td colSpan={7} className="p-10 text-center"><Loader2 className="animate-spin mx-auto w-6 h-6 text-slate-300" /></td></tr>
-                ) : items.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4 font-bold text-slate-700">{item.schoolName}</td>
-                    <td className="p-4 text-slate-600">{item.location} - {item.area}</td>
-                    <td className="p-4">{item.stage}</td>
-                    <td className="p-4 text-slate-500 text-xs">{item.studyDays}</td>
-                    <td className="p-4 font-medium">{item.shift}</td>
-                    <td className="p-4 text-center">
-                      <span className={`px-2 py-1 rounded text-[10px] font-bold ${item.feesStatus === 'فى رسوم' ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'}`}>
-                        {item.feesStatus}
+                  <tr><td colSpan={9} className="p-10 text-center"><Loader2 className="animate-spin mx-auto w-6 h-6 text-slate-300" /></td></tr>
+                ) : filtered.length === 0 ? (
+                  <tr><td colSpan={9} className="p-10 text-center text-slate-400">لا توجد مدارس</td></tr>
+                ) : filtered.map(s => (
+                  <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4 font-bold text-slate-700">{s.name}</td>
+                    <td className="p-4 text-slate-600">{[s.location, s.region].filter(Boolean).join(' - ') || '—'}</td>
+                    <td className="p-4 text-slate-500">{s.schoolType || '—'}</td>
+                    <td className="p-4">
+                      {s.gender && <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${s.gender === 'ذكور' ? 'bg-blue-50 text-blue-700' : s.gender === 'إناث' ? 'bg-pink-50 text-pink-700' : 'bg-purple-50 text-purple-700'}`}>{s.gender}</span>}
+                    </td>
+                    <td className="p-4 text-slate-500">{s.level || '—'}</td>
+                    <td className="p-4 text-slate-500">{s.totalCount > 0 ? s.totalCount.toLocaleString('ar') : '—'}</td>
+                    <td className="p-4 text-slate-500">{s.timing || '—'}</td>
+                    <td className="p-4">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${s.fees > 0 ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'}`}>
+                        {s.fees > 0 ? `${s.fees} ₪` : 'مجاني'}
                       </span>
                     </td>
-                    <td className="p-4 text-center"><Pencil className="w-4 h-4 mx-auto text-slate-400 cursor-pointer hover:text-blue-600" /></td>
+                    <td className="p-4">
+                      <Button size="sm" variant="outline" onClick={() => openEdit(s)} className="gap-1">
+                        <Pencil className="w-3 h-3" /> تعديل
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -168,19 +169,51 @@ export default function SchoolsPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-md font-arabic rounded-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="text-right text-lg font-bold">إضافة مدرسة جديدة</DialogTitle></DialogHeader>
-          <div className="flex flex-col gap-4 py-4 text-right">
-            
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">اسم المدرسة</label>
-              <Input className="h-11 bg-slate-50" placeholder="أدخل اسم المدرسة" value={schoolName} onChange={e => setSchoolName(e.target.value)} />
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold">{editing ? 'تعديل مدرسة' : 'إضافة مدرسة جديدة'}</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            {error && <p className="col-span-2 text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+
+            <div className="col-span-2 space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">اسم المدرسة *</label>
+              <Input className="h-11 bg-slate-50" value={form.name} onChange={f('name')} placeholder="أدخل اسم المدرسة" />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">الموقع</label>
-              <select className={selectBaseClass + " h-11 bg-slate-50"} value={location} onChange={e => { setLocation(e.target.value); setArea(''); }}>
+              <label className="text-xs font-bold text-slate-700">نوع المدرسة *</label>
+              <select className={sel} value={form.schoolType} onChange={f('schoolType')}>
+                <option value="">اختر النوع</option>
+                {SCHOOL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">الجنس *</label>
+              <select className={sel} value={form.gender} onChange={f('gender')}>
+                <option value="">اختر</option>
+                {GENDERS.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">المرحلة الدراسية *</label>
+              <select className={sel} value={form.level} onChange={f('level')}>
+                <option value="">اختر المرحلة</option>
+                {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">عدد الطلاب الكلي</label>
+              <Input className="h-11 bg-slate-50" type="number" value={form.totalCount} onChange={f('totalCount')} />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">الموقع (المحافظة)</label>
+              <select className={sel} value={form.location} onChange={e => { setForm(p => ({ ...p, location: e.target.value, region: '' })) }}>
                 <option value="">اختر الموقع</option>
                 {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
@@ -188,23 +221,15 @@ export default function SchoolsPage() {
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">المنطقة</label>
-              <select className={selectBaseClass + " h-11 bg-slate-50"} value={area} onChange={e => setArea(e.target.value)} disabled={!location}>
+              <select className={sel} value={form.region} onChange={f('region')} disabled={!form.location}>
                 <option value="">اختر المنطقة</option>
-                {location && AREAS_BY_LOCATION[location].map(a => <option key={a} value={a}>{a}</option>)}
+                {form.location && (AREAS_BY_LOCATION[form.location] || []).map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">المرحلة الدراسية</label>
-              <select className={selectBaseClass + " h-11 bg-slate-50"} value={stage} onChange={e => setStage(e.target.value)}>
-                <option value="">اختر المرحلة</option>
-                {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">مواعيد الدراسة (الأيام)</label>
-              <select className={selectBaseClass + " h-11 bg-slate-50"} value={studyDays} onChange={e => setStudyDays(e.target.value)}>
+              <label className="text-xs font-bold text-slate-700">أيام الدراسة</label>
+              <select className={sel} value={form.studyDays} onChange={f('studyDays')}>
                 <option value="">اختر الأيام</option>
                 {STUDY_DAYS.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
@@ -212,31 +237,48 @@ export default function SchoolsPage() {
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">التوقيت</label>
-              <select className={selectBaseClass + " h-11 bg-slate-50"} value={shift} onChange={e => setShift(e.target.value)}>
+              <select className={sel} value={form.timing} onChange={f('timing')}>
                 <option value="">اختر التوقيت</option>
-                {SHIFTS.map(sh => <option key={sh} value={sh}>{sh}</option>)}
+                {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">الرسوم الدراسية</label>
-              <select className={selectBaseClass + " h-11 bg-slate-50"} value={feesStatus} onChange={e => setFeesStatus(e.target.value)}>
-                <option value="">اختر حالة الرسوم</option>
-                {FEES_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+              <label className="text-xs font-bold text-slate-700">الرسوم</label>
+              <select className={sel} value={form.feesStatus} onChange={f('feesStatus')}>
+                {FEES_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
 
-            {!isAddValid && (
-              <div className="text-[11px] text-amber-600 flex items-center gap-2 bg-amber-50 p-2 rounded-lg border border-amber-100">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0"/> يرجى تعبئة كافة الحقول المطلوبة.
+            {form.feesStatus === 'برسوم' && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">مبلغ الرسوم (₪)</label>
+                <Input className="h-11 bg-slate-50" type="number" value={form.fees} onChange={f('fees')} />
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">خط العرض (Latitude)</label>
+              <Input className="h-11 bg-slate-50" value={form.latitude} onChange={f('latitude')} placeholder="31.5..." />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">خط الطول (Longitude)</label>
+              <Input className="h-11 bg-slate-50" value={form.longitude} onChange={f('longitude')} placeholder="34.4..." />
+            </div>
+
+            {!isValid && (
+              <div className="col-span-2 text-xs text-amber-600 flex items-center gap-2 bg-amber-50 p-2 rounded-lg border border-amber-100">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" /> يرجى تعبئة الحقول المطلوبة: الاسم، النوع، الجنس، المرحلة
               </div>
             )}
           </div>
           <DialogFooter className="flex flex-row gap-3">
-            <Button onClick={onAdd} disabled={!isAddValid || submitting} className="flex-1 bg-blue-600 text-white font-bold h-11 rounded-xl shadow-lg">
-              {submitting ? <Loader2 className="animate-spin ml-2" /> : null} حفظ البيانات
+            <Button onClick={handleSave} disabled={!isValid || saving} className="flex-1 bg-blue-600 text-white font-bold h-11 rounded-xl">
+              {saving && <Loader2 className="animate-spin w-4 h-4 ml-2" />}
+              {editing ? 'حفظ التعديلات' : 'إضافة المدرسة'}
             </Button>
-            <Button variant="outline" onClick={() => setAddOpen(false)} className="flex-1 h-11 rounded-xl">إلغاء</Button>
+            <Button variant="outline" onClick={() => setOpen(false)} className="flex-1 h-11 rounded-xl">إلغاء</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
