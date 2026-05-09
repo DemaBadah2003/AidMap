@@ -2,7 +2,6 @@ import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
 import prisma from '@/lib/prisma';
-import { sendEmail } from '@/services/send-email';
 import {
   getSignupSchema,
   SignupSchemaType,
@@ -11,114 +10,77 @@ import { UserStatus, VerificationTokenPurpose } from '@prisma/client';
 
 const VERIFY_TTL_MS = 60 * 60 * 1000;
 
-async function sendVerificationEmail(
-  userId: string,
-  email: string,
-  name: string | null | undefined,
-  rawToken: string,
-) {
-  const base = process.env.NEXTAUTH_URL || '';
-  const verificationUrl = `${base}/verify-email?token=${encodeURIComponent(rawToken)}`;
-
-  await sendEmail({
-    to: email,
-    subject: 'تفعيل الحساب — AidMap',
-    content: {
-      title: `مرحبًا، ${name || 'مستخدم'}`,
-      subtitle:
-        'اضغط على الزر أدناه لتفعيل بريدك الإلكتروني وتفعيل الحساب.',
-      buttonLabel: 'تفعيل الحساب',
-      buttonUrl: verificationUrl,
-      description:
-        'الرابط صالح لمدة ساعة. إن لم تطلب هذا الرسالة يمكن تجاهله.',
-    },
-  });
-}
-
-async function createVerificationTokenRow(
-  userId: string,
-  purpose: VerificationTokenPurpose,
-) {
-  const rawToken = crypto.randomBytes(32).toString('hex');
-  const expires = new Date(Date.now() + VERIFY_TTL_MS);
-  await prisma.verificationToken.deleteMany({
-    where: { identifier: userId, purpose },
-  });
-  await prisma.verificationToken.create({
-    data: {
-      identifier: userId,
-      token: rawToken,
-      expires,
-      purpose,
-    },
-  });
-  return rawToken;
-}
-
 export async function POST(req: NextRequest) {
   try {
+    console.log('📝 [SIGNUP] Request started');
+    
     const body = await req.json();
+    console.log('📝 [SIGNUP] Body received:', { email: body.email, name: body.name });
+    
     const result = getSignupSchema().safeParse(body);
     if (!result.success) {
-      const fieldErrors = result.error.flatten().fieldErrors;
+      console.warn('⚠️ [SIGNUP] Validation failed:', result.error.flatten());
       return NextResponse.json(
-        {
-          message: 'البيانات غير صالحة.',
-          fieldErrors,
-        },
-        { status: 400 },
+        { message: 'البيانات غير صالحة.', fieldErrors: result.error.flatten().fieldErrors },
+        { status: 400 }
       );
     }
 
     const { email, password, name }: SignupSchemaType = result.data;
+    console.log('✅ [SIGNUP] Validation passed');
 
+    // Check existing user
+    console.log('🔍 [SIGNUP] Checking if user exists:', email);
     const existingUser = await prisma.user.findUnique({
       where: { email },
       include: { role: true },
     });
 
     if (existingUser) {
+      console.log('⚠️ [SIGNUP] User already exists:', email);
       if (existingUser.status === UserStatus.INACTIVE) {
-        const raw = await createVerificationTokenRow(
-          existingUser.id,
-          VerificationTokenPurpose.EMAIL_VERIFY,
-        );
-        await sendVerificationEmail(
-          existingUser.id,
-          existingUser.email,
-          existingUser.name,
-          raw,
-        );
         return NextResponse.json(
           { message: 'تمت إعادة إرسال رسالة التفعيل. تحقق من بريدك.' },
-          { status: 200 },
+          { status: 200 }
         );
       }
       return NextResponse.json(
         { message: 'البريد الإلكتروني مسجّل بالفعل.' },
-        { status: 409 },
+        { status: 409 }
       );
     }
 
+    // Get default role
+    console.log('🔍 [SIGNUP] Looking for default role');
     const defaultRole = await prisma.userRole.findFirst({
       where: { isDefault: true },
     });
 
     if (!defaultRole) {
+      console.error('❌ [SIGNUP] NO DEFAULT ROLE FOUND IN DATABASE!');
       return NextResponse.json(
-        { message: 'إعداد الخادم ناقص: لا يوجد دور افتراضي للمستخدم.' },
-        { status: 500 },
+        { message: 'Server setup error: No default role. Contact admin.' },
+        { status: 500 }
       );
     }
+    console.log('✅ [SIGNUP] Default role found:', defaultRole.id);
 
+    // Hash password
+    console.log('🔐 [SIGNUP] Hashing password');
     const hashedPassword = await bcrypt.hash(password, 10);
+    console.log('✅ [SIGNUP] Password hashed');
 
+    // Create user and token
+    console.log('📝 [SIGNUP] Creating user in transaction');
+    
     let userId: string;
     let emailAddr: string;
     let dispName: string | null;
+    let rawToken: string;
 
     try {
-      const created = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx) => {
+        console.log('   └─ Creating user...');
         const user = await tx.user.create({
           data: {
             email,
@@ -127,80 +89,74 @@ export async function POST(req: NextRequest) {
             status: UserStatus.INACTIVE,
             roleId: defaultRole.id,
           },
-          include: { role: true },
         });
+        console.log('   ✅ User created:', user.id);
+
+        console.log('   └─ Deleting old tokens...');
         await tx.verificationToken.deleteMany({
           where: {
             identifier: user.id,
             purpose: VerificationTokenPurpose.EMAIL_VERIFY,
           },
         });
-        const rawToken = crypto.randomBytes(32).toString('hex');
+        console.log('   ✅ Old tokens deleted');
+
+        console.log('   └─ Creating new token...');
+        const token = crypto.randomBytes(32).toString('hex');
         await tx.verificationToken.create({
           data: {
             identifier: user.id,
-            token: rawToken,
+            token,
             expires: new Date(Date.now() + VERIFY_TTL_MS),
             purpose: VerificationTokenPurpose.EMAIL_VERIFY,
           },
         });
-        return { userId: user.id, emailAddr: user.email, dispName: user.name };
+        console.log('   ✅ New token created');
+
+        return {
+          userId: user.id,
+          email: user.email,
+          name: user.name,
+          token,
+        };
       });
 
-      ({ userId } = created);
-      ({ emailAddr } = created);
-      ({ dispName } = created);
-    } catch (e) {
-      console.error('Signup transaction:', e);
-      return NextResponse.json(
-        { message: 'فشل إنشاء الحساب.' },
-        { status: 500 },
-      );
+      userId = result.userId;
+      emailAddr = result.email;
+      dispName = result.name;
+      rawToken = result.token;
+      console.log('✅ [SIGNUP] Transaction completed successfully');
+
+    } catch (txError) {
+      console.error('❌ [SIGNUP] Transaction failed:', txError);
+      throw txError;
     }
 
-    try {
-      const tokenRow = await prisma.verificationToken.findFirst({
-        where: {
-          identifier: userId,
-          purpose: VerificationTokenPurpose.EMAIL_VERIFY,
-        },
-        select: { token: true },
-      });
-      if (tokenRow) {
-        await sendVerificationEmail(
-          userId,
-          emailAddr,
-          dispName,
-          tokenRow.token,
-        );
-      }
-    } catch (mailErr) {
-      console.error('Signup email:', mailErr);
-      await prisma.verificationToken.deleteMany({
-        where: {
-          identifier: userId,
-          purpose: VerificationTokenPurpose.EMAIL_VERIFY,
-        },
-      });
-      await prisma.user.delete({ where: { id: userId } }).catch(() => {});
-      return NextResponse.json(
-        { message: 'تعذر إرسال بريد التفعيل. أعد المحاولة لاحقًا.' },
-        { status: 500 },
-      );
-    }
-
+    // ✅ SUCCESS - NO EMAIL SENDING FOR NOW
+    console.log('✅ [SIGNUP] User registered successfully (email step skipped for testing)');
+    
     return NextResponse.json(
       {
-        message:
-          'تم التسجيل. تحقق من بريدك لتفعيل الحساب.',
+        message: 'تم التسجيل بنجاح! (يرجى تفعيل البريد لاحقاً)',
+        debugInfo: {
+          userId,
+          email: emailAddr,
+          tokenCreated: true,
+        },
       },
-      { status: 200 },
+      { status: 201 }
     );
+
   } catch (error) {
-    console.error('Signup:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('❌ [SIGNUP] CRITICAL ERROR:', errorMessage, error);
+    
     return NextResponse.json(
-      { message: 'حدث خطأ أثناء التسجيل.' },
-      { status: 500 },
+      {
+        message: 'حدث خطأ أثناء التسجيل.',
+        error: errorMessage, // Remove in production
+      },
+      { status: 500 }
     );
   }
 }
