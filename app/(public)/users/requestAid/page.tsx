@@ -102,17 +102,20 @@ export default function RequestAidPage() {
           notes: notes.trim(),
         }),
       })
+
+      const data = await res.json().catch(() => ({}))
+
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
         setServerError(data?.message || 'فشل في إرسال الطلب، يرجى المحاولة مرة أخرى.')
       } else {
-        const data = await res.json().catch(() => ({}))
-        const code =
-          typeof data?.data?.referenceCode === 'string'
-            ? data.data.referenceCode
-            : null
-        setReferenceCode(code)
+        // بما أن السكيما ليس بها referenceCode، نأخذ أول جزء من الـ ID التلقائي
+        const orderId = data?.data?.id
+        const shortCode = orderId ? orderId.split('-')[0].toUpperCase() : 'DONE'
+        
+        setReferenceCode(shortCode)
         setSuccess(true)
+        
+        // إعادة تعيين الحقول
         setFullName(''); setNationalId(''); setPhone(''); setAidType('')
         setFamilyCount(''); setAddress(''); setNotes(''); setErrors({})
       }
@@ -166,7 +169,6 @@ export default function RequestAidPage() {
     <div className="min-h-[calc(100vh-80px)] bg-muted/30 px-4 py-10">
       <div className="mx-auto w-full max-w-xl">
 
-        {/* Header */}
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-foreground">طلب مساعدة إغاثية</h1>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -174,7 +176,6 @@ export default function RequestAidPage() {
           </p>
         </div>
 
-        {/* Form card */}
         <div className="rounded-2xl border bg-card p-6 shadow-sm sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
 
@@ -185,7 +186,6 @@ export default function RequestAidPage() {
               </div>
             )}
 
-            {/* Name */}
             <div>
               <Label required>الاسم الكامل (رباعي)</Label>
               <Input
@@ -197,7 +197,6 @@ export default function RequestAidPage() {
               <FieldError msg={errors.fullName} />
             </div>
 
-            {/* Two column row */}
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div>
                 <Label required>رقم الهوية</Label>
@@ -225,7 +224,6 @@ export default function RequestAidPage() {
               </div>
             </div>
 
-            {/* Aid type + family count */}
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div>
                 <Label required>نوع المساعدة</Label>
@@ -256,7 +254,6 @@ export default function RequestAidPage() {
               </div>
             </div>
 
-            {/* Address */}
             <div>
               <Label required>العنوان بالتفصيل</Label>
               <Input
@@ -268,7 +265,6 @@ export default function RequestAidPage() {
               <FieldError msg={errors.address} />
             </div>
 
-            {/* Notes */}
             <div>
               <Label>ملاحظات أو احتياجات خاصة</Label>
               <textarea
@@ -280,7 +276,6 @@ export default function RequestAidPage() {
               />
             </div>
 
-            {/* Submit */}
             <Button
               type="submit"
               disabled={loading}

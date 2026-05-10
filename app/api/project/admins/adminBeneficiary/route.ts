@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { requireStaffApi } from '@/lib/api/auth'
 
+// تعريف الأنواع بناءً على ما يتم إرساله من الفرونت إند
 type CreateBeneficiaryBody = {
   name?: unknown
   phone?: unknown
@@ -30,25 +31,16 @@ function parseOptionalText(
   if (value === null || value === undefined || value === '') {
     return null
   }
-
   if (typeof value !== 'string') {
     return 'INVALID'
   }
-
   const normalized = normalizeSpaces(value)
-
-  if (!normalized) {
-    return null
-  }
-
-  if (normalized.length > maxLength) {
-    return 'INVALID'
-  }
-
+  if (!normalized) return null
+  if (normalized.length > maxLength) return 'INVALID'
   return normalized
 }
 
-// جلب المستفيدين — فريق العمليات فقط
+// 1. جلب المستفيدين (تعديل اسم الجدول إلى citizens)
 export async function GET(req: NextRequest) {
   try {
     const unauthorized = await requireStaffApi(req)
@@ -57,16 +49,16 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const campId = searchParams.get('campId')
 
-    const where: Prisma.BeneficiaryWhereInput = {}
+    const where: Prisma.CitizensWhereInput = {}
 
     if (campId) {
       where.campId = campId
     }
 
-    const beneficiaries = await prisma.beneficiary.findMany({
+    const beneficiaries = await prisma.citizens.findMany({
       where,
       include: {
-        camp: true,
+        Camps: true, // في السكيما العلاقة اسمها Camps بحرف كبير
       },
       orderBy: {
         createdAt: 'desc',
@@ -82,81 +74,61 @@ export async function GET(req: NextRequest) {
       { status: 200 }
     )
   } catch (error) {
-    console.error('GET /api/project/admins/adminBeneficiary error:', error)
-
+    console.error('GET error:', error)
     return NextResponse.json(
       {
         success: false,
         message: 'فشل في جلب المستفيدين',
-        error: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     )
   }
 }
 
-// تسجيل مستفيد — متاح بدون تسجيل دخول (نموذج المواطن العام)
+// 2. تسجيل مستفيد جديد (تعديل الربط مع جدول Citizens)
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as CreateBeneficiaryBody
     const { name, phone, numberOfFamily, campId } = body
 
-    // 1. التحقق من الاسم
+    // التحقق من البيانات
     if (typeof name !== 'string') {
-      return NextResponse.json(
-        { success: false, message: 'الاسم مطلوب' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, message: 'الاسم مطلوب' }, { status: 400 })
     }
 
     const normalizedName = normalizeSpaces(name)
-
     if (!normalizedName || normalizedName.length < NAME_MIN_LENGTH) {
-      return NextResponse.json(
-        { success: false, message: 'الاسم غير صالح أو قصير جداً' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, message: 'الاسم قصير جداً' }, { status: 400 })
     }
 
     if (!ARABIC_NAME_REGEX.test(normalizedName)) {
-      return NextResponse.json(
-        { success: false, message: 'الاسم يجب أن يكون باللغة العربية فقط' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, message: 'الاسم يجب أن يكون بالعربية' }, { status: 400 })
     }
 
-    // 2. التحقق من رقم الهاتف
     if (typeof phone !== 'string' || !PHONE_REGEX.test(phone)) {
-      return NextResponse.json(
-        { success: false, message: 'رقم الهاتف غير صالح (يجب أن يبدأ بـ 056 أو 059)' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, message: 'رقم الهاتف غير صالح' }, { status: 400 })
     }
 
-    // 3. التحقق من عدد أفراد الأسرة
     const familyAsString = typeof numberOfFamily === 'number' ? String(numberOfFamily) : (numberOfFamily as string)
     if (!familyAsString || !FAMILY_REGEX.test(familyAsString)) {
-      return NextResponse.json(
-        { success: false, message: 'عدد أفراد الأسرة يجب أن يكون بين 1 و 99' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, message: 'عدد أفراد الأسرة غير صالح' }, { status: 400 })
     }
 
     const parsedNumberOfFamily = Number(familyAsString)
 
-    // 4. فحص التكرار (منع تسجيل نفس الهاتف مرتين)
-    const existingBeneficiary = await prisma.beneficiary.findFirst({
+    // التحقق من التكرار في جدول citizens
+    const existingBeneficiary = await prisma.citizens.findFirst({
       where: { phone },
     })
 
     if (existingBeneficiary) {
       return NextResponse.json(
-        { success: false, message: 'رقم الهاتف مسجل مسبقًا في النظام' },
+        { success: false, message: 'رقم الهاتف مسجل مسبقاً' },
         { status: 409 }
       )
     }
 
-    // 5. ربط المخيم إذا وجد
+    // ربط المخيم
     let resolvedCampId: string | null = null
     const parsedCampName = parseOptionalText(campId, MAX_CAMP_LENGTH)
     
@@ -169,23 +141,25 @@ export async function POST(req: NextRequest) {
       if (existingCamp) resolvedCampId = existingCamp.id
     }
 
-    // 6. إنشاء السجل
-    const newBeneficiary = await prisma.beneficiary.create({
+    // إنشاء السجل في جدول citizens
+    // ملاحظة: تم إضافة id و updatedAt يدوياً لأن السكيما الحالية تطلبهما ولا توفرهما تلقائياً
+    const newBeneficiary = await prisma.citizens.create({
       data: {
+        id: crypto.randomUUID(), // توليد ID فريد
         name: normalizedName,
         phone,
         numberOfFamily: parsedNumberOfFamily,
         campId: resolvedCampId,
-      },
-      include: {
-        camp: true,
+        updatedAt: new Date(), // الحقل مطلوب في السكيما
+        role: 'CITIZEN',
+        isActive: true,
       },
     })
 
     return NextResponse.json(
       {
         success: true,
-        message: 'تم تسجيل بياناتك بنجاح',
+        message: 'تم تسجيل البيانات بنجاح',
         data: newBeneficiary,
       },
       { status: 201 }
@@ -193,7 +167,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('POST error:', error)
     return NextResponse.json(
-      { success: false, message: 'حدث خطأ أثناء حفظ البيانات' },
+      { success: false, message: 'حدث خطأ أثناء حفظ البيانات في قاعدة البيانات' },
       { status: 500 }
     )
   }
