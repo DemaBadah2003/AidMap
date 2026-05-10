@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// دالة جلب البيانات (GET)
+// 1. دالة جلب البيانات (GET)
 export async function GET(req: NextRequest) {
   try {
     const doctors = await prisma.doctor.findMany({
@@ -11,11 +11,11 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    // تنسيق البيانات لتناسب أسماء الحقول في الفرونت إند (Frontend)
+    // تنسيق البيانات لتناسب واجهة الفرونت إند
     const formattedDoctors = doctors.map(doc => ({
       id: doc.id,
       name: doc.name,
-      specialization: doc.specialty, // مطابقة specialty في السكيما مع specialization في الواجهة
+      specialty: doc.specialty, 
       hospitalName: doc.hospital?.name || "غير محدد",
       hospitalId: doc.hospitalId,
       phone: doc.phone,
@@ -30,12 +30,12 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// دالة إضافة طبيب جديد (POST)
+// 2. دالة إضافة طبيب جديد (POST)
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // التحقق من الحقول المطلوبة لضمان عدم حدوث خطأ 400
+    // التحقق من الحقول الأساسية
     if (!body.name || !body.hospitalId || !body.phone) {
       return NextResponse.json(
         { message: 'الاسم، المستشفى، ورقم الهاتف حقول مطلوبة' }, 
@@ -43,15 +43,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // إنشاء السجل في قاعدة البيانات باستخدام أسماء حقول السكيما
     const newDoctor = await prisma.doctor.create({
       data: {
         name: body.name,
-        specialty: body.specialization || "عام",
+        specialty: body.specialization || "عام", // استخدام التخصص المرسل من الفرونت
         phone: body.phone,
         workSchedule: body.workSchedule || "غير محدد",
         description: body.description || "",
-        hospitalId: body.hospitalId, // يجب أن يكون معرف UUID صحيح لمستشفى موجود
+        hospitalId: body.hospitalId,
       },
       include: {
         hospital: true
@@ -61,32 +60,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(newDoctor, { status: 201 });
   } catch (error: any) {
     console.error("Prisma POST Error:", error);
-    // رسالة الخطأ التي تظهر عند فشل الربط أو وجود بيانات غير صحيحة
     return NextResponse.json(
-      { message: 'فشل إضافة الطبيب: تأكد من صحة البيانات وجودة الربط بالمستشفى' }, 
+      { message: 'فشل إضافة الطبيب: تأكد من صحة البيانات' }, 
       { status: 400 }
     );
   }
 }
 
-// دالة تحديث بيانات طبيب (PATCH)
+// 3. دالة تحديث بيانات طبيب (PATCH) - تم الإصلاح هنا لتقرأ الـ ID من الجسم المرسل
 export async function PATCH(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get('id');
     const body = await req.json();
+    const { id, name, specialization, phone, workSchedule, description, hospitalId } = body;
 
-    if (!id) return NextResponse.json({ message: 'ID مفقود' }, { status: 400 });
+    // التأكد من وصول المعرف (ID) لتنفيذ التحديث
+    if (!id) {
+      return NextResponse.json({ message: 'المعرف (ID) مفقود' }, { status: 400 });
+    }
 
     const updated = await prisma.doctor.update({
-      where: { id },
+      where: { id: id },
       data: {
-        name: body.name,
-        specialty: body.specialization,
-        phone: body.phone,
-        workSchedule: body.workSchedule,
-        description: body.description,
-        hospitalId: body.hospitalId,
+        name: name,
+        specialty: specialization, // التحويل من اسم الحقل في الفرونت إلى السكيما
+        phone: phone,
+        workSchedule: workSchedule,
+        description: description,
+        hospitalId: hospitalId,
       },
     });
 
@@ -97,7 +97,7 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-// دالة حذف طبيب (DELETE)
+// 4. دالة حذف طبيب (DELETE)
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -106,11 +106,12 @@ export async function DELETE(req: NextRequest) {
     if (!id) return NextResponse.json({ message: 'ID مفقود' }, { status: 400 });
 
     await prisma.doctor.delete({
-      where: { id },
+      where: { id: id },
     });
 
     return NextResponse.json({ message: 'تم حذف الطبيب بنجاح' });
   } catch (error) {
+    console.error("Delete Error:", error);
     return NextResponse.json({ message: 'فشل عملية الحذف' }, { status: 500 });
   }
 }

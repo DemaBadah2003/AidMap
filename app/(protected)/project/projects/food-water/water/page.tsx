@@ -11,9 +11,10 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Pencil, Plus, Search, Loader2, Droplets, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Search, Loader2 } from 'lucide-react'
 
 const REGIONS = ['شمال', 'جنوب', 'شرق', 'غرب', 'وسط'] as const
+const STATUS_OPTIONS = ['نشط', 'متوقف مؤقتاً', 'متوقف'] as const
 
 type WaterPoint = {
   id: string
@@ -72,7 +73,15 @@ export default function WaterPointsPage() {
     setFormData({ name: item.name, lat: item.lat, lng: item.lng, operator: item.operator, statusText: item.statusText })
   }
 
-  const isValid = (d: typeof formData) => d.name.trim() !== ''
+  const isValid = (d: typeof formData) => {
+    return (
+      d.name.trim() !== '' && 
+      d.operator !== '' && 
+      d.statusText !== '' && 
+      d.lat !== null && 
+      d.lng !== null
+    )
+  }
 
   const onAdd = async () => {
     if (!isValid(formData)) return
@@ -115,17 +124,9 @@ export default function WaterPointsPage() {
     setItems(prev => prev.filter(p => p.id !== id))
   }
 
-  const FieldRow = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div className="space-y-1.5">
-      <label className="text-xs font-bold text-foreground">{label}</label>
-      {children}
-    </div>
-  )
-
   return (
     <div className="w-full px-4 py-6" dir="rtl">
       <div className="mb-6 flex items-center gap-2">
-        <Droplets className="w-8 h-8 text-blue-600" />
         <div>
           <h1 className="text-2xl font-bold text-foreground">نقاط توزيع المياه</h1>
           <p className="text-sm text-muted-foreground">{loading ? 'جاري التحميل...' : `${items.length} نقطة مياه`}</p>
@@ -174,16 +175,18 @@ export default function WaterPointsPage() {
                     </td>
                     <td className="p-4">
                       {item.statusText
-                        ? <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">{item.statusText}</span>
+                        ? <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${
+                            item.statusText === 'نشط' ? 'bg-green-100 text-green-700' : 
+                            item.statusText === 'متوقف' ? 'bg-red-100 text-red-700' : 
+                            'bg-amber-100 text-amber-700'
+                          }`}>{item.statusText}</span>
                         : <span className="text-muted-foreground text-xs">—</span>}
                     </td>
                     <td className="p-4 text-center">
                       <div className="flex gap-2 justify-center">
+                        {/* تم الإبقاء على أيقونة التعديل فقط */}
                         <button onClick={() => openEdit(item)} className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-md border text-muted-foreground" title="تعديل">
                           <Pencil className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => onDelete(item.id)} className="p-2 hover:bg-red-50 hover:text-red-600 rounded-md border text-muted-foreground" title="حذف">
-                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -207,8 +210,8 @@ export default function WaterPointsPage() {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-md rounded-2xl" dir="rtl">
           <DialogHeader>
-            <DialogTitle className="text-right text-lg font-bold text-blue-800 flex items-center gap-2">
-              <Droplets className="w-5 h-5 text-blue-600" /> إضافة نقطة مياه
+            <DialogTitle className="text-right text-lg font-bold text-blue-800">
+              إضافة نقطة مياه
             </DialogTitle>
           </DialogHeader>
           <FormFields formData={formData} setFormData={setFormData} />
@@ -225,8 +228,8 @@ export default function WaterPointsPage() {
       <Dialog open={!!editItem} onOpenChange={open => { if (!open) setEditItem(null) }}>
         <DialogContent className="max-w-md rounded-2xl" dir="rtl">
           <DialogHeader>
-            <DialogTitle className="text-right text-lg font-bold text-blue-800 flex items-center gap-2">
-              <Pencil className="w-5 h-5 text-blue-600" /> تعديل نقطة مياه
+            <DialogTitle className="text-right text-lg font-bold text-blue-800">
+              تعديل نقطة مياه
             </DialogTitle>
           </DialogHeader>
           <FormFields formData={formData} setFormData={setFormData} />
@@ -256,7 +259,7 @@ function FormFields({
         <Input className="h-11" value={formData.name} onChange={e => setFormData(f => ({ ...f, name: e.target.value }))} placeholder="اسم نقطة المياه" />
       </div>
       <div className="space-y-1.5">
-        <label className="text-xs font-bold text-foreground">الموقع / المنطقة</label>
+        <label className="text-xs font-bold text-foreground">الموقع / المنطقة *</label>
         <select
           className="w-full h-11 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
           value={formData.operator}
@@ -268,17 +271,26 @@ function FormFields({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-foreground">خط العرض (Lat)</label>
+          <label className="text-xs font-bold text-foreground">خط العرض (Lat) *</label>
           <Input className="h-11 font-mono" type="number" step="any" value={formData.lat ?? ''} onChange={e => setFormData(f => ({ ...f, lat: e.target.value ? Number(e.target.value) : null }))} placeholder="31.5" />
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-foreground">خط الطول (Lng)</label>
+          <label className="text-xs font-bold text-foreground">خط الطول (Lng) *</label>
           <Input className="h-11 font-mono" type="number" step="any" value={formData.lng ?? ''} onChange={e => setFormData(f => ({ ...f, lng: e.target.value ? Number(e.target.value) : null }))} placeholder="34.4" />
         </div>
       </div>
       <div className="space-y-1.5">
-        <label className="text-xs font-bold text-foreground">الحالة</label>
-        <Input className="h-11" value={formData.statusText} onChange={e => setFormData(f => ({ ...f, statusText: e.target.value }))} placeholder="مثال: نشط، متوقف مؤقتاً..." />
+        <label className="text-xs font-bold text-foreground">الحالة *</label>
+        <select
+          className="w-full h-11 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+          value={formData.statusText}
+          onChange={e => setFormData(f => ({ ...f, statusText: e.target.value }))}
+        >
+          <option value="">— اختر الحالة —</option>
+          {STATUS_OPTIONS.map(status => (
+            <option key={status} value={status}>{status}</option>
+          ))}
+        </select>
       </div>
     </div>
   )

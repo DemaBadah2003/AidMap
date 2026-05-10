@@ -11,9 +11,10 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Pencil, Plus, Search, Loader2, HandHeart, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Search, Loader2, HandHeart } from 'lucide-react'
 
 const REGIONS = ['شمال', 'جنوب', 'شرق', 'غرب', 'وسط'] as const
+const STATUS_OPTIONS = ['نشط', 'متوقف حالياً', 'متوقف'] as const
 
 type AidPoint = {
   id: string
@@ -76,7 +77,18 @@ export default function AidPointsPage() {
     setFormData({ name: item.name, lat: item.lat, lng: item.lng, operator: item.operator, statusText: item.statusText, capacity: item.capacity, occupancy: item.occupancy })
   }
 
-  const isValid = (d: typeof formData) => d.name.trim() !== ''
+  // التعديل هنا: شرط أن تكون جميع الحقول مدخلة
+  const isValid = (d: typeof formData) => {
+    return (
+      d.name.trim() !== '' &&
+      d.operator !== '' &&
+      d.lat !== null &&
+      d.lng !== null &&
+      d.statusText !== '' &&
+      d.capacity !== null &&
+      d.occupancy !== null
+    )
+  }
 
   const onAdd = async () => {
     if (!isValid(formData)) return
@@ -111,12 +123,6 @@ export default function AidPointsPage() {
         setEditItem(null)
       }
     } finally { setSubmitting(false) }
-  }
-
-  const onDelete = async (id: string) => {
-    if (!confirm('هل أنت متأكد من الحذف؟')) return
-    await fetch(`/api/project/food-water/food?id=${id}`, { method: 'DELETE' })
-    setItems(prev => prev.filter(p => p.id !== id))
   }
 
   return (
@@ -182,9 +188,6 @@ export default function AidPointsPage() {
                       <div className="flex gap-2 justify-center">
                         <button onClick={() => openEdit(item)} className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-md border text-muted-foreground" title="تعديل">
                           <Pencil className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => onDelete(item.id)} className="p-2 hover:bg-red-50 hover:text-red-600 rounded-md border text-muted-foreground" title="حذف">
-                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -257,7 +260,7 @@ function AidFormFields({
         <Input className="h-11" value={formData.name} onChange={e => setFormData(f => ({ ...f, name: e.target.value }))} placeholder="اسم نقطة التوزيع" />
       </div>
       <div className="space-y-1.5">
-        <label className="text-xs font-bold text-foreground">الموقع / المنطقة</label>
+        <label className="text-xs font-bold text-foreground">الموقع / المنطقة *</label>
         <select
           className="w-full h-11 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
           value={formData.operator}
@@ -269,27 +272,36 @@ function AidFormFields({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-foreground">خط العرض (Lat)</label>
+          <label className="text-xs font-bold text-foreground">خط العرض (Lat) *</label>
           <Input className="h-11 font-mono" type="number" step="any" value={formData.lat ?? ''} onChange={e => setFormData(f => ({ ...f, lat: e.target.value ? Number(e.target.value) : null }))} placeholder="31.5" />
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-foreground">خط الطول (Lng)</label>
+          <label className="text-xs font-bold text-foreground">خط الطول (Lng) *</label>
           <Input className="h-11 font-mono" type="number" step="any" value={formData.lng ?? ''} onChange={e => setFormData(f => ({ ...f, lng: e.target.value ? Number(e.target.value) : null }))} placeholder="34.4" />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-foreground">الطاقة الاستيعابية</label>
-          <Input className="h-11" type="number" min="0" value={formData.capacity || ''} onChange={e => setFormData(f => ({ ...f, capacity: Number(e.target.value) }))} placeholder="0" />
+          <label className="text-xs font-bold text-foreground">الطاقة الاستيعابية *</label>
+          <Input className="h-11" type="number" min="0" value={formData.capacity || ''} onChange={e => setFormData(f => ({ ...f, capacity: e.target.value ? Number(e.target.value) : 0 }))} placeholder="0" />
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-foreground">العدد الحالي</label>
-          <Input className="h-11" type="number" min="0" value={formData.occupancy || ''} onChange={e => setFormData(f => ({ ...f, occupancy: Number(e.target.value) }))} placeholder="0" />
+          <label className="text-xs font-bold text-foreground">العدد الحالي *</label>
+          <Input className="h-11" type="number" min="0" value={formData.occupancy || ''} onChange={e => setFormData(f => ({ ...f, occupancy: e.target.value ? Number(e.target.value) : 0 }))} placeholder="0" />
         </div>
       </div>
       <div className="space-y-1.5">
-        <label className="text-xs font-bold text-foreground">الحالة</label>
-        <Input className="h-11" value={formData.statusText} onChange={e => setFormData(f => ({ ...f, statusText: e.target.value }))} placeholder="مثال: نشط، متوقف مؤقتاً..." />
+        <label className="text-xs font-bold text-foreground">الحالة *</label>
+        <select
+          className="w-full h-11 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+          value={formData.statusText}
+          onChange={e => setFormData(f => ({ ...f, statusText: e.target.value }))}
+        >
+          <option value="">— اختر الحالة —</option>
+          {STATUS_OPTIONS.map(status => (
+            <option key={status} value={status}>{status}</option>
+          ))}
+        </select>
       </div>
     </div>
   )

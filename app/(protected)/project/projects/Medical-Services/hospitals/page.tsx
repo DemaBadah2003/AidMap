@@ -202,7 +202,7 @@ export default function HospitalsPage() {
 
       <Card className="overflow-hidden rounded-xl border shadow-sm">
         <CardContent className="p-0">
-          <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b">
+          <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b text-start">
             <div className="relative w-full max-w-xs">
               <Search className="absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={q} onChange={e => setQ(e.target.value)} placeholder={t('common.messages.searchPlaceholder')} className="h-10 pe-10" />
@@ -216,27 +216,35 @@ export default function HospitalsPage() {
             <table className="w-full text-start border-collapse text-sm">
               <thead className="bg-muted/40 border-b">
                 <tr>
-                  <th className="p-4 font-semibold text-muted-foreground">{t('pages.hospitals.type')}</th>
-                  <th className="p-4 font-semibold text-muted-foreground">{t('pages.hospitals.name')}</th>
-                  <th className="p-4 font-semibold text-muted-foreground">المنطقة</th>
-                  <th className="p-4 font-semibold text-muted-foreground">{t('common.labels.phone')}</th>
-                  <th className="p-4 text-center font-semibold text-muted-foreground">{t('common.labels.actions')}</th>
+                  <th className="p-4 font-semibold text-muted-foreground text-start">النوع</th>
+                  <th className="p-4 font-semibold text-muted-foreground text-start">اسم المستشفى</th>
+                  <th className="p-4 font-semibold text-muted-foreground text-start">المنطقة</th>
+                  <th className="p-4 font-semibold text-muted-foreground text-start">الهاتف</th>
+                  <th className="p-4 text-center font-semibold text-muted-foreground">الإجراءات</th>
                   <th className="p-4 text-center font-semibold text-muted-foreground">التفاصيل</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {loading ? (
-                  <tr><td colSpan={6} className="p-16 text-center text-muted-foreground">
-                    <Loader2 className="animate-spin mx-auto mb-2 size-5" />{t('common.messages.loading')}
-                  </td></tr>
+                  <tr>
+                    <td colSpan={6} className="p-16 text-center text-muted-foreground">
+                      <Loader2 className="animate-spin mx-auto mb-2 size-5" />{t('common.messages.loading')}
+                    </td>
+                  </tr>
                 ) : filteredItems.length === 0 ? (
-                  <tr><td colSpan={6} className="p-16 text-center text-muted-foreground italic">{t('common.messages.noData')}</td></tr>
+                  <tr>
+                    <td colSpan={6} className="p-16 text-center text-muted-foreground italic">{t('common.messages.noData')}</td>
+                  </tr>
                 ) : filteredItems.map(item => (
                   <tr key={item.id} className="transition-colors hover:bg-muted/30">
-                    <td className="p-4 font-medium text-blue-600">{item.hospitalType}</td>
-                    <td className="p-4 font-semibold text-foreground">{item.hospitalName}</td>
-                    <td className="p-4 text-muted-foreground">{item.region}</td>
-                    <td className="p-4 text-muted-foreground">{item.phone}</td>
+                    <td className="p-4 font-medium text-blue-600 text-start">
+                      <span className="bg-blue-50 dark:bg-blue-900/20 px-2.5 py-1 rounded-full text-[11px] uppercase tracking-wider">
+                        {item.hospitalType}
+                      </span>
+                    </td>
+                    <td className="p-4 font-semibold text-foreground text-start">{item.hospitalName}</td>
+                    <td className="p-4 text-muted-foreground text-start">{item.region}</td>
+                    <td className="p-4 text-muted-foreground text-start">{item.phone}</td>
                     <td className="p-4 text-center">
                       <button
                         onClick={() => openEdit(item)}
@@ -248,7 +256,7 @@ export default function HospitalsPage() {
                     <td className="p-4 text-center">
                       <button
                         onClick={() => router.push(`/project/projects/Medical-Services/hospitals/${item.id}`)}
-                        className="rounded-md border p-2 text-muted-foreground transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600"
+                        className="rounded-md border p-2 text-muted-foreground transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/30"
                       >
                         <ChevronLeft className="w-4 h-4" />
                       </button>

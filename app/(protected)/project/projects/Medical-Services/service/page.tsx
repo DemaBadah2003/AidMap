@@ -14,7 +14,7 @@ type ServiceRecord = {
   departmentId: string; departmentName: string; hospitalId: string; hospitalName: string
 }
 
-const sel = 'w-full rounded-lg border border-input bg-background px-3 h-11 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
+const sel = 'w-full rounded-lg border border-input bg-background px-3 h-11 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-right'
 
 const blank = { name: '', price: '', isAvailable: true, hospitalId: '', departmentId: '' }
 
@@ -109,11 +109,11 @@ export default function ServicesPage() {
       </div>
       <div className="space-y-1.5">
         <label className="text-sm font-semibold">اسم الخدمة</label>
-        <Input className="h-11" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="اسم الخدمة الطبية" />
+        <Input className="h-11 text-right" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="اسم الخدمة الطبية" />
       </div>
       <div className="space-y-1.5">
         <label className="text-sm font-semibold">التكلفة (₪)</label>
-        <Input className="h-11" type="number" min="0" step="any" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="0" />
+        <Input className="h-11 text-right" type="number" min="0" step="any" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="0" />
       </div>
       <div className="space-y-1.5">
         <label className="text-sm font-semibold">حالة التوفر</label>
@@ -126,50 +126,51 @@ export default function ServicesPage() {
   )
 
   return (
-    <div className="w-full px-4 py-6">
-      <div className="mb-6"><h1 className="text-2xl font-bold">سجل الخدمات الطبية</h1></div>
+    <div className="w-full px-4 py-6" dir="rtl">
+      <div className="mb-6"><h1 className="text-2xl font-bold text-right">سجل الخدمات الطبية</h1></div>
 
       <Card className="overflow-hidden rounded-xl border shadow-sm">
         <CardContent className="p-0">
           <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b">
             <div className="relative w-full max-w-xs">
-              <Search className="absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={q} onChange={e => setQ(e.target.value)} placeholder="ابحث..." className="h-10 pe-10" />
+              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={q} onChange={e => setQ(e.target.value)} placeholder="ابحث..." className="h-10 pr-10 text-right" />
             </div>
-            <Button onClick={() => { setAddForm(blank); setAddOpen(true) }} className="bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 gap-2 sm:ms-auto">
+            <Button onClick={() => { setAddForm(blank); setAddOpen(true) }} className="bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 gap-2 mr-auto">
               <Plus className="h-4 w-4" /> إضافة خدمة
             </Button>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-start border-collapse text-sm">
+            <table className="w-full text-right border-collapse text-sm min-w-[800px]">
               <thead className="bg-muted/40 border-b">
                 <tr>
-                  <th className="p-4 font-semibold text-muted-foreground">المستشفى</th>
                   <th className="p-4 font-semibold text-muted-foreground">القسم</th>
                   <th className="p-4 font-semibold text-muted-foreground">الخدمة</th>
                   <th className="p-4 font-semibold text-muted-foreground">التكلفة</th>
                   <th className="p-4 font-semibold text-muted-foreground">الحالة</th>
-                  <th className="p-4 text-center font-semibold text-muted-foreground">الإجراءات</th>
+                  <th className="p-4 font-semibold text-muted-foreground text-center">تعديل</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {loading ? (
-                  <tr><td colSpan={6} className="p-16 text-center"><Loader2 className="animate-spin mx-auto size-5" /></td></tr>
+                  <tr><td colSpan={5} className="p-16 text-center"><Loader2 className="animate-spin mx-auto size-5" /></td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={6} className="p-16 text-center text-muted-foreground italic">لا توجد بيانات</td></tr>
+                  <tr><td colSpan={5} className="p-16 text-center text-muted-foreground italic">لا توجد بيانات</td></tr>
                 ) : filtered.map(item => (
                   <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="p-4 font-medium text-blue-600">{item.hospitalName}</td>
                     <td className="p-4 text-muted-foreground">{item.departmentName}</td>
                     <td className="p-4 font-semibold">{item.name}</td>
-                    <td className="p-4 font-mono text-blue-600">{item.price > 0 ? `${item.price} ₪` : 'مجاني'}</td>
+                    <td className="p-4 font-mono text-blue-600">{Number(item.price) > 0 ? `${item.price} ₪` : 'مجاني'}</td>
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-bold ${item.isAvailable ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                         {item.isAvailable ? 'متاحة' : 'غير متوفرة'}
                       </span>
                     </td>
                     <td className="p-4 text-center">
-                      <button onClick={() => openEdit(item)} className="rounded-md border p-2 text-muted-foreground hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                      <button 
+                        onClick={() => openEdit(item)} 
+                        className="p-2 rounded-md border border-input hover:bg-blue-50 hover:text-blue-600 transition-all inline-flex items-center justify-center"
+                      >
                         <Pencil className="w-4 h-4" />
                       </button>
                     </td>
@@ -181,32 +182,25 @@ export default function ServicesPage() {
         </CardContent>
       </Card>
 
-      {/* Add */}
-      <Dialog open={addOpen} onOpenChange={open => { setAddOpen(open); if (!open) setAddForm(blank) }}>
-        <DialogContent className="max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="text-start text-lg font-bold">إضافة خدمة جديدة</DialogTitle></DialogHeader>
+      {/* حوار الإضافة والتعديل بنفس التنسيق */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="max-w-md rounded-2xl text-right" dir="rtl">
+          <DialogHeader><DialogTitle className="text-right text-lg font-bold">إضافة خدمة جديدة</DialogTitle></DialogHeader>
           <FormFields form={addForm} setForm={setAddForm} />
-          {!isValid(addForm) && <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700"><AlertCircle className="w-3.5 h-3.5 shrink-0" /> يرجى تعبئة الحقول المطلوبة</div>}
-          <DialogFooter className="flex flex-row gap-3 mt-2">
-            <Button onClick={onAdd} disabled={!isValid(addForm) || addSub} className="flex-1 h-11 gap-2 bg-blue-600 text-white hover:bg-blue-700 rounded-xl">
-              {addSub && <Loader2 className="animate-spin size-4" />} حفظ
-            </Button>
-            <Button variant="outline" onClick={() => setAddOpen(false)} className="flex-1 h-11 rounded-xl">إلغاء</Button>
+          <DialogFooter className="flex gap-3 mt-4">
+            <Button onClick={onAdd} disabled={!isValid(addForm) || addSub} className="flex-1 bg-blue-600">حفظ</Button>
+            <Button variant="outline" onClick={() => setAddOpen(false)} className="flex-1">إلغاء</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Edit */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="text-start text-lg font-bold">تعديل الخدمة</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-md rounded-2xl text-right" dir="rtl">
+          <DialogHeader><DialogTitle className="text-right text-lg font-bold">تعديل الخدمة</DialogTitle></DialogHeader>
           <FormFields form={editForm} setForm={setEditForm} />
-          {!isValid(editForm) && <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700"><AlertCircle className="w-3.5 h-3.5 shrink-0" /> يرجى تعبئة الحقول المطلوبة</div>}
-          <DialogFooter className="flex flex-row gap-3 mt-2">
-            <Button onClick={onEdit} disabled={!isValid(editForm) || editSub} className="flex-1 h-11 gap-2 bg-blue-600 text-white hover:bg-blue-700 rounded-xl">
-              {editSub && <Loader2 className="animate-spin size-4" />} حفظ
-            </Button>
-            <Button variant="outline" onClick={() => setEditOpen(false)} className="flex-1 h-11 rounded-xl">إلغاء</Button>
+          <DialogFooter className="flex gap-3 mt-4">
+            <Button onClick={onEdit} disabled={!isValid(editForm) || editSub} className="flex-1 bg-blue-600">تعديل</Button>
+            <Button variant="outline" onClick={() => setEditOpen(false)} className="flex-1">إلغاء</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
