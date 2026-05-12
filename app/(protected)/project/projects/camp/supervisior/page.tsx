@@ -12,14 +12,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Pencil, Save, X, Plus } from 'lucide-react'
+import { Pencil, Save, X, Plus, Loader2 } from 'lucide-react'
 
 // --- وظائف التحقق المساعدة ---
-
-// تنظيف الرقم: حذف أي شيء ليس رقماً وتحديد الطول بـ 10 أرقام فقط
 const normalizePhone = (value: string) => value.replace(/[^\d]/g, '').slice(0, 10)
 
-// الشرط الصارم: يجب أن يبدأ بـ 056 أو 059 ويتبعه 7 أرقام بالضبط (المجموع 10)
 const isValidPalestinePhone = (phone: string) => {
   const regex = /^(056|059)\d{7}$/
   return regex.test(phone)
@@ -32,25 +29,29 @@ export default function SupervisorsPage() {
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
-  // حالات الإضافة
+  // حالات الإضافة والتعديل
   const [addOpen, setAddOpen] = useState(false)
   const [nameAr, setNameAr] = useState('')
   const [phone, setPhone] = useState('')
   const [area, setArea] = useState('')
-  const [status, setStatus] = useState('active')
   const [submitting, setSubmitting] = useState(false)
-  const [phoneTouched, setPhoneTouched] = useState(false) // مراقبة إذا بدأ المستخدم الكتابة
-
-  // حالات التعديل
+  const [phoneTouched, setPhoneTouched] = useState(false) 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState({ nameAr: '', phone: '', status: 'active' })
 
-  // رسالة التحذير الموحدة
+  // رسائل التنبيه
   const phoneErrorMessage = "يجب أن يبدأ رقم الهاتف بـ 056 أو 059 ويتكون من 10 أرقام"
+  const duplicateErrorMessage = "عفواً! هذا الرقم موجود مسبقاً في النظام"
 
-  // دوال التحقق المباشر
-  const isAddPhoneValid = isValidPalestinePhone(phone)
-  const canSaveAdd = nameAr.trim() !== '' && area !== '' && isAddPhoneValid
+  // --- دالة فحص التكرار (الأكثر صرامة على الإطلاق) ---
+  const checkDuplicate = (phoneToTest: string, currentId: string | null) => {
+    const cleanPhone = phoneToTest.trim();
+    if (!cleanPhone) return false;
+    // نبحث في مصفوفة items عن أي عنصر يملك نفس الرقم بشرط ألا يكون هو نفس العنصر الذي نعدله حالياً
+    return items.some(item => 
+      String(item.phone).trim() === cleanPhone && String(item.id) !== String(currentId)
+    );
+  }
 
   const fetchSupervisors = async () => {
     setLoading(true)
@@ -64,37 +65,54 @@ export default function SupervisorsPage() {
 
   useEffect(() => { fetchSupervisors() }, [])
 
+  // منطق التحقق للإضافة
+  const isAddDuplicate = checkDuplicate(phone, null);
+  const canSaveAdd = nameAr.trim() !== '' && area !== '' && isValidPalestinePhone(phone) && !isAddDuplicate;
+
   const onAdd = async () => {
-    if (!canSaveAdd) return;
+    if (!canSaveAdd) return; // منع الإضافة لو كان مكرر
     setSubmitting(true)
     try {
       const res = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nameAr: nameAr.trim(), phone, status }),
+        body: JSON.stringify({ nameAr: nameAr.trim(), phone: phone.trim(), status: 'active' }),
       })
       if (res.ok) {
-        fetchSupervisors()
-        setAddOpen(false)
-        setNameAr(''); setPhone(''); setArea(''); setPhoneTouched(false);
+        await fetchSupervisors()
+        setAddOpen(false); setNameAr(''); setPhone(''); setPhoneTouched(false);
       }
     } catch (err) { console.error(err) }
     finally { setSubmitting(false) }
   }
 
   const onSaveEdit = async (id: string) => {
-    if (!isValidPalestinePhone(editDraft.phone)) return;
+    // التحقق النهائي (خط الدفاع الأخير)
+    const isDuplicate = checkDuplicate(editDraft.phone, id);
+    const isInvalid = !isValidPalestinePhone(editDraft.phone);
+
+    if (isDuplicate || isInvalid || submitting) {
+      alert(isDuplicate ? duplicateErrorMessage : "بيانات غير صالحة");
+      return; // توقف فوراً ولا ترسل شيئاً للسيرفر
+    }
+    
+    setSubmitting(true)
     try {
       const res = await fetch(`${API_URL}?id=${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editDraft),
+        body: JSON.stringify({
+            nameAr: editDraft.nameAr.trim(),
+            phone: editDraft.phone.trim(),
+            status: editDraft.status
+        }),
       })
       if (res.ok) {
-        setEditingId(null)
-        fetchSupervisors()
+        setEditingId(null);
+        await fetchSupervisors();
       }
     } catch (err) { console.error(err) }
+    finally { setSubmitting(false) }
   }
 
   return (
@@ -119,7 +137,8 @@ export default function SupervisorsPage() {
             <tbody>
               {items.map((sp: any) => {
                 const isEditing = editingId === sp.id;
-                const isEditPhoneInvalid = isEditing && editDraft.phone.length > 0 && !isValidPalestinePhone(editDraft.phone);
+                const isEditDuplicate = isEditing && checkDuplicate(editDraft.phone, sp.id);
+                const isEditInvalid = isEditing && !isValidPalestinePhone(editDraft.phone);
 
                 return (
                   <tr key={sp.id} className="border-b last:border-0 hover:bg-gray-50/50 transition-colors">
@@ -133,29 +152,32 @@ export default function SupervisorsPage() {
                         <div className="flex flex-col gap-1 min-w-[180px]">
                           <Input 
                             value={editDraft.phone} 
+                            maxLength={10}
                             onChange={(e) => setEditDraft({...editDraft, phone: normalizePhone(e.target.value)})}
-                            className={isEditPhoneInvalid ? "border-red-500 bg-red-50 focus-visible:ring-red-500" : ""}
+                            className={(isEditInvalid || isEditDuplicate) ? "border-red-500 bg-red-50" : "border-blue-400"}
                           />
-                          {isEditPhoneInvalid && (
-                            <span className="text-[10px] text-red-600 font-bold leading-tight">{phoneErrorMessage}</span>
-                          )}
+                          {isEditInvalid && <span className="text-[10px] text-red-600 font-bold">{phoneErrorMessage}</span>}
+                          {isEditDuplicate && <span className="text-[10px] text-red-600 font-bold bg-yellow-100 p-1">⚠️ {duplicateErrorMessage}</span>}
                         </div>
                       ) : sp.phone}
                     </td>
                     <td className="p-4 flex gap-2">
                       {isEditing ? (
                         <>
-                          <Button size="sm" onClick={() => onSaveEdit(sp.id)} disabled={!isValidPalestinePhone(editDraft.phone)} className="bg-green-600">
-                             <Save className="h-4 w-4" />
+                          <Button 
+                            size="sm" 
+                            onClick={() => onSaveEdit(sp.id)} 
+                            disabled={isEditInvalid || isEditDuplicate || submitting} 
+                            className="bg-green-600"
+                          >
+                             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>
-                             <X className="h-4 w-4" />
-                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></Button>
                         </>
                       ) : (
                         <Button size="sm" variant="ghost" className="text-blue-600" onClick={() => {
-                          setEditingId(sp.id)
-                          setEditDraft({ nameAr: sp.nameAr, phone: sp.phone, status: sp.status })
+                          setEditingId(sp.id);
+                          setEditDraft({ nameAr: sp.nameAr, phone: sp.phone, status: sp.status });
                         }}>
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -169,7 +191,6 @@ export default function SupervisorsPage() {
         </CardContent>
       </Card>
 
-      {/* مودال الإضافة */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent dir="rtl">
           <DialogHeader><DialogTitle className="text-right">إضافة مشرف جديد</DialogTitle></DialogHeader>
@@ -182,18 +203,16 @@ export default function SupervisorsPage() {
               <label className="block text-sm font-bold mb-1 text-gray-700">رقم الهاتف *</label>
               <Input 
                 value={phone} 
+                maxLength={10}
                 placeholder="05XXXXXXXX"
-                onChange={(e) => {
-                    setPhone(normalizePhone(e.target.value));
-                    setPhoneTouched(true);
-                }}
-                className={phoneTouched && phone.length > 0 && !isAddPhoneValid ? "border-red-500 bg-red-50 focus-visible:ring-red-500" : ""}
+                onChange={(e) => { setPhone(normalizePhone(e.target.value)); setPhoneTouched(true); }}
+                className={phoneTouched && (phone.length > 0 && (!isValidPalestinePhone(phone) || isAddDuplicate)) ? "border-red-500" : ""}
               />
-              {/* رسالة التحذير الحمراء تظهر هنا فوراً */}
-              {phoneTouched && phone.length > 0 && !isAddPhoneValid && (
-                <p className="text-[11px] text-red-600 font-bold mt-1 bg-red-50 p-2 rounded border border-red-200 shadow-sm animate-in fade-in slide-in-from-top-1">
-                   ⚠️ {phoneErrorMessage}
-                </p>
+              {phoneTouched && phone.length > 0 && !isValidPalestinePhone(phone) && (
+                <p className="text-[11px] text-red-600 font-bold mt-1">⚠️ {phoneErrorMessage}</p>
+              )}
+              {phoneTouched && isAddDuplicate && (
+                <p className="text-[11px] text-red-600 font-bold mt-1 bg-yellow-50 p-1">⚠️ {duplicateErrorMessage}</p>
               )}
             </div>
             <div>
@@ -203,15 +222,12 @@ export default function SupervisorsPage() {
                 <option value="Gaza">غزة</option>
                 <option value="North">الشمال</option>
                 <option value="South">الجنوب</option>
+                <option value="Center">الوسطى</option>
               </select>
             </div>
           </div>
           <DialogFooter>
-            <Button 
-              onClick={onAdd} 
-              disabled={!canSaveAdd || submitting} 
-              className={`w-full font-bold ${!canSaveAdd ? 'bg-gray-300' : 'bg-blue-600 hover:bg-blue-700'}`}
-            >
+            <Button onClick={onAdd} disabled={!canSaveAdd || submitting} className={`w-full font-bold ${!canSaveAdd ? 'bg-gray-300' : 'bg-blue-600 hover:bg-blue-700'}`}>
               {submitting ? "جاري الحفظ..." : "حفظ البيانات"}
             </Button>
           </DialogFooter>

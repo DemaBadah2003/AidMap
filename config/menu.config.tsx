@@ -68,8 +68,6 @@ export const MENU_SIDEBAR: MenuConfig = [
             children: [
               { title: 'المؤسسات', path: '/project/projects/institution/institutions' },
               { title: 'منتجات المؤسسات', path: '/project/projects/institution/Enterprise-Products' },
-              { title: 'الخدمات', path: '/project/projects/institution/service' },
-              { title: 'الخدمات المؤسساتية', path: '/project/projects/institution/institutional-services' },
             ],
           },
         ],

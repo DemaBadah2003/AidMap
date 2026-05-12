@@ -161,7 +161,6 @@ model Hospital {
   doctors       Doctor[]
   Address       Address        @relation(fields: [addressId], references: [id])
   place         Place?         @relation("HospitalPlace", fields: [placeId], references: [id])
-  patients      Patient[]
 }
 
 model Department {
@@ -200,19 +199,6 @@ model Doctor {
   workSchedule String
   department   Department? @relation(fields: [departmentId], references: [id])
   hospital     Hospital    @relation(fields: [hospitalId], references: [id])
-}
-
-model Patient {
-  id          String   @id @default(uuid())
-  name        String
-  phone       String
-  diseaseType String?
-  hospitalId  String
-  createdAt   DateTime @default(now())
-  address     String
-  age         String
-  nationalId  String   @unique
-  hospital    Hospital @relation(fields: [hospitalId], references: [id])
 }
 
 model Address {
@@ -334,7 +320,6 @@ model Place {
   FoodPoint     FoodPoint?
   hospital      Hospital?      @relation("HospitalPlace")
   institution   Institution?   @relation("InstitutionPlace")
-  Internet      Internet?
   shelter       Shelter?       @relation("ShelterPlace")
   WaterPoint    WaterPoint?
 }
@@ -499,40 +484,6 @@ model FoodPoint {
   Place       Place?          @relation(fields: [placeId], references: [id])
 }
 
-model Internet {
-  id          String   @id
-  placeName   String
-  powerSource String
-  wifiQuality String
-  seatsCount  Int      @default(0)
-  isFree      String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime
-  isTrashed   Boolean  @default(false)
-  placeId     String?  @unique
-  Place       Place?   @relation(fields: [placeId], references: [id])
-
-  @@index([placeName])
-  @@index([wifiQuality])
-}
-
-model PsychologicalSupport {
-  id           String   @id
-  centerName   String
-  specialist   String
-  appointments String
-  serviceType  String
-  capacity     Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime
-  isTrashed    Boolean  @default(false)
-  currentCount Int      @default(0)
-  phoneNumber  String
-  status       String   @default("متاح")
-
-  @@index([centerName])
-  @@index([specialist])
-}
 
 model School {
   id           String   @id
@@ -553,32 +504,6 @@ model School {
   isTrashed    Boolean  @default(false)
 }
 
-model Student {
-  id            String   @id
-  name          String
-  nationalId    String   @unique
-  level         String
-  birthDate     DateTime
-  guardianName  String
-  guardianPhone String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime
-  isTrashed     Boolean  @default(false)
-}
-
-model StudentIssue {
-  id          String   @id
-  issueType   String
-  level       String
-  studentName String
-  schoolName  String
-  status      String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime
-  isTrashed   Boolean  @default(false)
-
-  @@index([studentName])
-}
 
 model WaterPoint {
   id        String           @id

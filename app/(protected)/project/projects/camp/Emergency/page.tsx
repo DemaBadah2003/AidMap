@@ -23,7 +23,7 @@ type Emergency = {
   status: EmergencyStatus
 }
 
-const BASE_URL = '/api/project/projects/Emergency'
+const BASE_URL = '/api/project/camp/Emergency'
 const EMERGENCY_TYPES = ["إخلاء طارئ", "تعليم طارئ", "نقص موارد", "حالة طبية حرجة", "أزمة مياه", "أخرى"]
 const EMERGENCY_LEVELS: EmergencyLevel[] = ["منخفض", "متوسط", "مرتفع"]
 const EMERGENCY_STATUSES: EmergencyStatus[] = ["جديدة", "قيد المعالجة", "مغلقة"]

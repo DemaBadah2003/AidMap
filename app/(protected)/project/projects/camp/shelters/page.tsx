@@ -39,6 +39,9 @@ const SUPERVISOR_API = '/api/project/camp/supervisior'
 
 const sel = 'rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
 
+// دالة التحقق من رقم الهاتف (تبدأ بـ 056 أو 059 وتتكون من 10 أرقام)
+const isPhoneValid = (p: string) => /^(056|059)\d{7}$/.test(p.trim())
+
 // ─── Shelter Tab ─────────────────────────────────────────────────────────────
 
 function SheltersTab() {
@@ -53,7 +56,7 @@ function SheltersTab() {
   const [editItem, setEditItem] = useState<Shelter | null>(null)
   const [formData, setFormData] = useState({
     nameAr: '', areaAr: 'شمال' as typeof REGIONS[number],
-    supervisorAr: '', phone: '', capacity: 0, fillStatus: 'غير ممتلئ' as 'ممتلئ' | 'غير ممتلئ',
+    supervisorAr: '', phone: '', capacity: 0, familiesCount: 0, fillStatus: 'غير ممتلئ' as 'ممتلئ' | 'غير ممتلئ',
   })
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -85,21 +88,29 @@ function SheltersTab() {
     const e: Record<string, string> = {}
     if (!d.nameAr.trim()) e.nameAr = 'مطلوب'
     if (!d.supervisorAr.trim()) e.supervisorAr = 'مطلوب'
-    if (!d.phone.trim() || !/^(056|059)\d{7}$/.test(d.phone.trim())) e.phone = 'رقم غير صحيح'
+    if (!isPhoneValid(d.phone)) e.phone = 'رقم غير صحيح'
     if (!d.capacity || d.capacity <= 0) e.capacity = 'مطلوب'
     setErrors(e)
     return Object.keys(e).length === 0
   }
 
   const openAdd = () => {
-    setFormData({ nameAr: '', areaAr: 'شمال', supervisorAr: '', phone: '', capacity: 0, fillStatus: 'غير ممتلئ' })
+    setFormData({ nameAr: '', areaAr: 'شمال', supervisorAr: '', phone: '', capacity: 0, familiesCount: 0, fillStatus: 'غير ممتلئ' })
     setErrors({})
     setAddOpen(true)
   }
 
   const openEdit = (item: Shelter) => {
     setEditItem(item)
-    setFormData({ nameAr: item.nameAr, areaAr: item.areaAr as typeof REGIONS[number], supervisorAr: item.supervisorAr, phone: item.phone, capacity: item.capacity, fillStatus: item.fillStatus })
+    setFormData({ 
+      nameAr: item.nameAr, 
+      areaAr: item.areaAr as typeof REGIONS[number], 
+      supervisorAr: item.supervisorAr, 
+      phone: item.phone, 
+      capacity: item.capacity, 
+      familiesCount: item.familiesCount,
+      fillStatus: item.fillStatus 
+    })
     setErrors({})
   }
 
@@ -137,7 +148,6 @@ function SheltersTab() {
               <Input value={q} onChange={e => { setQ(e.target.value); setCurrentPage(1) }} placeholder="ابحث بالاسم أو المنطقة..." className="h-10 pr-10" />
             </div>
             
-            {/* التعديل المطلوب: زر الفلترة مرفوع وصغير بجانب البحث */}
             <select 
               value={statusFilter} 
               onChange={e => setStatusFilter(e.target.value as any)} 
@@ -161,8 +171,8 @@ function SheltersTab() {
                   <th className="p-4 font-semibold text-muted-foreground">المنطقة</th>
                   <th className="p-4 font-semibold text-muted-foreground">المشرف</th>
                   <th className="p-4 font-semibold text-muted-foreground">الهاتف</th>
-                  <th className="p-4 font-semibold text-muted-foreground">الطاقة</th>
-                  <th className="p-4 font-semibold text-muted-foreground">الأسر</th>
+                  <th className="p-4 font-semibold text-muted-foreground">السعة الكلية</th>
+                  <th className="p-4 font-semibold text-muted-foreground">السعة الموجودة</th>
                   <th className="p-4 text-center font-semibold text-muted-foreground">الحالة</th>
                   <th className="p-4 text-center font-semibold text-muted-foreground">إجراءات</th>
                 </tr>
@@ -207,11 +217,11 @@ function SheltersTab() {
       </Card>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-md rounded-2xl" dir="rtl">
+        <DialogContent className="max-w-md rounded-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
           <DialogHeader><DialogTitle className="text-right text-lg font-bold text-blue-800">إضافة مركز إيواء</DialogTitle></DialogHeader>
           <ShelterForm formData={formData} setFormData={setFormData} errors={errors} />
           {errors._ && <p className="text-sm text-red-600">{errors._}</p>}
-          <DialogFooter className="mt-2 flex flex-col sm:flex-row gap-3">
+          <DialogFooter className="mt-4 flex flex-col sm:flex-row gap-3">
             <Button onClick={onAdd} disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700 h-11 rounded-xl text-white">
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'حفظ'}
             </Button>
@@ -221,11 +231,11 @@ function SheltersTab() {
       </Dialog>
 
       <Dialog open={!!editItem} onOpenChange={open => { if (!open) setEditItem(null) }}>
-        <DialogContent className="max-w-md rounded-2xl" dir="rtl">
+        <DialogContent className="max-w-md rounded-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
           <DialogHeader><DialogTitle className="text-right text-lg font-bold text-blue-800">تعديل مركز إيواء</DialogTitle></DialogHeader>
           <ShelterForm formData={formData} setFormData={setFormData} errors={errors} />
           {errors._ && <p className="text-sm text-red-600">{errors._}</p>}
-          <DialogFooter className="mt-2 flex flex-col sm:flex-row gap-3">
+          <DialogFooter className="mt-4 flex flex-col sm:flex-row gap-3">
             <Button onClick={onEdit} disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700 h-11 rounded-xl text-white">
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'حفظ التعديلات'}
             </Button>
@@ -244,25 +254,40 @@ function ShelterForm({ formData, setFormData, errors }: { formData: any, setForm
         <label className="text-xs font-bold text-foreground">اسم المركز *</label>
         <Input className={`h-11 ${errors.nameAr ? 'border-red-400' : ''}`} value={formData.nameAr} onChange={e => setFormData({ ...formData, nameAr: e.target.value })} />
       </div>
+
       <div className="space-y-1.5">
         <label className="text-xs font-bold text-foreground">المنطقة</label>
         <select className={`${sel} h-11 w-full`} value={formData.areaAr} onChange={e => setFormData({ ...formData, areaAr: e.target.value })}>
           {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
       </div>
+
       <div className="space-y-1.5">
         <label className="text-xs font-bold text-foreground">المشرف *</label>
         <Input className={`h-11 ${errors.supervisorAr ? 'border-red-400' : ''}`} value={formData.supervisorAr} onChange={e => setFormData({ ...formData, supervisorAr: e.target.value })} />
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold text-foreground">الهاتف *</label>
-          <Input className={`h-11 ${errors.phone ? 'border-red-400' : ''}`} value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="059xxxxxxx" dir="ltr" />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold text-foreground">الطاقة *</label>
-          <Input type="number" className={`h-11 ${errors.capacity ? 'border-red-400' : ''}`} value={formData.capacity || ''} onChange={e => setFormData({ ...formData, capacity: Number(e.target.value) })} />
-        </div>
+
+      <div className="space-y-1.5">
+        <label className="text-xs font-bold text-foreground">الهاتف *</label>
+        <Input 
+          className={`h-11 ${errors.phone ? 'border-red-400 text-red-500' : ''}`} 
+          value={formData.phone} 
+          maxLength={10}
+          onChange={e => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })} 
+          placeholder="05XXXXXXXX" 
+          dir="ltr" 
+        />
+        {errors.phone && <p className="text-[10px] text-red-500 font-bold">يبدأ بـ 056 أو 059 ويتكون من 10 أرقام</p>}
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-xs font-bold text-foreground">السعة الكلية *</label>
+        <Input type="number" className={`h-11 ${errors.capacity ? 'border-red-400' : ''}`} value={formData.capacity || ''} onChange={e => setFormData({ ...formData, capacity: Number(e.target.value) })} />
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-xs font-bold text-foreground">السعة الموجودة</label>
+        <Input type="number" className="h-11" value={formData.familiesCount || ''} onChange={e => setFormData({ ...formData, familiesCount: Number(e.target.value) })} />
       </div>
     </div>
   )
@@ -279,8 +304,9 @@ function SupervisorsTab() {
   const [addOpen, setAddOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<Omit<Supervisor, 'id'>>({ nameAr: '', phone: '', status: 'نشط' })
-  const [addForm, setAddForm] = useState({ nameAr: '', phone: '', region: '', status: 'نشط' as 'نشط' | 'موقوف' })
+  const [addForm, setAddForm] = useState({ nameAr: '', phone: '', status: 'نشط' as 'نشط' | 'موقوف' })
   const [submitting, setSubmitting] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   const load = async () => {
     setLoading(true)
@@ -300,7 +326,16 @@ function SupervisorsTab() {
   const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1
   const rangeEnd = Math.min(currentPage * itemsPerPage, filtered.length)
 
+  const validate = (name: string, phone: string) => {
+    const e: Record<string, string> = {}
+    if (!name.trim()) e.name = 'مطلوب'
+    if (!isPhoneValid(phone)) e.phone = 'خطأ'
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
   const onEdit = async (id: string) => {
+    if (!validate(editDraft.nameAr, editDraft.phone)) return
     setSubmitting(true)
     try {
       const res = await fetch(`${SUPERVISOR_API}?id=${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editDraft) })
@@ -313,6 +348,7 @@ function SupervisorsTab() {
   }
 
   const onAdd = async () => {
+    if (!validate(addForm.nameAr, addForm.phone)) return
     setSubmitting(true)
     try {
       const res = await fetch(SUPERVISOR_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(addForm) })
@@ -333,7 +369,7 @@ function SupervisorsTab() {
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={q} onChange={e => { setQ(e.target.value); setCurrentPage(1) }} placeholder="ابحث بالاسم أو الرقم..." className="h-10 pr-10" />
             </div>
-            <Button onClick={() => setAddOpen(true)} className="bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 gap-2 sm:mr-auto">
+            <Button onClick={() => { setErrors({}); setAddForm({ nameAr: '', phone: '', status: 'نشط' }); setAddOpen(true) }} className="bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 gap-2 sm:mr-auto">
               <Plus className="h-4 w-4" /> إضافة مشرف
             </Button>
           </div>
@@ -356,10 +392,10 @@ function SupervisorsTab() {
                 ) : paged.map(sp => (
                   <tr key={sp.id} className="hover:bg-muted/30 transition-colors">
                     <td className="p-4 font-bold text-foreground">
-                      {editingId === sp.id ? <Input value={editDraft.nameAr} onChange={e => setEditDraft(d => ({ ...d, nameAr: e.target.value }))} className="h-9" /> : sp.nameAr}
+                      {editingId === sp.id ? <Input value={editDraft.nameAr} onChange={e => setEditDraft(d => ({ ...d, nameAr: e.target.value }))} className={`h-9 ${errors.name ? 'border-red-400' : ''}`} /> : sp.nameAr}
                     </td>
                     <td className="p-4 text-muted-foreground" dir="ltr">
-                      {editingId === sp.id ? <Input value={editDraft.phone} onChange={e => setEditDraft(d => ({ ...d, phone: e.target.value }))} className="h-9" /> : sp.phone}
+                      {editingId === sp.id ? <Input maxLength={10} value={editDraft.phone} onChange={e => setEditDraft(d => ({ ...d, phone: e.target.value.replace(/\D/g, '') }))} className={`h-9 ${errors.phone ? 'border-red-400' : ''}`} /> : sp.phone}
                     </td>
                     <td className="p-4">
                       {editingId === sp.id ? (
@@ -376,7 +412,7 @@ function SupervisorsTab() {
                           <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}><X className="w-4 h-4" /></Button>
                         </div>
                       ) : (
-                        <button onClick={() => { setEditingId(sp.id); setEditDraft({ nameAr: sp.nameAr, phone: sp.phone, status: sp.status }) }} className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-md border text-muted-foreground">
+                        <button onClick={() => { setErrors({}); setEditingId(sp.id); setEditDraft({ nameAr: sp.nameAr, phone: sp.phone, status: sp.status }) }} className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-md border text-muted-foreground">
                           <Pencil className="w-4 h-4" />
                         </button>
                       )}
@@ -393,8 +429,21 @@ function SupervisorsTab() {
         <DialogContent className="max-w-sm rounded-2xl" dir="rtl">
           <DialogHeader><DialogTitle className="text-right text-lg font-bold text-blue-800">إضافة مشرف</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-1.5"><label className="text-xs font-bold">الاسم *</label><Input className="h-11" value={addForm.nameAr} onChange={e => setAddForm(f => ({ ...f, nameAr: e.target.value }))} /></div>
-            <div className="space-y-1.5"><label className="text-xs font-bold">الهاتف *</label><Input className="h-11" value={addForm.phone} onChange={e => setAddForm(f => ({ ...f, phone: e.target.value }))} dir="ltr" /></div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold">الاسم *</label>
+              <Input className={`h-11 ${errors.name ? 'border-red-400' : ''}`} value={addForm.nameAr} onChange={e => setAddForm(f => ({ ...f, nameAr: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold">الهاتف *</label>
+              <Input 
+                className={`h-11 ${errors.phone ? 'border-red-400' : ''}`} 
+                value={addForm.phone} 
+                maxLength={10}
+                onChange={e => setAddForm(f => ({ ...f, phone: e.target.value.replace(/\D/g, '') }))} 
+                dir="ltr" 
+              />
+              {errors.phone && <p className="text-[10px] text-red-500 font-bold">يبدأ بـ 056 أو 059 ويتكون من 10 أرقام</p>}
+            </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold">الحالة</label>
               <select className={`${sel} h-11 w-full`} value={addForm.status} onChange={e => setAddForm(f => ({ ...f, status: e.target.value as any }))}><option value="نشط">نشط</option><option value="موقوف">موقوف</option></select>
