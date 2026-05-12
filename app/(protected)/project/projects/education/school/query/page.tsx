@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ArrowRight, Search, Loader2, School, Users, BookOpen } from 'lucide-react'
 
+// --- استدعاء الحماية لضمان دخول الأدمن والمواطن فقط ---
+import { requireCitizen } from '@/app/(protected)/project/helpers/route-guards'
+
 const LOCATIONS = ['شمال', 'جنوب', 'شرق', 'غرب', 'وسط']
 const AREAS_BY_LOCATION: Record<string, string[]> = {
   'شمال': ['جباليا', 'بيت لاهيا', 'بيت حانون'],
@@ -37,6 +40,7 @@ const sel = 'w-full h-12 border-2 border-white shadow-sm rounded-2xl px-4 bg-whi
 
 export default function SchoolQueryPage() {
   const router = useRouter()
+  const [isVerifying, setIsVerifying] = useState(true) // حالة التحقق من الصلاحية
   const [schools, setSchools] = useState<School[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
@@ -47,13 +51,26 @@ export default function SchoolQueryPage() {
   const [filterLevel, setFilterLevel] = useState('')
   const [filterFees, setFilterFees] = useState('')
 
+  // 1. نظام الحماية: السماح للأدمن والمواطن فقط بالدخول
   useEffect(() => {
-    fetch('/api/project/education/schools')
-      .then(r => r.json())
-      .then(d => setSchools(Array.isArray(d.schools) ? d.schools : []))
-      .catch(() => setSchools([]))
-      .finally(() => setLoading(false))
-  }, [])
+    async function checkAccess() {
+      // requireCitizen تسمح بالدخول لكل من الأدمن والمواطن وتطرد الضيوف
+      await requireCitizen(router)
+      setIsVerifying(false)
+    }
+    checkAccess()
+  }, [router])
+
+  // 2. جلب البيانات فقط بعد التأكد من الصلاحية
+  useEffect(() => {
+    if (!isVerifying) {
+      fetch('/api/project/education/schools')
+        .then(r => r.json())
+        .then(d => setSchools(Array.isArray(d.schools) ? d.schools : []))
+        .catch(() => setSchools([]))
+        .finally(() => setLoading(false))
+    }
+  }, [isVerifying])
 
   const filtered = useMemo(() => {
     return schools.filter(s => {
@@ -77,6 +94,18 @@ export default function SchoolQueryPage() {
 
   const clearFilters = () => { setQ(''); setFilterLocation(''); setFilterRegion(''); setFilterType(''); setFilterGender(''); setFilterLevel(''); setFilterFees('') }
 
+  // شاشة الانتظار أثناء فحص الصلاحية
+  if (isVerifying) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-white">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto" />
+          <p className="mt-4 text-slate-500 font-medium">جاري التحقق من الهوية...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full px-4 py-8 sm:px-10" dir="rtl">
       <div className="mb-8 flex items-center gap-4">
@@ -85,16 +114,16 @@ export default function SchoolQueryPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-black text-blue-900">نظام فلترة المدارس</h1>
-          <p className="text-blue-600 font-medium mt-1">ابحث وصفّ البيانات المدرسية</p>
+          <p className="text-blue-600 font-medium mt-1">عرض البيانات للمواطنين والإدارة</p>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <Card className="border-none shadow-md rounded-2xl bg-blue-600 text-white">
           <CardContent className="p-5 flex items-center gap-3">
             <School className="w-8 h-8 opacity-80" />
-            <div><p className="text-sm opacity-80">المدارس</p><p className="text-2xl font-black">{stats.total}</p></div>
+            <div><p className="text-sm opacity-80">المدارس المتاحة</p><p className="text-2xl font-black">{stats.total}</p></div>
           </CardContent>
         </Card>
         <Card className="border-none shadow-md rounded-2xl bg-emerald-600 text-white">
@@ -121,7 +150,7 @@ export default function SchoolQueryPage() {
             </div>
 
             <select className={sel} value={filterLocation} onChange={e => { setFilterLocation(e.target.value); setFilterRegion('') }}>
-              <option value="">كل المواقع</option>
+              <option value="">كل المحافظات</option>
               {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
             </select>
 
@@ -131,69 +160,71 @@ export default function SchoolQueryPage() {
             </select>
 
             <select className={sel} value={filterType} onChange={e => setFilterType(e.target.value)}>
-              <option value="">كل الأنواع</option>
+              <option value="">كل أنواع المدارس</option>
               {SCHOOL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
 
             <select className={sel} value={filterGender} onChange={e => setFilterGender(e.target.value)}>
-              <option value="">ذكور / إناث / مشترك</option>
+              <option value="">نوع الطلاب (الكل)</option>
               {GENDERS.map(g => <option key={g} value={g}>{g}</option>)}
             </select>
 
             <select className={sel} value={filterLevel} onChange={e => setFilterLevel(e.target.value)}>
-              <option value="">كل المراحل</option>
+              <option value="">كل المراحل التعليمية</option>
               {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
 
             <select className={sel} value={filterFees} onChange={e => setFilterFees(e.target.value)}>
-              <option value="">مجاني / برسوم</option>
+              <option value="">التكلفة (الكل)</option>
               <option value="مجاني">مجاني</option>
               <option value="برسوم">برسوم</option>
             </select>
           </div>
-          <Button variant="outline" onClick={clearFilters} className="text-sm">مسح الفلاتر</Button>
+          <Button variant="outline" onClick={clearFilters} className="text-sm rounded-xl">مسح الفلاتر</Button>
         </CardContent>
       </Card>
 
       {/* Results */}
       {loading ? (
-        <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>
+        <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 animate-spin text-blue-500" /></div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-slate-400 bg-slate-50 rounded-3xl border-2 border-dashed">
-          لا توجد نتائج تطابق الفلاتر المحددة
+          لا توجد مدارس تطابق معايير البحث الحالية
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filtered.map(s => (
-            <Card key={s.id} className="border-none shadow-md rounded-2xl hover:shadow-lg transition-shadow">
+            <Card key={s.id} className="border-none shadow-md rounded-2xl hover:shadow-lg transition-shadow bg-white overflow-hidden group">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-3">
-                  <h3 className="font-black text-slate-800 text-base leading-tight">{s.name}</h3>
-                  <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-bold ${s.fees > 0 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                  <h3 className="font-black text-slate-800 text-base group-hover:text-blue-600 transition-colors leading-tight">{s.name}</h3>
+                  <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-bold ${s.fees > 0 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
                     {s.fees > 0 ? `${s.fees} ₪` : 'مجاني'}
                   </span>
                 </div>
 
                 <div className="space-y-1.5 text-sm">
                   {(s.location || s.region) && (
-                    <p className="text-slate-500">{[s.location, s.region].filter(Boolean).join(' › ')}</p>
+                    <p className="text-slate-500 font-medium">{[s.location, s.region].filter(Boolean).join(' › ')}</p>
                   )}
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {s.schoolType && <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs">{s.schoolType}</span>}
+                    {s.schoolType && <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-lg text-[11px] font-bold">{s.schoolType}</span>}
                     {s.gender && (
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${s.gender === 'ذكور' ? 'bg-blue-100 text-blue-700' : s.gender === 'إناث' ? 'bg-pink-100 text-pink-700' : 'bg-purple-100 text-purple-700'}`}>
+                      <span className={`px-2 py-0.5 rounded-lg text-[11px] font-bold ${s.gender === 'ذكور' ? 'bg-blue-100 text-blue-700' : s.gender === 'إناث' ? 'bg-pink-100 text-pink-700' : 'bg-purple-100 text-purple-700'}`}>
                         {s.gender}
                       </span>
                     )}
-                    {s.level && <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full text-xs">{s.level}</span>}
-                    {s.timing && <span className="px-2 py-0.5 bg-orange-50 text-orange-600 rounded-full text-xs">{s.timing}</span>}
+                    {s.level && <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-lg text-[11px] font-bold">{s.level}</span>}
                   </div>
-                  {s.totalCount > 0 && (
-                    <p className="text-slate-500 mt-1 flex items-center gap-1">
-                      <Users className="w-3.5 h-3.5" /> {s.totalCount.toLocaleString('ar')} طالب
-                    </p>
-                  )}
-                  {s.studyDays && <p className="text-xs text-slate-400">{s.studyDays}</p>}
+                  
+                  <div className="pt-3 mt-3 border-t border-slate-50 flex items-center justify-between">
+                    {s.totalCount > 0 ? (
+                      <p className="text-slate-500 text-xs flex items-center gap-1.5 font-bold">
+                        <Users className="w-3.5 h-3.5 text-slate-400" /> {s.totalCount.toLocaleString('ar')} طالب
+                      </p>
+                    ) : <span></span>}
+                    {s.timing && <p className="text-[11px] text-slate-400 font-medium">{s.timing}</p>}
+                  </div>
                 </div>
               </CardContent>
             </Card>

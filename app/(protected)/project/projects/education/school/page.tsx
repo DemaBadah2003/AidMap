@@ -6,7 +6,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Pencil, Plus, Search, Loader2, AlertCircle, ChevronLeft } from 'lucide-react'
+import { Pencil, Plus, Search, Loader2, AlertCircle } from 'lucide-react'
+
+// --- التعديل: استدعاء حماية الأدمن فقط ---
+import { requireAdmin } from '@/app/(protected)/project/helpers/route-guards'
 
 const LOCATIONS = ['شمال', 'جنوب', 'شرق', 'غرب', 'وسط']
 const AREAS_BY_LOCATION: Record<string, string[]> = {
@@ -48,16 +51,42 @@ const sel = 'w-full h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 tex
 
 export default function SchoolsPage() {
   const router = useRouter()
+  const [isVerifying, setIsVerifying] = useState(true) 
   const [q, setQ] = useState('')
   const [items, setItems] = useState<School[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<School | null>(null)
   const [form, setForm] = useState(emptyForm)
-  const [submitting, setSubmitting] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // 1. حماية الصفحة: السماح للأدمن فقط ومنع المواطن
+  useEffect(() => {
+    async function checkAccess() {
+      try {
+        // التحقق من خلال الهيلبر الموحد
+        await requireAdmin(router)
+        
+        // فحص إضافي للتأكد من رتبة المستخدم من الجلسة (اختياري لزيادة الأمان)
+        const res = await fetch('/api/auth/session')
+        const session = await res.json()
+        
+        if (session?.user?.role !== 'ADMIN') {
+          router.replace('/project/dashboard') // إعادة توجيه المواطن بعيداً
+          return
+        }
+
+        setIsVerifying(false)
+      } catch (err) {
+        router.replace('/login')
+      }
+    }
+    checkAccess()
+  }, [router])
+
   const fetchData = () => {
+    if (isVerifying) return 
     setLoading(true)
     fetch('/api/project/education/schools')
       .then(r => r.json())
@@ -65,7 +94,10 @@ export default function SchoolsPage() {
       .catch(() => setItems([]))
       .finally(() => setLoading(false))
   }
-  useEffect(() => { fetchData() }, [])
+
+  useEffect(() => {
+    if (!isVerifying) fetchData()
+  }, [isVerifying])
 
   const filtered = useMemo(() =>
     items.filter(s => s.name.toLowerCase().includes(q.toLowerCase()) || (s.location || '').includes(q) || (s.region || '').includes(q)),
@@ -99,16 +131,26 @@ export default function SchoolsPage() {
     } finally { setSaving(false) }
   }
 
-  const [saving, setSaving] = useState(false)
   const f = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(p => ({ ...p, [key]: e.target.value }))
+
+  if (isVerifying) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-white">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 animate-spin text-blue-600 mx-auto" />
+          <p className="mt-4 text-slate-500 text-sm">جاري التحقق من صلاحيات المسؤول...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="w-full px-4 py-6 font-arabic" dir="rtl">
       <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">إدارة المدارس</h1>
-          <p className="text-sm text-slate-500 mt-1">الرئيسية &gt; جدول المدارس</p>
+        <div className="text-right">
+          <h1 className="text-2xl font-bold text-slate-900">إدارة المدارس (لوحة التحكم)</h1>
+          <p className="text-sm text-slate-500 mt-1">الرئيسية &gt; إعدادات المنظومة</p>
         </div>
         <Button variant="outline" onClick={() => router.push('/project/projects/education/school/query')} className="gap-2">
           <Search className="w-4 h-4" /> نظام الفلترة
@@ -120,7 +162,7 @@ export default function SchoolsPage() {
           <div className="p-4 flex flex-col sm:flex-row items-center gap-3 border-b">
             <div className="relative w-full max-w-xs">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input value={q} onChange={e => setQ(e.target.value)} placeholder="ابحث بالاسم أو المنطقة..." className="w-full pr-10 bg-slate-50 border-none h-10 rounded-lg text-sm" />
+              <Input value={q} onChange={e => setQ(e.target.value)} placeholder="ابحث بالاسم أو المنطقة..." className="w-full pr-10 bg-slate-50 border-none h-10 rounded-lg text-sm text-right" />
             </div>
             <Button onClick={openAdd} className="bg-blue-600 hover:bg-blue-700 h-10 px-4 rounded-lg font-bold shadow-sm mr-auto gap-2">
               <Plus className="h-4 w-4" /> إضافة مدرسة
@@ -131,7 +173,7 @@ export default function SchoolsPage() {
             <table className="w-full text-right text-sm">
               <thead className="bg-slate-50 border-b font-bold text-slate-600">
                 <tr>
-                  {['اسم المدرسة', 'الموقع / المنطقة', 'النوع', 'الجنس', 'المرحلة', 'عدد الطلاب', 'التوقيت', 'الرسوم', ''].map(h => (
+                  {['اسم المدرسة', 'الموقع / المنطقة', 'النوع', 'الجنس', 'المرحلة', 'عدد الطلاب', 'التوقيت', 'الرسوم', 'إجراءات'].map(h => (
                     <th key={h} className="p-4">{h}</th>
                   ))}
                 </tr>
@@ -140,7 +182,7 @@ export default function SchoolsPage() {
                 {loading ? (
                   <tr><td colSpan={9} className="p-10 text-center"><Loader2 className="animate-spin mx-auto w-6 h-6 text-slate-300" /></td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={9} className="p-10 text-center text-slate-400">لا توجد مدارس</td></tr>
+                  <tr><td colSpan={9} className="p-10 text-center text-slate-400">لا توجد سجلات حالياً</td></tr>
                 ) : filtered.map(s => (
                   <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                     <td className="p-4 font-bold text-slate-700">{s.name}</td>
@@ -173,14 +215,14 @@ export default function SchoolsPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold">{editing ? 'تعديل مدرسة' : 'إضافة مدرسة جديدة'}</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-right">{editing ? 'تعديل بيانات المدرسة' : 'إضافة مدرسة جديدة'}</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4">
+          <div className="grid grid-cols-2 gap-4 py-4 text-right">
             {error && <p className="col-span-2 text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
 
             <div className="col-span-2 space-y-1.5">
               <label className="text-xs font-bold text-slate-700">اسم المدرسة *</label>
-              <Input className="h-11 bg-slate-50" value={form.name} onChange={f('name')} placeholder="أدخل اسم المدرسة" />
+              <Input className="h-11 bg-slate-50 text-right" value={form.name} onChange={f('name')} placeholder="أدخل اسم المدرسة" />
             </div>
 
             <div className="space-y-1.5">
@@ -209,7 +251,7 @@ export default function SchoolsPage() {
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">عدد الطلاب الكلي</label>
-              <Input className="h-11 bg-slate-50" type="number" value={form.totalCount} onChange={f('totalCount')} />
+              <Input className="h-11 bg-slate-50 text-right" type="number" value={form.totalCount} onChange={f('totalCount')} />
             </div>
 
             <div className="space-y-1.5">
@@ -254,18 +296,18 @@ export default function SchoolsPage() {
             {form.feesStatus === 'برسوم' && (
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">مبلغ الرسوم (₪)</label>
-                <Input className="h-11 bg-slate-50" type="number" value={form.fees} onChange={f('fees')} />
+                <Input className="h-11 bg-slate-50 text-right" type="number" value={form.fees} onChange={f('fees')} />
               </div>
             )}
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">خط العرض (Latitude)</label>
-              <Input className="h-11 bg-slate-50" value={form.latitude} onChange={f('latitude')} placeholder="31.5..." />
+              <Input className="h-11 bg-slate-50 text-right" value={form.latitude} onChange={f('latitude')} placeholder="31.5..." />
             </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">خط الطول (Longitude)</label>
-              <Input className="h-11 bg-slate-50" value={form.longitude} onChange={f('longitude')} placeholder="34.4..." />
+              <Input className="h-11 bg-slate-50 text-right" value={form.longitude} onChange={f('longitude')} placeholder="34.4..." />
             </div>
 
             {!isValid && (
