@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Pencil, Plus, Search, Loader2, AlertCircle, ChevronLeft } from 'lucide-react'
 
-// --- استدعاء الحماية من ملفك بناءً على الصورة image_8dd741.png ---
+// --- استدعاء الحماية ---
 import { requireAdmin } from '@/app/(protected)/project/helpers/route-guards'
 
 // --- وظائف التحقق والتحكم ---
@@ -132,7 +132,7 @@ export default function HospitalsPage() {
   const [editLat, setEditLat] = useState(''); const [editLng, setEditLng] = useState('')
   const [editSubmitting, setEditSubmitting] = useState(false)
 
-  // 1. حماية الصفحة: يسمح فقط للآدمن بالدخول
+  // 1. حماية الصفحة
   useEffect(() => {
     async function checkAccess() {
       await requireAdmin(router)
@@ -154,8 +154,33 @@ export default function HospitalsPage() {
 
   useEffect(() => { if (!isVerifying) fetchData() }, [isVerifying])
 
-  const isAddValid = useMemo(() => addName.trim() !== '' && addType !== '' && addRegion !== '' && isValidPalestinePhone(addPhone), [addName, addType, addRegion, addPhone])
-  const isEditValid = useMemo(() => editName.trim() !== '' && editType !== '' && editRegion !== '' && isValidPalestinePhone(editPhone), [editName, editType, editRegion, editPhone])
+  // --- التحقق من تكرار رقم الهاتف ---
+  const isPhoneDuplicateAdd = useMemo(() => {
+    return items.some(item => item.phone === addPhone)
+  }, [items, addPhone])
+
+  const isPhoneDuplicateEdit = useMemo(() => {
+    return items.some(item => item.phone === editPhone && item.id !== editId)
+  }, [items, editPhone, editId])
+
+  // --- شروط صحة البيانات (مع منع التكرار) ---
+  const isAddValid = useMemo(() => 
+    addName.trim() !== '' && 
+    addType !== '' && 
+    addRegion !== '' && 
+    isValidPalestinePhone(addPhone) && 
+    !isPhoneDuplicateAdd, 
+    [addName, addType, addRegion, addPhone, isPhoneDuplicateAdd]
+  )
+
+  const isEditValid = useMemo(() => 
+    editName.trim() !== '' && 
+    editType !== '' && 
+    editRegion !== '' && 
+    isValidPalestinePhone(editPhone) && 
+    !isPhoneDuplicateEdit, 
+    [editName, editType, editRegion, editPhone, isPhoneDuplicateEdit]
+  )
 
   const onAdd = async () => {
     if (!isAddValid) return
@@ -260,7 +285,18 @@ export default function HospitalsPage() {
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader><DialogTitle className="text-start">{t('pages.hospitals.addTitle')}</DialogTitle></DialogHeader>
           <HospitalForm hospitalName={addName} setHospitalName={setAddName} hospitalType={addType} setHospitalType={setAddType} region={addRegion} setRegion={setAddRegion} phone={addPhone} setPhone={setAddPhone} latitude={addLat} setLatitude={setAddLat} longitude={addLng} setLongitude={setAddLng} />
-          {!isAddValid && <div className="flex items-center gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-700"><AlertCircle className="w-3.5 h-3.5" /> {addPhone.length > 0 && !isValidPalestinePhone(addPhone) ? "الرقم غير صحيح" : t('common.messages.required')}</div>}
+          
+          {!isAddValid && (
+            <div className="flex items-center gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
+              <AlertCircle className="w-3.5 h-3.5" />
+              {addPhone.length > 0 && !isValidPalestinePhone(addPhone) 
+                ? "الرقم غير صحيح" 
+                : isPhoneDuplicateAdd 
+                ? "عذراً، هذا الرقم مسجل مسبقاً لمستشفى آخر"
+                : t('common.messages.required')}
+            </div>
+          )}
+
           <DialogFooter className="flex flex-row gap-3">
             <Button onClick={onAdd} disabled={!isAddValid || addSubmitting} className="flex-1 bg-blue-600 hover:bg-blue-700">{addSubmitting && <Loader2 className="animate-spin size-4 me-2" />}{t('common.buttons.save')}</Button>
             <Button variant="outline" onClick={() => setAddOpen(false)} className="flex-1">{t('common.buttons.cancel')}</Button>
@@ -272,8 +308,19 @@ export default function HospitalsPage() {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader><DialogTitle className="text-start">تعديل المستشفى</DialogTitle></DialogHeader>
-          <HospitalForm hospitalName={editName} setHospitalName={setEditName} hospitalType={editType} setHospitalType={setEditType} region={editRegion} setRegion={editRegion} phone={editPhone} setPhone={setEditPhone} latitude={editLat} setLatitude={setEditLat} longitude={editLng} setLongitude={setEditLng} />
-          {!isEditValid && <div className="flex items-center gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-700"><AlertCircle className="w-3.5 h-3.5" /> {editPhone.length > 0 && !isValidPalestinePhone(editPhone) ? "الرقم غير صحيح" : t('common.messages.required')}</div>}
+          <HospitalForm hospitalName={editName} setHospitalName={setEditName} hospitalType={editType} setHospitalType={setEditType} region={editRegion} setRegion={setEditRegion} phone={editPhone} setPhone={setEditPhone} latitude={editLat} setLatitude={setEditLat} longitude={editLng} setLongitude={setEditLng} />
+          
+          {!isEditValid && (
+            <div className="flex items-center gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
+              <AlertCircle className="w-3.5 h-3.5" />
+              {editPhone.length > 0 && !isValidPalestinePhone(editPhone) 
+                ? "الرقم غير صحيح" 
+                : isPhoneDuplicateEdit 
+                ? "عذراً، هذا الرقم مسجل مسبقاً لمستشفى آخر"
+                : t('common.messages.required')}
+            </div>
+          )}
+
           <DialogFooter className="flex flex-row gap-3">
             <Button onClick={onEdit} disabled={!isEditValid || editSubmitting} className="flex-1 bg-blue-600 hover:bg-blue-700">{editSubmitting && <Loader2 className="animate-spin size-4 me-2" />}{t('common.buttons.save')}</Button>
             <Button variant="outline" onClick={() => setEditOpen(false)} className="flex-1">{t('common.buttons.cancel')}</Button>

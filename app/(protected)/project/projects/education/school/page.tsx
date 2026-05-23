@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Pencil, Plus, Search, Loader2, AlertCircle } from 'lucide-react'
 
-// --- التعديل: استدعاء حماية الأدمن فقط ---
+// --- استدعاء الحماية ---
 import { requireAdmin } from '@/app/(protected)/project/helpers/route-guards'
 
 const LOCATIONS = ['شمال', 'جنوب', 'شرق', 'غرب', 'وسط']
@@ -51,7 +51,10 @@ const sel = 'w-full h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 tex
 
 export default function SchoolsPage() {
   const router = useRouter()
-  const [isVerifying, setIsVerifying] = useState(true) 
+
+  // --- حماية الصفحة ---
+  const [isVerifying, setIsVerifying] = useState(true)
+
   const [q, setQ] = useState('')
   const [items, setItems] = useState<School[]>([])
   const [loading, setLoading] = useState(true)
@@ -61,32 +64,17 @@ export default function SchoolsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // 1. حماية الصفحة: السماح للأدمن فقط ومنع المواطن
+  // 1. حماية الصفحة - أول شي ينشغل
   useEffect(() => {
     async function checkAccess() {
-      try {
-        // التحقق من خلال الهيلبر الموحد
-        await requireAdmin(router)
-        
-        // فحص إضافي للتأكد من رتبة المستخدم من الجلسة (اختياري لزيادة الأمان)
-        const res = await fetch('/api/auth/session')
-        const session = await res.json()
-        
-        if (session?.user?.role !== 'ADMIN') {
-          router.replace('/project/dashboard') // إعادة توجيه المواطن بعيداً
-          return
-        }
-
-        setIsVerifying(false)
-      } catch (err) {
-        router.replace('/login')
-      }
+      await requireAdmin(router)
+      setIsVerifying(false)
     }
     checkAccess()
   }, [router])
 
+  // 2. جلب البيانات بس بعد ما تنتهي الحماية
   const fetchData = () => {
-    if (isVerifying) return 
     setLoading(true)
     fetch('/api/project/education/schools')
       .then(r => r.json())
@@ -100,7 +88,11 @@ export default function SchoolsPage() {
   }, [isVerifying])
 
   const filtered = useMemo(() =>
-    items.filter(s => s.name.toLowerCase().includes(q.toLowerCase()) || (s.location || '').includes(q) || (s.region || '').includes(q)),
+    items.filter(s =>
+      s.name.toLowerCase().includes(q.toLowerCase()) ||
+      (s.location || '').includes(q) ||
+      (s.region || '').includes(q)
+    ),
     [items, q]
   )
 
@@ -122,34 +114,47 @@ export default function SchoolsPage() {
   const handleSave = async () => {
     if (!isValid) { setError('يرجى تعبئة الحقول المطلوبة'); return }
     setSaving(true)
-    const payload = { ...form, fees: form.feesStatus === 'مجاني' ? 0 : form.fees }
+    const payload = {
+      ...form,
+      fees: form.feesStatus === 'مجاني' ? 0 : Number(form.fees),
+      totalCount: Number(form.totalCount) || 0,
+      latitude: form.latitude ? parseFloat(form.latitude) : null,
+      longitude: form.longitude ? parseFloat(form.longitude) : null
+    }
     try {
       const url = editing ? `/api/project/education/schools?id=${editing.id}` : '/api/project/education/schools'
-      const res = await fetch(url, { method: editing ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-      if (!res.ok) { const d = await res.json(); setError(d.error || 'خطأ'); return }
-      setOpen(false); fetchData()
+      const res = await fetch(url, {
+        method: editing ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        setError(d.error || 'حدث خطأ أثناء حفظ البيانات')
+        return
+      }
+      setOpen(false)
+      fetchData()
+    } catch {
+      setError('فشل الاتصال بالخادم')
     } finally { setSaving(false) }
   }
 
   const f = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(p => ({ ...p, [key]: e.target.value }))
 
-  if (isVerifying) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-white">
-        <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-blue-600 mx-auto" />
-          <p className="mt-4 text-slate-500 text-sm">جاري التحقق من صلاحيات المسؤول...</p>
-        </div>
-      </div>
-    )
-  }
+  // 3. شاشة التحقق
+  if (isVerifying) return (
+    <div className="flex h-screen w-full items-center justify-center">
+      <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+    </div>
+  )
 
   return (
     <div className="w-full px-4 py-6 font-arabic" dir="rtl">
       <div className="mb-6 flex items-center justify-between">
         <div className="text-right">
-          <h1 className="text-2xl font-bold text-slate-900">إدارة المدارس (لوحة التحكم)</h1>
+          <h1 className="text-2xl font-bold text-slate-900">إدارة المدارس</h1>
           <p className="text-sm text-slate-500 mt-1">الرئيسية &gt; إعدادات المنظومة</p>
         </div>
         <Button variant="outline" onClick={() => router.push('/project/projects/education/school/query')} className="gap-2">
@@ -189,7 +194,11 @@ export default function SchoolsPage() {
                     <td className="p-4 text-slate-600">{[s.location, s.region].filter(Boolean).join(' - ') || '—'}</td>
                     <td className="p-4 text-slate-500">{s.schoolType || '—'}</td>
                     <td className="p-4">
-                      {s.gender && <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${s.gender === 'ذكور' ? 'bg-blue-50 text-blue-700' : s.gender === 'إناث' ? 'bg-pink-50 text-pink-700' : 'bg-purple-50 text-purple-700'}`}>{s.gender}</span>}
+                      {s.gender && (
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${s.gender === 'ذكور' ? 'bg-blue-50 text-blue-700' : s.gender === 'إناث' ? 'bg-pink-50 text-pink-700' : 'bg-purple-50 text-purple-700'}`}>
+                          {s.gender}
+                        </span>
+                      )}
                     </td>
                     <td className="p-4 text-slate-500">{s.level || '—'}</td>
                     <td className="p-4 text-slate-500">{s.totalCount > 0 ? s.totalCount.toLocaleString('ar') : '—'}</td>
@@ -256,7 +265,7 @@ export default function SchoolsPage() {
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">الموقع (المحافظة)</label>
-              <select className={sel} value={form.location} onChange={e => { setForm(p => ({ ...p, location: e.target.value, region: '' })) }}>
+              <select className={sel} value={form.location} onChange={e => setForm(p => ({ ...p, location: e.target.value, region: '' }))}>
                 <option value="">اختر الموقع</option>
                 {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
               </select>

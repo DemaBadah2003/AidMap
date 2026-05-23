@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { requireAdmin } from '@/app/(protected)/project/helpers/route-guards'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,7 +41,6 @@ const SUPERVISOR_API = '/api/project/camp/supervisior'
 
 const sel = 'rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
 
-// دالة التحقق من رقم الهاتف (تبدأ بـ 056 أو 059 وتتكون من 10 أرقام)
 const isPhoneValid = (p: string) => /^(056|059)\d{7}$/.test(p.trim())
 
 // ─── Shelter Tab ─────────────────────────────────────────────────────────────
@@ -462,7 +463,25 @@ function SupervisorsTab() {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function CampPage() {
+  const router = useRouter()
   const [tab, setTab] = useState<'shelters' | 'supervisors'>('shelters')
+  const [isAuthorized, setIsAuthorized] = useState(false)
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      await requireAdmin(router)
+      setIsAuthorized(true)
+    }
+    checkAccess()
+  }, [router])
+
+  if (!isAuthorized) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+      </div>
+    )
+  }
 
   return (
     <div className="w-full px-4 py-6" dir="rtl">

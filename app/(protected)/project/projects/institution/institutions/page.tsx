@@ -1,6 +1,8 @@
 ﻿'use client'
 
 import { useMemo, useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { requireAdmin } from '@/app/(protected)/project/helpers/route-guards'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,10 +11,9 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Pencil, Save, X, Plus, Search, Loader2, ChevronRight, ChevronLeft } from 'lucide-react'
+import { Pencil, X, Plus, Search, Loader2 } from 'lucide-react'
 
 // التعريفات
 type PresenceStatus = 'متاح' | 'غير متاح'
@@ -38,15 +39,16 @@ const serviceTypeOptions = [
 ] as const
 
 export default function InstitutionsPage() {
+  const router = useRouter()
   const [items, setItems] = useState<Institution[]>([])
   const [loading, setLoading] = useState(false)
+  const [isAuthorized, setIsAuthorized] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   
   const [q, setQ] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'unavailable'>('all')
 
-  // Pagination States - نفس أسلوب الكود السابق
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
 
@@ -63,14 +65,21 @@ export default function InstitutionsPage() {
   const [editDraft, setEditDraft] = useState<Institution | null>(null)
   const [editErrors, setEditErrors] = useState<FieldErrors>({})
 
-  const validate = (data: typeof formData): FieldErrors => {
+  // حماية الصفحة والتأكد من صلاحية الأدمن
+  useEffect(() => {
+    const checkAccess = async () => {
+      await requireAdmin(router)
+      setIsAuthorized(true)
+    }
+    checkAccess()
+  }, [router])
+
+  const validate = (data: any): FieldErrors => {
     const errors: FieldErrors = {}
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.com$/
     
-    if (!data.nameAr) {
+    if (!data.nameAr?.trim()) {
       errors.nameAr = 'هذا الحقل مطلوب'
-    } else if (data.nameAr !== data.nameAr.trim()) {
-      errors.nameAr = 'ممنوع البدء أو الانتهاء بفراغات'
     } else if (data.nameAr.length < 2) {
       errors.nameAr = 'الاسم يجب أن يكون حرفين على الأقل'
     }
@@ -107,9 +116,14 @@ export default function InstitutionsPage() {
   }
 
   useEffect(() => {
-    fetchInstitutions()
+    if (isAuthorized) {
+        fetchInstitutions()
+    }
+  }, [q, statusFilter, isAuthorized])
+
+  useEffect(() => {
     setCurrentPage(1)
-  }, [q, statusFilter])
+  }, [itemsPerPage])
 
   // حسابات الـ Pagination
   const totalPages = Math.max(1, Math.ceil(items.length / itemsPerPage))
@@ -118,8 +132,6 @@ export default function InstitutionsPage() {
     const start = (currentPage - 1) * itemsPerPage
     return items.slice(start, start + itemsPerPage)
   }, [items, currentPage, itemsPerPage])
-
-  useEffect(() => { setCurrentPage(1) }, [itemsPerPage])
 
   const rangeStart = items.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1
   const rangeEnd = Math.min(currentPage * itemsPerPage, items.length)
@@ -140,7 +152,7 @@ export default function InstitutionsPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'فشل الحفظ')
 
-      setItems(prev => [data, ...prev])
+      await fetchInstitutions()
       setAddOpen(false)
       setFormData({ nameAr: '', email: '', serviceType: '', presence: 'متاح' })
       setFieldErrors({})
@@ -168,14 +180,23 @@ export default function InstitutionsPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.message)
 
-      setItems(prev => prev.map(ins => ins.id === id ? data : ins))
       setEditingId(null)
       setEditErrors({})
+      await fetchInstitutions()
     } catch (err: any) {
       setErrorMessage(err.message)
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // شاشة التحميل أثناء التحقق من الصلاحية
+  if (!isAuthorized) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+      </div>
+    )
   }
 
   return (
@@ -271,7 +292,7 @@ export default function InstitutionsPage() {
                          <select 
                             value={editDraft?.presence} 
                             onChange={e => setEditDraft({...editDraft!, presence: e.target.value as PresenceStatus})}
-                            className="h-9 border border-blue-400 rounded-md px-1 bg-white text-xs outline-none focus:ring-1 focus:ring-blue-500"
+                            className="h-9 border border-blue-400 rounded-md px-1 bg-white text-xs outline-none"
                           >
                             <option value="متاح">متاح</option>
                             <option value="غير متاح">غير متاح</option>
@@ -304,8 +325,7 @@ export default function InstitutionsPage() {
             </table>
           </div>
 
-          {/* Pagination Area - تم تعديلها لتطابق التصميم المطلوب */}
-          <div className="p-4 border-t flex items-center justify-between bg-slate-50/30 font-arabic">
+          <div className="p-4 border-t flex items-center justify-between bg-slate-50/30">
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <span>عرض صفوف:</span>
               <select 
@@ -348,9 +368,8 @@ export default function InstitutionsPage() {
         </CardContent>
       </Card>
 
-      {/* Add Modal */}
       <Dialog open={addOpen} onOpenChange={(val) => { setAddOpen(val); if(!val) setFieldErrors({}); }}>
-        <DialogContent className="max-w-md shadow-2xl border-none rounded-2xl font-arabic">
+        <DialogContent className="max-w-md shadow-2xl border-none rounded-2xl">
           <DialogHeader className="text-right">
             <DialogTitle className="text-lg font-bold">إضافة مؤسسة جديدة</DialogTitle>
           </DialogHeader>
@@ -360,8 +379,7 @@ export default function InstitutionsPage() {
               <Input 
                 value={formData.nameAr} 
                 onChange={e => setFormData({...formData, nameAr: e.target.value})} 
-                placeholder="أدخل اسم المؤسسة"
-                className={`h-11 bg-slate-50 border-slate-200 ${fieldErrors.nameAr ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                className={`h-11 bg-slate-50 border-slate-200 ${fieldErrors.nameAr ? 'border-red-500' : ''}`}
               />
               {fieldErrors.nameAr && <p className="text-[11px] text-red-500 font-medium">{fieldErrors.nameAr}</p>}
             </div>
@@ -371,8 +389,7 @@ export default function InstitutionsPage() {
               <Input 
                 value={formData.email} 
                 onChange={e => setFormData({...formData, email: e.target.value})} 
-                placeholder="example@example.com"
-                className={`h-11 bg-slate-50 border-slate-200 ${fieldErrors.email ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                className={`h-11 bg-slate-50 border-slate-200 ${fieldErrors.email ? 'border-red-500' : ''}`}
               />
               {fieldErrors.email && <p className="text-[11px] text-red-500 font-medium">{fieldErrors.email}</p>}
             </div>
@@ -382,24 +399,12 @@ export default function InstitutionsPage() {
               <select 
                 value={formData.serviceType} 
                 onChange={e => setFormData({...formData, serviceType: e.target.value})}
-                className={`w-full h-11 border rounded-lg px-2 bg-slate-50 text-sm outline-none focus:ring-2 focus:ring-slate-100 ${fieldErrors.serviceType ? 'border-red-500' : 'border-slate-200'}`}
+                className="w-full h-11 border border-slate-200 rounded-lg px-2 bg-slate-50 text-sm outline-none"
               >
                 <option value="">اختر النوع...</option>
                 {serviceTypeOptions.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
               {fieldErrors.serviceType && <p className="text-[11px] text-red-500 font-medium">{fieldErrors.serviceType}</p>}
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">الحالة</label>
-              <select 
-                value={formData.presence} 
-                onChange={e => setFormData({...formData, presence: e.target.value as any})}
-                className="w-full h-11 border border-slate-200 rounded-lg px-2 bg-slate-50 text-sm outline-none focus:ring-2 focus:ring-slate-100"
-              >
-                <option value="متاح">متاح</option>
-                <option value="غير متاح">غير متاح</option>
-              </select>
             </div>
           </div>
           <DialogFooter className="mt-2 flex flex-row items-center gap-3 w-full">

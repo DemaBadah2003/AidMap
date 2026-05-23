@@ -14,36 +14,37 @@ export const MENU_SIDEBAR: MenuConfig = [
   {
     title: 'لوحات التحكم',
     icon: LayoutGrid,
-    expanded: true, 
+    expanded: true,
     children: [
       {
         title: 'إدارة المشاريع',
-        expanded: true, 
+        expanded: true,
         children: [
-          // 1. الخدمات الطبية (معدل ليكون أشمل)
+          // 1. الخدمات الطبية (الرئيسية عامة، المستشفيات للأدمن)
           {
             title: 'الخدمات الطبية والصحية',
             path: '/project/projects/Medical-Services/clinic',
             children: [
               { title: 'الصفحة الرئيسية', path: '/project/projects/Medical-Services/home' },
-              { title: 'جدول المستشفيات', path: '/project/projects/Medical-Services/hospitals' },
+              { title: 'جدول المستشفيات', path: '/project/projects/Medical-Services/hospitals', roles: ['admin'] },
             ],
           },
 
-          // 2. الخدمات التعليمية (القسم الجديد المضاف)
+          // 2. الخدمات التعليمية (الفلترة عامة، جدول المدارس للأدمن)
           {
             title: 'الخدمات التعليمية والطلاب',
             path: '/project/projects/education',
             children: [
-              { title: 'جدول المدارس', path: '/project/projects/education/school' },
+              { title: 'جدول المدارس', path: '/project/projects/education/school', roles: ['admin'] },
               { title: 'فلترة المدارس', path: '/project/projects/education/school/query' },
             ],
           },
 
-          // 3. الغذاء والمياه (القسم الجديد المضاف)
+          // 3. الغذاء والمياه (كل القسم للأدمن)
           {
             title: 'الغذاء والمياه (المعونات)',
             path: '/project/projects/food-water',
+            roles: ['admin'],
             children: [
               { title: 'نقاط توزيع المياه', path: '/project/projects/food-water/water' },
               { title: 'نقاط توزيع المساعدات', path: '/project/projects/food-water/food' },
@@ -51,20 +52,22 @@ export const MENU_SIDEBAR: MenuConfig = [
             ],
           },
 
-          // 4. المراكز الإيوائية
+          // 4. المراكز الإيوائية (كل القسم للأدمن)
           {
             title: 'المراكز الإيوائية',
             path: '/project/projects/camp',
+            roles: ['admin'],
             children: [
               { title: 'مراكز الإيواء والمشرفون', path: '/project/projects/camp/shelters' },
               { title: 'جدول الطوارئ', path: '/project/projects/camp/Emergency' },
             ],
           },
 
-          // 5. المؤسسات الداعمة
+          // 5. المؤسسات الداعمة (كل القسم للأدمن)
           {
             title: 'المؤسسات الداعمة',
             path: '/project/projects/institutions',
+            roles: ['admin'],
             children: [
               { title: 'المؤسسات', path: '/project/projects/institution/institutions' },
               { title: 'منتجات المؤسسات', path: '/project/projects/institution/Enterprise-Products' },
@@ -72,11 +75,12 @@ export const MENU_SIDEBAR: MenuConfig = [
           },
         ],
       },
+      // قسم لوحة تحكم المسؤول (محمي بالكامل)
       {
         title: 'لوحة تحكم المسؤول',
         path: '/store-admin/dashboard',
         roles: ['admin'],
-        expanded: true, 
+        expanded: true,
         children: [
           { title: 'معاينة الخريطة', path: '/project/MapPreview' },
           { title: 'إضافة مكان', path: '/project/admins/addPlaces' },
@@ -89,7 +93,7 @@ export const MENU_SIDEBAR: MenuConfig = [
   },
 ];
 
-// القوائم الأخرى والوظائف تظل كما هي في كودك الأصلي...
+// ... (باقي كود MENU_HELP و الدوال يظل كما هو دون تغيير)
 export const MENU_SIDEBAR_CUSTOM: MenuConfig = [];
 export const MENU_SIDEBAR_COMPACT: MenuConfig = [];
 export const MENU_ROOT: MenuConfig = [];

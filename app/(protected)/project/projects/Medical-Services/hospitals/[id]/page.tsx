@@ -1,15 +1,17 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input' 
+import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import {
   ArrowRight, Building2, Phone, MapPin, Stethoscope, Activity, Users,
   Plus, Pencil, Loader2, AlertCircle,
 } from 'lucide-react'
+
+import { requireAdmin } from '@/app/(protected)/project/helpers/route-guards'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type Hospital = {
@@ -76,7 +78,11 @@ function DeptForm({ form, setForm }: { form: any; setForm: (v: any) => void }) {
       </div>
       <div className="space-y-1.5 text-start">
         <label className="text-sm font-semibold block">ملاحظات</label>
-        <textarea className="w-full text-start rounded-lg border border-input bg-background p-2 text-sm outline-none min-h-[70px] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.description || ''} onChange={e => setForm({ ...form, description: e.target.value })} />
+        <textarea
+          className="w-full text-start rounded-lg border border-input bg-background p-2 text-sm outline-none min-h-[70px] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+          value={form.description || ''}
+          onChange={e => setForm({ ...form, description: e.target.value })}
+        />
       </div>
     </div>
   )
@@ -112,7 +118,7 @@ function SvcForm({ form, setForm, departments }: { form: any; setForm: (v: any) 
 }
 
 function DocForm({ form, setForm, departments }: { form: any; setForm: (v: any) => void; departments: Department[] }) {
-  const isPhoneError = form.phone && !phoneValid(form.phone);
+  const isPhoneError = form.phone && !phoneValid(form.phone)
   return (
     <div className="flex flex-col gap-4 py-2">
       <div className="space-y-1.5 text-start">
@@ -135,12 +141,12 @@ function DocForm({ form, setForm, departments }: { form: any; setForm: (v: any) 
       </div>
       <div className="space-y-1.5 text-start">
         <label className="text-sm font-semibold block">رقم الهاتف</label>
-        <Input 
-          className={`h-11 text-left ${isPhoneError ? 'border-red-500' : ''}`} 
-          dir="ltr" 
-          value={form.phone} 
-          onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })} 
-          placeholder="05XXXXXXXX" 
+        <Input
+          className={`h-11 text-left ${isPhoneError ? 'border-red-500' : ''}`}
+          dir="ltr"
+          value={form.phone}
+          onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })}
+          placeholder="05XXXXXXXX"
         />
         {isPhoneError && (
           <p className="text-[11px] text-red-600 font-bold flex items-center gap-1 mt-1">
@@ -157,7 +163,11 @@ function DocForm({ form, setForm, departments }: { form: any; setForm: (v: any) 
       </div>
       <div className="space-y-1.5 text-start">
         <label className="text-sm font-semibold block">ملاحظات</label>
-        <textarea className="w-full text-start rounded-lg border border-input bg-background p-2 text-sm outline-none min-h-[70px] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.description || ''} onChange={e => setForm({ ...form, description: e.target.value })} />
+        <textarea
+          className="w-full text-start rounded-lg border border-input bg-background p-2 text-sm outline-none min-h-[70px] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+          value={form.description || ''}
+          onChange={e => setForm({ ...form, description: e.target.value })}
+        />
       </div>
     </div>
   )
@@ -167,12 +177,23 @@ function DocForm({ form, setForm, departments }: { form: any; setForm: (v: any) 
 export default function HospitalDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+
+  const [isVerifying, setIsVerifying] = useState(true)
   const [tab, setTab] = useState<'departments' | 'services' | 'doctors'>('departments')
   const [hospital, setHospital] = useState<Hospital | null>(null)
   const [departments, setDepartments] = useState<Department[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [loading, setLoading] = useState(true)
+
+  // 1. حماية الصفحة - أول شي ينشغل
+  useEffect(() => {
+    async function checkAccess() {
+      await requireAdmin(router)
+      setIsVerifying(false)
+    }
+    checkAccess()
+  }, [router])
 
   const fetchHospital = async () => {
     try {
@@ -185,15 +206,31 @@ export default function HospitalDetailPage() {
     } catch (e) { console.error(e) }
   }
 
+  // 2. جلب البيانات بس بعد ما تنتهي الحماية
   useEffect(() => {
+    if (isVerifying) return
     setLoading(true)
     fetchHospital().finally(() => setLoading(false))
-  }, [id])
+  }, [id, isVerifying])
 
   const refresh = async () => { await fetchHospital() }
 
-  if (loading) return <div className="flex justify-center items-center min-h-[50vh]"><Loader2 className="animate-spin size-8 text-blue-500" /></div>
-  if (!hospital) return <div className="p-10 text-center text-muted-foreground">المستشفى غير موجود</div>
+  // 3. شاشة التحقق
+  if (isVerifying) return (
+    <div className="flex h-screen w-full items-center justify-center">
+      <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+    </div>
+  )
+
+  if (loading) return (
+    <div className="flex justify-center items-center min-h-[50vh]">
+      <Loader2 className="animate-spin size-8 text-blue-500" />
+    </div>
+  )
+
+  if (!hospital) return (
+    <div className="p-10 text-center text-muted-foreground">المستشفى غير موجود</div>
+  )
 
   return (
     <div className="w-full px-4 py-6 space-y-6" dir="rtl">
@@ -227,10 +264,12 @@ export default function HospitalDetailPage() {
             <span className="font-semibold" dir="ltr">{hospital.phone}</span>
           </div>
           {hospital.latitude && (
-             <div className="flex items-center gap-2 text-sm">
-             <MapPin className="w-4 h-4 text-emerald-500 shrink-0" />
-             <span className="font-mono text-xs" dir="ltr">{Number(hospital.latitude).toFixed(4)}, {Number(hospital.longitude).toFixed(4)}</span>
-           </div>
+            <div className="flex items-center gap-2 text-sm">
+              <MapPin className="w-4 h-4 text-emerald-500 shrink-0" />
+              <span className="font-mono text-xs" dir="ltr">
+                {Number(hospital.latitude).toFixed(4)}, {Number(hospital.longitude).toFixed(4)}
+              </span>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -239,39 +278,45 @@ export default function HospitalDetailPage() {
       <div className="flex gap-1 border-b">
         {([
           { key: 'departments', label: 'الأقسام', icon: Stethoscope, count: departments.length },
-          { key: 'services', label: 'الخدمات', icon: Activity, count: services.length },
-          { key: 'doctors', label: 'الأطباء', icon: Users, count: doctors.length },
+          { key: 'services',    label: 'الخدمات', icon: Activity,    count: services.length },
+          { key: 'doctors',     label: 'الأطباء', icon: Users,       count: doctors.length },
         ] as const).map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              tab === t.key
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
           >
             <t.icon className="w-4 h-4" />
             {t.label}
-            <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${tab === t.key ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'}`}>{t.count}</span>
+            <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
+              tab === t.key ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'
+            }`}>{t.count}</span>
           </button>
         ))}
       </div>
 
       {tab === 'departments' && <DepartmentsTab hospitalId={id} departments={departments} onRefresh={refresh} />}
-      {tab === 'services' && <ServicesTab hospitalId={id} departments={departments} services={services} onRefresh={refresh} />}
-      {tab === 'doctors' && <DoctorsTab hospitalId={id} departments={departments} doctors={doctors} onRefresh={refresh} />}
+      {tab === 'services'    && <ServicesTab    hospitalId={id} departments={departments} services={services} onRefresh={refresh} />}
+      {tab === 'doctors'     && <DoctorsTab     hospitalId={id} departments={departments} doctors={doctors}   onRefresh={refresh} />}
     </div>
   )
 }
 
-// ─── Sub-Tabs Implementation ──────────────────────────────────────────────────
+// ─── Sub-Tabs ─────────────────────────────────────────────────────────────────
 
 function DepartmentsTab({ hospitalId, departments, onRefresh }: any) {
   const blank = { name: '', deptType: '', status: 'يعمل بكفاءة', description: '' }
   const [addOpen, setAddOpen] = useState(false)
   const [addForm, setAddForm] = useState(blank)
-  const [addSub, setAddSub] = useState(false)
+  const [addSub,  setAddSub]  = useState(false)
   const [editOpen, setEditOpen] = useState(false)
-  const [editId, setEditId] = useState('')
+  const [editId,   setEditId]   = useState('')
   const [editForm, setEditForm] = useState(blank)
-  const [editSub, setEditSub] = useState(false)
+  const [editSub,  setEditSub]  = useState(false)
 
   const isValid = (f: any) => f.name.trim() !== '' && f.deptType !== ''
 
@@ -304,6 +349,7 @@ function DepartmentsTab({ hospitalId, departments, onRefresh }: any) {
           <Plus className="h-4 w-4" /> إضافة قسم
         </Button>
       </div>
+
       <Card className="rounded-xl border shadow-sm overflow-hidden">
         <CardContent className="p-0 overflow-x-auto">
           <table className="w-full border-collapse text-sm">
@@ -325,16 +371,23 @@ function DepartmentsTab({ hospitalId, departments, onRefresh }: any) {
                   <td className="p-4 text-muted-foreground">{d.deptType}</td>
                   <td className="p-4 font-semibold">{d.name}</td>
                   <td className="p-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${d.status === 'يعمل بكفاءة' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d.status}</span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                      d.status === 'يعمل بكفاءة'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>{d.status}</span>
                   </td>
                   <td className="p-4">{d.doctorCount}</td>
                   <td className="p-4">{d.serviceCount}</td>
                   <td className="p-4">
-                    <button onClick={() => { 
-                      setEditId(d.id); 
-                      setEditForm({ name: d.name, deptType: d.deptType, status: d.status, description: d.description || '' }); 
-                      setEditOpen(true) 
-                    }} className="rounded-md border p-2 text-muted-foreground hover:text-blue-600 transition-colors mx-auto block">
+                    <button
+                      onClick={() => {
+                        setEditId(d.id)
+                        setEditForm({ name: d.name, deptType: d.deptType, status: d.status, description: d.description || '' })
+                        setEditOpen(true)
+                      }}
+                      className="rounded-md border p-2 text-muted-foreground hover:text-blue-600 transition-colors mx-auto block"
+                    >
                       <Pencil className="w-4 h-4" />
                     </button>
                   </td>
@@ -374,11 +427,11 @@ function ServicesTab({ hospitalId, departments, services, onRefresh }: any) {
   const blank = { name: '', price: '', isAvailable: true, departmentId: '' }
   const [addOpen, setAddOpen] = useState(false)
   const [addForm, setAddForm] = useState(blank)
-  const [addSub, setAddSub] = useState(false)
+  const [addSub,  setAddSub]  = useState(false)
   const [editOpen, setEditOpen] = useState(false)
-  const [editId, setEditId] = useState('')
+  const [editId,   setEditId]   = useState('')
   const [editForm, setEditForm] = useState(blank)
-  const [editSub, setEditSub] = useState(false)
+  const [editSub,  setEditSub]  = useState(false)
 
   const onAdd = async () => {
     setAddSub(true)
@@ -409,6 +462,7 @@ function ServicesTab({ hospitalId, departments, services, onRefresh }: any) {
           <Plus className="h-4 w-4" /> إضافة خدمة
         </Button>
       </div>
+
       <Card className="rounded-xl border shadow-sm overflow-hidden">
         <CardContent className="p-0 overflow-x-auto">
           <table className="w-full border-collapse text-sm">
@@ -428,14 +482,19 @@ function ServicesTab({ hospitalId, departments, services, onRefresh }: any) {
                   <td className="p-4 font-semibold">{s.name}</td>
                   <td className="p-4 font-mono text-blue-600 font-bold">{s.price} ₪</td>
                   <td className="p-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${s.isAvailable ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{s.isAvailable ? 'متاحة' : 'غير متوفرة'}</span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                      s.isAvailable ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                    }`}>{s.isAvailable ? 'متاحة' : 'غير متوفرة'}</span>
                   </td>
                   <td className="p-4">
-                    <button onClick={() => {
-                      setEditId(s.id);
-                      setEditForm({ name: s.name, price: String(s.price), isAvailable: s.isAvailable, departmentId: s.departmentId });
-                      setEditOpen(true);
-                    }} className="rounded-md border p-2 text-muted-foreground hover:text-blue-600 transition-colors mx-auto block">
+                    <button
+                      onClick={() => {
+                        setEditId(s.id)
+                        setEditForm({ name: s.name, price: String(s.price), isAvailable: s.isAvailable, departmentId: s.departmentId })
+                        setEditOpen(true)
+                      }}
+                      className="rounded-md border p-2 text-muted-foreground hover:text-blue-600 transition-colors mx-auto block"
+                    >
                       <Pencil className="w-4 h-4" />
                     </button>
                   </td>
@@ -475,11 +534,11 @@ function DoctorsTab({ hospitalId, departments, doctors, onRefresh }: any) {
   const blank = { name: '', departmentId: '', specialty: '', phone: '', workSchedule: '', description: '' }
   const [addOpen, setAddOpen] = useState(false)
   const [addForm, setAddForm] = useState(blank)
-  const [addSub, setAddSub] = useState(false)
+  const [addSub,  setAddSub]  = useState(false)
   const [editOpen, setEditOpen] = useState(false)
-  const [editId, setEditId] = useState('')
+  const [editId,   setEditId]   = useState('')
   const [editForm, setEditForm] = useState(blank)
-  const [editSub, setEditSub] = useState(false)
+  const [editSub,  setEditSub]  = useState(false)
 
   const canSave = (f: any) => f.name.trim() !== '' && f.specialty !== '' && phoneValid(f.phone)
 
@@ -514,6 +573,7 @@ function DoctorsTab({ hospitalId, departments, doctors, onRefresh }: any) {
           <Plus className="h-4 w-4" /> إضافة طبيب
         </Button>
       </div>
+
       <Card className="rounded-xl border shadow-sm overflow-hidden">
         <CardContent className="p-0 overflow-x-auto">
           <table className="w-full border-collapse text-sm">
@@ -534,18 +594,21 @@ function DoctorsTab({ hospitalId, departments, doctors, onRefresh }: any) {
                   <td className="p-4 font-mono font-bold" dir="ltr">{d.phone}</td>
                   <td className="p-4 text-blue-600 font-medium text-xs">{d.workSchedule}</td>
                   <td className="p-4">
-                    <button onClick={() => {
-                      setEditId(d.id);
-                      setEditForm({ 
-                        name: d.name, 
-                        departmentId: d.departmentId || '', 
-                        specialty: d.specialty, 
-                        phone: d.phone, 
-                        workSchedule: d.workSchedule, 
-                        description: d.description || '' 
-                      });
-                      setEditOpen(true);
-                    }} className="rounded-md border p-2 text-muted-foreground hover:text-blue-600 transition-colors mx-auto block">
+                    <button
+                      onClick={() => {
+                        setEditId(d.id)
+                        setEditForm({
+                          name: d.name,
+                          departmentId: d.departmentId || '',
+                          specialty: d.specialty,
+                          phone: d.phone,
+                          workSchedule: d.workSchedule,
+                          description: d.description || '',
+                        })
+                        setEditOpen(true)
+                      }}
+                      className="rounded-md border p-2 text-muted-foreground hover:text-blue-600 transition-colors mx-auto block"
+                    >
                       <Pencil className="w-4 h-4" />
                     </button>
                   </td>

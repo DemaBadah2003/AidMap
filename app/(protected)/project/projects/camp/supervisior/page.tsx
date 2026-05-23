@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTranslation } from 'react-i18next'
+import { requireAdmin } from '@/app/(protected)/project/helpers/route-guards'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,9 +27,11 @@ const isValidPalestinePhone = (phone: string) => {
 const API_URL = '/api/project/camp/supervisior'
 
 export default function SupervisorsPage() {
+  const router = useRouter()
   const { t } = useTranslation()
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const [isAuthorized, setIsAuthorized] = useState(false)
 
   // حالات الإضافة والتعديل
   const [addOpen, setAddOpen] = useState(false)
@@ -43,11 +47,19 @@ export default function SupervisorsPage() {
   const phoneErrorMessage = "يجب أن يبدأ رقم الهاتف بـ 056 أو 059 ويتكون من 10 أرقام"
   const duplicateErrorMessage = "عفواً! هذا الرقم موجود مسبقاً في النظام"
 
-  // --- دالة فحص التكرار (الأكثر صرامة على الإطلاق) ---
+  // حماية الصفحة والتأكد من صلاحية الأدمن
+  useEffect(() => {
+    const checkAccess = async () => {
+      await requireAdmin(router)
+      setIsAuthorized(true)
+    }
+    checkAccess()
+  }, [router])
+
+  // --- دالة فحص التكرار ---
   const checkDuplicate = (phoneToTest: string, currentId: string | null) => {
     const cleanPhone = phoneToTest.trim();
     if (!cleanPhone) return false;
-    // نبحث في مصفوفة items عن أي عنصر يملك نفس الرقم بشرط ألا يكون هو نفس العنصر الذي نعدله حالياً
     return items.some(item => 
       String(item.phone).trim() === cleanPhone && String(item.id) !== String(currentId)
     );
@@ -63,14 +75,16 @@ export default function SupervisorsPage() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { fetchSupervisors() }, [])
+  useEffect(() => { 
+    if (isAuthorized) fetchSupervisors() 
+  }, [isAuthorized])
 
   // منطق التحقق للإضافة
   const isAddDuplicate = checkDuplicate(phone, null);
   const canSaveAdd = nameAr.trim() !== '' && area !== '' && isValidPalestinePhone(phone) && !isAddDuplicate;
 
   const onAdd = async () => {
-    if (!canSaveAdd) return; // منع الإضافة لو كان مكرر
+    if (!canSaveAdd) return;
     setSubmitting(true)
     try {
       const res = await fetch(API_URL, {
@@ -87,13 +101,12 @@ export default function SupervisorsPage() {
   }
 
   const onSaveEdit = async (id: string) => {
-    // التحقق النهائي (خط الدفاع الأخير)
     const isDuplicate = checkDuplicate(editDraft.phone, id);
     const isInvalid = !isValidPalestinePhone(editDraft.phone);
 
     if (isDuplicate || isInvalid || submitting) {
       alert(isDuplicate ? duplicateErrorMessage : "بيانات غير صالحة");
-      return; // توقف فوراً ولا ترسل شيئاً للسيرفر
+      return;
     }
     
     setSubmitting(true)
@@ -113,6 +126,15 @@ export default function SupervisorsPage() {
       }
     } catch (err) { console.error(err) }
     finally { setSubmitting(false) }
+  }
+
+  // شاشة تحميل في حال عدم اكتمال التحقق من الصلاحية
+  if (!isAuthorized) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    )
   }
 
   return (

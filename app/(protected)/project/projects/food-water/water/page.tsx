@@ -1,17 +1,16 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { Pencil, Plus, Search, Loader2 } from 'lucide-react'
+
+import { requireAdmin } from '@/app/(protected)/project/helpers/route-guards'
 
 const REGIONS = ['شمال', 'جنوب', 'شرق', 'غرب', 'وسط'] as const
 const STATUS_OPTIONS = ['نشط', 'متوقف مؤقتاً', 'متوقف'] as const
@@ -30,6 +29,9 @@ const EMPTY_FORM: Omit<WaterPoint, 'id'> = {
 }
 
 export default function WaterPointsPage() {
+  const router = useRouter()
+
+  const [isVerifying, setIsVerifying] = useState(true)
   const [q, setQ] = useState('')
   const [items, setItems] = useState<WaterPoint[]>([])
   const [loading, setLoading] = useState(true)
@@ -41,6 +43,16 @@ export default function WaterPointsPage() {
   const [formData, setFormData] = useState<Omit<WaterPoint, 'id'>>(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
 
+  // 1. حماية الصفحة
+  useEffect(() => {
+    async function checkAccess() {
+      await requireAdmin(router)
+      setIsVerifying(false)
+    }
+    checkAccess()
+  }, [router])
+
+  // 2. جلب البيانات بعد التحقق
   const fetchPoints = async () => {
     setLoading(true)
     try {
@@ -51,7 +63,9 @@ export default function WaterPointsPage() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { fetchPoints() }, [])
+  useEffect(() => {
+    if (!isVerifying) fetchPoints()
+  }, [isVerifying])
 
   const filtered = useMemo(() =>
     items.filter(s => !q || s.name.includes(q) || s.operator.includes(q) || s.statusText.includes(q)),
@@ -73,15 +87,8 @@ export default function WaterPointsPage() {
     setFormData({ name: item.name, lat: item.lat, lng: item.lng, operator: item.operator, statusText: item.statusText })
   }
 
-  const isValid = (d: typeof formData) => {
-    return (
-      d.name.trim() !== '' && 
-      d.operator !== '' && 
-      d.statusText !== '' && 
-      d.lat !== null && 
-      d.lng !== null
-    )
-  }
+  const isValid = (d: typeof formData) =>
+    d.name.trim() !== '' && d.operator !== '' && d.statusText !== '' && d.lat !== null && d.lng !== null
 
   const onAdd = async () => {
     if (!isValid(formData)) return
@@ -118,11 +125,12 @@ export default function WaterPointsPage() {
     } finally { setSubmitting(false) }
   }
 
-  const onDelete = async (id: string) => {
-    if (!confirm('هل أنت متأكد من الحذف؟')) return
-    await fetch(`/api/project/food-water/water?id=${id}`, { method: 'DELETE' })
-    setItems(prev => prev.filter(p => p.id !== id))
-  }
+  // 3. شاشة التحقق
+  if (isVerifying) return (
+    <div className="flex h-screen w-full items-center justify-center">
+      <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+    </div>
+  )
 
   return (
     <div className="w-full px-4 py-6" dir="rtl">
@@ -176,15 +184,14 @@ export default function WaterPointsPage() {
                     <td className="p-4">
                       {item.statusText
                         ? <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${
-                            item.statusText === 'نشط' ? 'bg-green-100 text-green-700' : 
-                            item.statusText === 'متوقف' ? 'bg-red-100 text-red-700' : 
+                            item.statusText === 'نشط' ? 'bg-green-100 text-green-700' :
+                            item.statusText === 'متوقف' ? 'bg-red-100 text-red-700' :
                             'bg-amber-100 text-amber-700'
                           }`}>{item.statusText}</span>
                         : <span className="text-muted-foreground text-xs">—</span>}
                     </td>
                     <td className="p-4 text-center">
                       <div className="flex gap-2 justify-center">
-                        {/* تم الإبقاء على أيقونة التعديل فقط */}
                         <button onClick={() => openEdit(item)} className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-md border text-muted-foreground" title="تعديل">
                           <Pencil className="w-4 h-4" />
                         </button>
@@ -210,9 +217,7 @@ export default function WaterPointsPage() {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-md rounded-2xl" dir="rtl">
           <DialogHeader>
-            <DialogTitle className="text-right text-lg font-bold text-blue-800">
-              إضافة نقطة مياه
-            </DialogTitle>
+            <DialogTitle className="text-right text-lg font-bold text-blue-800">إضافة نقطة مياه</DialogTitle>
           </DialogHeader>
           <FormFields formData={formData} setFormData={setFormData} />
           <DialogFooter className="mt-4 flex flex-col sm:flex-row gap-3">
@@ -228,9 +233,7 @@ export default function WaterPointsPage() {
       <Dialog open={!!editItem} onOpenChange={open => { if (!open) setEditItem(null) }}>
         <DialogContent className="max-w-md rounded-2xl" dir="rtl">
           <DialogHeader>
-            <DialogTitle className="text-right text-lg font-bold text-blue-800">
-              تعديل نقطة مياه
-            </DialogTitle>
+            <DialogTitle className="text-right text-lg font-bold text-blue-800">تعديل نقطة مياه</DialogTitle>
           </DialogHeader>
           <FormFields formData={formData} setFormData={setFormData} />
           <DialogFooter className="mt-4 flex flex-col sm:flex-row gap-3">
@@ -287,9 +290,7 @@ function FormFields({
           onChange={e => setFormData(f => ({ ...f, statusText: e.target.value }))}
         >
           <option value="">— اختر الحالة —</option>
-          {STATUS_OPTIONS.map(status => (
-            <option key={status} value={status}>{status}</option>
-          ))}
+          {STATUS_OPTIONS.map(status => <option key={status} value={status}>{status}</option>)}
         </select>
       </div>
     </div>

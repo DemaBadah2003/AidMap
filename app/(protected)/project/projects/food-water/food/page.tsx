@@ -1,17 +1,16 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { Pencil, Plus, Search, Loader2, HandHeart } from 'lucide-react'
+
+import { requireAdmin } from '@/app/(protected)/project/helpers/route-guards'
 
 const REGIONS = ['شمال', 'جنوب', 'شرق', 'غرب', 'وسط'] as const
 const STATUS_OPTIONS = ['نشط', 'متوقف حالياً', 'متوقف'] as const
@@ -34,6 +33,9 @@ const EMPTY_FORM: AidFormData = {
 }
 
 export default function AidPointsPage() {
+  const router = useRouter()
+
+  const [isVerifying, setIsVerifying] = useState(true)
   const [q, setQ] = useState('')
   const [items, setItems] = useState<AidPoint[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,6 +47,16 @@ export default function AidPointsPage() {
   const [formData, setFormData] = useState<AidFormData>(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
 
+  // 1. حماية الصفحة
+  useEffect(() => {
+    async function checkAccess() {
+      await requireAdmin(router)
+      setIsVerifying(false)
+    }
+    checkAccess()
+  }, [router])
+
+  // 2. جلب البيانات بعد التحقق
   const fetchPoints = async () => {
     setLoading(true)
     try {
@@ -55,7 +67,9 @@ export default function AidPointsPage() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { fetchPoints() }, [])
+  useEffect(() => {
+    if (!isVerifying) fetchPoints()
+  }, [isVerifying])
 
   const filtered = useMemo(() =>
     items.filter(s => !q || s.name.includes(q) || s.operator.includes(q) || s.statusText.includes(q)),
@@ -77,18 +91,9 @@ export default function AidPointsPage() {
     setFormData({ name: item.name, lat: item.lat, lng: item.lng, operator: item.operator, statusText: item.statusText, capacity: item.capacity, occupancy: item.occupancy })
   }
 
-  // التعديل هنا: شرط أن تكون جميع الحقول مدخلة
-  const isValid = (d: typeof formData) => {
-    return (
-      d.name.trim() !== '' &&
-      d.operator !== '' &&
-      d.lat !== null &&
-      d.lng !== null &&
-      d.statusText !== '' &&
-      d.capacity !== null &&
-      d.occupancy !== null
-    )
-  }
+  const isValid = (d: typeof formData) =>
+    d.name.trim() !== '' && d.operator !== '' && d.lat !== null && d.lng !== null &&
+    d.statusText !== '' && d.capacity !== null && d.occupancy !== null
 
   const onAdd = async () => {
     if (!isValid(formData)) return
@@ -124,6 +129,13 @@ export default function AidPointsPage() {
       }
     } finally { setSubmitting(false) }
   }
+
+  // 3. شاشة التحقق
+  if (isVerifying) return (
+    <div className="flex h-screen w-full items-center justify-center">
+      <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+    </div>
+  )
 
   return (
     <div className="w-full px-4 py-6" dir="rtl">
@@ -298,9 +310,7 @@ function AidFormFields({
           onChange={e => setFormData(f => ({ ...f, statusText: e.target.value }))}
         >
           <option value="">— اختر الحالة —</option>
-          {STATUS_OPTIONS.map(status => (
-            <option key={status} value={status}>{status}</option>
-          ))}
+          {STATUS_OPTIONS.map(status => <option key={status} value={status}>{status}</option>)}
         </select>
       </div>
     </div>

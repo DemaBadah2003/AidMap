@@ -7,9 +7,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ArrowRight, Search, Loader2, School, Users, BookOpen } from 'lucide-react'
 
-// --- استدعاء الحماية لضمان دخول الأدمن والمواطن فقط ---
-import { requireCitizen } from '@/app/(protected)/project/helpers/route-guards'
-
 const LOCATIONS = ['شمال', 'جنوب', 'شرق', 'غرب', 'وسط']
 const AREAS_BY_LOCATION: Record<string, string[]> = {
   'شمال': ['جباليا', 'بيت لاهيا', 'بيت حانون'],
@@ -40,7 +37,6 @@ const sel = 'w-full h-12 border-2 border-white shadow-sm rounded-2xl px-4 bg-whi
 
 export default function SchoolQueryPage() {
   const router = useRouter()
-  const [isVerifying, setIsVerifying] = useState(true) // حالة التحقق من الصلاحية
   const [schools, setSchools] = useState<School[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
@@ -51,26 +47,13 @@ export default function SchoolQueryPage() {
   const [filterLevel, setFilterLevel] = useState('')
   const [filterFees, setFilterFees] = useState('')
 
-  // 1. نظام الحماية: السماح للأدمن والمواطن فقط بالدخول
   useEffect(() => {
-    async function checkAccess() {
-      // requireCitizen تسمح بالدخول لكل من الأدمن والمواطن وتطرد الضيوف
-      await requireCitizen(router)
-      setIsVerifying(false)
-    }
-    checkAccess()
-  }, [router])
-
-  // 2. جلب البيانات فقط بعد التأكد من الصلاحية
-  useEffect(() => {
-    if (!isVerifying) {
-      fetch('/api/project/education/schools')
-        .then(r => r.json())
-        .then(d => setSchools(Array.isArray(d.schools) ? d.schools : []))
-        .catch(() => setSchools([]))
-        .finally(() => setLoading(false))
-    }
-  }, [isVerifying])
+    fetch('/api/project/education/schools')
+      .then(r => r.json())
+      .then(d => setSchools(Array.isArray(d.schools) ? d.schools : []))
+      .catch(() => setSchools([]))
+      .finally(() => setLoading(false))
+  }, [])
 
   const filtered = useMemo(() => {
     return schools.filter(s => {
@@ -93,18 +76,6 @@ export default function SchoolQueryPage() {
   }), [filtered])
 
   const clearFilters = () => { setQ(''); setFilterLocation(''); setFilterRegion(''); setFilterType(''); setFilterGender(''); setFilterLevel(''); setFilterFees('') }
-
-  // شاشة الانتظار أثناء فحص الصلاحية
-  if (isVerifying) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-white">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto" />
-          <p className="mt-4 text-slate-500 font-medium">جاري التحقق من الهوية...</p>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="w-full px-4 py-8 sm:px-10" dir="rtl">
