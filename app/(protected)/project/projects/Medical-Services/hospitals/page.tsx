@@ -15,18 +15,10 @@ import {
 } from '@/components/ui/dialog'
 import { Pencil, Plus, Search, Loader2, AlertCircle, ChevronLeft } from 'lucide-react'
 
-// --- استدعاء الحماية ---
 import { requireAdmin } from '@/app/(protected)/project/helpers/route-guards'
 
-// --- وظائف التحقق والتحكم ---
-const normalizePhone = (value: string) => {
-  return value.replace(/[^\d]/g, '').slice(0, 10)
-}
-
-const isValidPalestinePhone = (phone: string) => {
-  const regex = /^(056|059)\d{7}$/
-  return regex.test(phone)
-}
+const normalizePhone = (value: string) => value.replace(/[^\d]/g, '').slice(0, 10)
+const isValidPalestinePhone = (phone: string) => /^(056|059)\d{7}$/.test(phone)
 
 type HospitalRecord = {
   id: string
@@ -88,11 +80,11 @@ function HospitalForm({
       </div>
       <div className="space-y-1.5">
         <label className="text-sm font-semibold">{t('common.labels.phone')}</label>
-        <Input 
-          className={`h-11 ${isPhoneInvalid ? 'border-red-500 focus:ring-red-500/20' : ''}`} 
-          placeholder="05XXXXXXXX" 
-          value={phone} 
-          onChange={e => setPhone(normalizePhone(e.target.value))} 
+        <Input
+          className={`h-11 ${isPhoneInvalid ? 'border-red-500 focus:ring-red-500/20' : ''}`}
+          placeholder="05XXXXXXXX"
+          value={phone}
+          onChange={e => setPhone(normalizePhone(e.target.value))}
         />
         {isPhoneInvalid && <p className="text-[10px] text-red-500 font-medium">يجب أن يبدأ بـ 056 أو 059 ويتكون من 10 أرقام</p>}
       </div>
@@ -113,36 +105,44 @@ function HospitalForm({
 export default function HospitalsPage() {
   const { t } = useTranslation()
   const router = useRouter()
-  
+
   const [isVerifying, setIsVerifying] = useState(true)
   const [q, setQ] = useState('')
   const [items, setItems] = useState<HospitalRecord[]>([])
   const [loading, setLoading] = useState(true)
 
-  // States for Add/Edit Dialogs
   const [addOpen, setAddOpen] = useState(false)
-  const [addName, setAddName] = useState(''); const [addType, setAddType] = useState('')
-  const [addRegion, setAddRegion] = useState(''); const [addPhone, setAddPhone] = useState('')
-  const [addLat, setAddLat] = useState(''); const [addLng, setAddLng] = useState('')
+  const [addName, setAddName] = useState('')
+  const [addType, setAddType] = useState('')
+  const [addRegion, setAddRegion] = useState('')
+  const [addPhone, setAddPhone] = useState('')
+  const [addLat, setAddLat] = useState('')
+  const [addLng, setAddLng] = useState('')
   const [addSubmitting, setAddSubmitting] = useState(false)
 
-  const [editOpen, setEditOpen] = useState(false); const [editId, setEditId] = useState('')
-  const [editName, setEditName] = useState(''); const [editType, setEditType] = useState('')
-  const [editRegion, setEditRegion] = useState(''); const [editPhone, setEditPhone] = useState('')
-  const [editLat, setEditLat] = useState(''); const [editLng, setEditLng] = useState('')
+  const [editOpen, setEditOpen] = useState(false)
+  const [editId, setEditId] = useState('')
+  const [editName, setEditName] = useState('')
+  const [editType, setEditType] = useState('')
+  const [editRegion, setEditRegion] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editLat, setEditLat] = useState('')
+  const [editLng, setEditLng] = useState('')
   const [editSubmitting, setEditSubmitting] = useState(false)
 
-  // 1. حماية الصفحة
   useEffect(() => {
     async function checkAccess() {
-      await requireAdmin(router)
+      const isAdmin = await requireAdmin()
+      if (!isAdmin) {
+        router.push('/unauthorized')
+        return
+      }
       setIsVerifying(false)
     }
     checkAccess()
   }, [router])
 
   const fetchData = async () => {
-    if (isVerifying) return
     setLoading(true)
     try {
       const res = await fetch(BASE_URL)
@@ -152,33 +152,22 @@ export default function HospitalsPage() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { if (!isVerifying) fetchData() }, [isVerifying])
+  useEffect(() => {
+    if (!isVerifying) fetchData()
+  }, [isVerifying])
 
-  // --- التحقق من تكرار رقم الهاتف ---
-  const isPhoneDuplicateAdd = useMemo(() => {
-    return items.some(item => item.phone === addPhone)
-  }, [items, addPhone])
+  const isPhoneDuplicateAdd = useMemo(() => items.some(item => item.phone === addPhone), [items, addPhone])
+  const isPhoneDuplicateEdit = useMemo(() => items.some(item => item.phone === editPhone && item.id !== editId), [items, editPhone, editId])
 
-  const isPhoneDuplicateEdit = useMemo(() => {
-    return items.some(item => item.phone === editPhone && item.id !== editId)
-  }, [items, editPhone, editId])
-
-  // --- شروط صحة البيانات (مع منع التكرار) ---
-  const isAddValid = useMemo(() => 
-    addName.trim() !== '' && 
-    addType !== '' && 
-    addRegion !== '' && 
-    isValidPalestinePhone(addPhone) && 
-    !isPhoneDuplicateAdd, 
+  const isAddValid = useMemo(() =>
+    addName.trim() !== '' && addType !== '' && addRegion !== '' &&
+    isValidPalestinePhone(addPhone) && !isPhoneDuplicateAdd,
     [addName, addType, addRegion, addPhone, isPhoneDuplicateAdd]
   )
 
-  const isEditValid = useMemo(() => 
-    editName.trim() !== '' && 
-    editType !== '' && 
-    editRegion !== '' && 
-    isValidPalestinePhone(editPhone) && 
-    !isPhoneDuplicateEdit, 
+  const isEditValid = useMemo(() =>
+    editName.trim() !== '' && editType !== '' && editRegion !== '' &&
+    isValidPalestinePhone(editPhone) && !isPhoneDuplicateEdit,
     [editName, editType, editRegion, editPhone, isPhoneDuplicateEdit]
   )
 
@@ -191,13 +180,20 @@ export default function HospitalsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hospitalName: addName, hospitalType: addType, region: addRegion, phone: addPhone, latitude: addLat || null, longitude: addLng || null })
       })
-      if (res.ok) { await fetchData(); setAddOpen(false); setAddName(''); setAddType(''); setAddRegion(''); setAddPhone(''); setAddLat(''); setAddLng('') }
+      if (res.ok) {
+        await fetchData()
+        setAddOpen(false)
+        setAddName(''); setAddType(''); setAddRegion(''); setAddPhone(''); setAddLat(''); setAddLng('')
+      }
     } finally { setAddSubmitting(false) }
   }
 
   const openEdit = (item: HospitalRecord) => {
-    setEditId(item.id); setEditName(item.hospitalName); setEditType(item.hospitalType)
-    setEditRegion(item.region); setEditPhone(item.phone)
+    setEditId(item.id)
+    setEditName(item.hospitalName)
+    setEditType(item.hospitalType)
+    setEditRegion(item.region)
+    setEditPhone(item.phone)
     setEditLat(item.latitude != null ? String(item.latitude) : '')
     setEditLng(item.longitude != null ? String(item.longitude) : '')
     setEditOpen(true)
@@ -216,12 +212,19 @@ export default function HospitalsPage() {
     } finally { setEditSubmitting(false) }
   }
 
-  const filteredItems = useMemo(() => 
-    items.filter(item => item.hospitalName?.toLowerCase().includes(q.toLowerCase()) || item.region?.toLowerCase().includes(q.toLowerCase())), 
+  const filteredItems = useMemo(() =>
+    items.filter(item =>
+      item.hospitalName?.toLowerCase().includes(q.toLowerCase()) ||
+      item.region?.toLowerCase().includes(q.toLowerCase())
+    ),
     [items, q]
   )
 
-  if (isVerifying) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-blue-600" /></div>
+  if (isVerifying) return (
+    <div className="flex h-screen w-full items-center justify-center">
+      <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+    </div>
+  )
 
   return (
     <div className="w-full px-4 py-6">
@@ -267,10 +270,17 @@ export default function HospitalsPage() {
                     <td className="p-4 text-muted-foreground text-start">{item.region}</td>
                     <td className="p-4 text-muted-foreground text-start">{item.phone}</td>
                     <td className="p-4 text-center">
-                      <button onClick={() => openEdit(item)} className="rounded-md border p-2 text-muted-foreground hover:bg-blue-50 hover:text-blue-600"><Pencil className="w-4 h-4" /></button>
+                      <button onClick={() => openEdit(item)} className="rounded-md border p-2 text-muted-foreground hover:bg-blue-50 hover:text-blue-600">
+                        <Pencil className="w-4 h-4" />
+                      </button>
                     </td>
                     <td className="p-4 text-center">
-                      <button onClick={() => router.push(`/project/projects/Medical-Services/hospitals/${item.id}`)} className="rounded-md border p-2 text-muted-foreground hover:bg-emerald-50 hover:text-emerald-600"><ChevronLeft className="w-4 h-4" /></button>
+                      <button 
+  onClick={() => router.push(`/project/Medical-Services/hospitals/${item.id}`)} 
+  className="rounded-md border p-2 text-muted-foreground hover:bg-emerald-50 hover:text-emerald-600"
+>
+  <ChevronLeft className="w-4 h-4" />
+</button>
                     </td>
                   </tr>
                 ))}
@@ -280,49 +290,65 @@ export default function HospitalsPage() {
         </CardContent>
       </Card>
 
-      {/* Add Dialog */}
+      {/* Add Dialog - (باقي الكود كما هو) */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader><DialogTitle className="text-start">{t('pages.hospitals.addTitle')}</DialogTitle></DialogHeader>
-          <HospitalForm hospitalName={addName} setHospitalName={setAddName} hospitalType={addType} setHospitalType={setAddType} region={addRegion} setRegion={setAddRegion} phone={addPhone} setPhone={setAddPhone} latitude={addLat} setLatitude={setAddLat} longitude={addLng} setLongitude={setAddLng} />
-          
+          <HospitalForm
+            hospitalName={addName} setHospitalName={setAddName}
+            hospitalType={addType} setHospitalType={setAddType}
+            region={addRegion} setRegion={setAddRegion}
+            phone={addPhone} setPhone={setAddPhone}
+            latitude={addLat} setLatitude={setAddLat}
+            longitude={addLng} setLongitude={setAddLng}
+          />
           {!isAddValid && (
             <div className="flex items-center gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
               <AlertCircle className="w-3.5 h-3.5" />
-              {addPhone.length > 0 && !isValidPalestinePhone(addPhone) 
-                ? "الرقم غير صحيح" 
-                : isPhoneDuplicateAdd 
+              {addPhone.length > 0 && !isValidPalestinePhone(addPhone)
+                ? "الرقم غير صحيح"
+                : isPhoneDuplicateAdd
                 ? "عذراً، هذا الرقم مسجل مسبقاً لمستشفى آخر"
                 : t('common.messages.required')}
             </div>
           )}
-
           <DialogFooter className="flex flex-row gap-3">
-            <Button onClick={onAdd} disabled={!isAddValid || addSubmitting} className="flex-1 bg-blue-600 hover:bg-blue-700">{addSubmitting && <Loader2 className="animate-spin size-4 me-2" />}{t('common.buttons.save')}</Button>
+            <Button onClick={onAdd} disabled={!isAddValid || addSubmitting} className="flex-1 bg-blue-600 hover:bg-blue-700">
+              {addSubmitting && <Loader2 className="animate-spin size-4 me-2" />}
+              {t('common.buttons.save')}
+            </Button>
             <Button variant="outline" onClick={() => setAddOpen(false)} className="flex-1">{t('common.buttons.cancel')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
+      {/* Edit Dialog - (باقي الكود كما هو) */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader><DialogTitle className="text-start">تعديل المستشفى</DialogTitle></DialogHeader>
-          <HospitalForm hospitalName={editName} setHospitalName={setEditName} hospitalType={editType} setHospitalType={setEditType} region={editRegion} setRegion={setEditRegion} phone={editPhone} setPhone={setEditPhone} latitude={editLat} setLatitude={setEditLat} longitude={editLng} setLongitude={setEditLng} />
-          
+          <HospitalForm
+            hospitalName={editName} setHospitalName={setEditName}
+            hospitalType={editType} setHospitalType={setEditType}
+            region={editRegion} setRegion={setEditRegion}
+            phone={editPhone} setPhone={setEditPhone}
+            latitude={editLat} setLatitude={setEditLat}
+            longitude={editLng} setLongitude={setEditLng}
+          />
           {!isEditValid && (
             <div className="flex items-center gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
               <AlertCircle className="w-3.5 h-3.5" />
-              {editPhone.length > 0 && !isValidPalestinePhone(editPhone) 
-                ? "الرقم غير صحيح" 
-                : isPhoneDuplicateEdit 
+              {editPhone.length > 0 && !isValidPalestinePhone(editPhone)
+                ? "الرقم غير صحيح"
+                : isPhoneDuplicateEdit
                 ? "عذراً، هذا الرقم مسجل مسبقاً لمستشفى آخر"
                 : t('common.messages.required')}
             </div>
           )}
-
           <DialogFooter className="flex flex-row gap-3">
-            <Button onClick={onEdit} disabled={!isEditValid || editSubmitting} className="flex-1 bg-blue-600 hover:bg-blue-700">{editSubmitting && <Loader2 className="animate-spin size-4 me-2" />}{t('common.buttons.save')}</Button>
+            <Button onClick={onEdit} disabled={!isEditValid || editSubmitting} className="flex-1 bg-blue-600 hover:bg-blue-700">
+              {editSubmitting && <Loader2 className="animate-spin size-4 me-2" />}
+              {t('common.buttons.save')}
+            </Button>
             <Button variant="outline" onClick={() => setEditOpen(false)} className="flex-1">{t('common.buttons.cancel')}</Button>
           </DialogFooter>
         </DialogContent>

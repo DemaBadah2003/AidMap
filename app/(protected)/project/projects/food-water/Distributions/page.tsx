@@ -62,7 +62,7 @@ export default function DistributionsPage() {
     try {
       const [dDist, dBen, dProd] = await Promise.all([
         fetch(BASE_URL).then(r => r.json()).catch(() => []),
-        fetch('/api/project/projects/beneficiaries').then(r => r.json()).catch(() => []),
+        fetch('/api/project/projects/citizens').then(r => r.json()).catch(() => []),
         fetch('/api/project/projects/products').then(r => r.json()).catch(() => []),
       ])
       setItems(Array.isArray(dDist) ? dDist : [])

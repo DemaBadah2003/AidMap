@@ -29,7 +29,7 @@ export const DashboardWireframe = () => {
   useEffect(() => {
     Promise.all([
       fetch('/api/project/places', { cache: 'no-store' }).then(r => r.json()).catch(() => ({ data: [] })),
-      fetch('/api/project/projects/beneficiaries', { cache: 'no-store' }).then(r => r.json()).catch(() => []),
+      fetch('/api/project/projects/citizens', { cache: 'no-store' }).then(r => r.json()).catch(() => []),
       fetch('/api/project/projects/aids', { cache: 'no-store' }).then(r => r.json()).catch(() => []),
     ]).then(([placesData, bens, aids]) => {
       const allPlaces: AdminPlace[] = Array.isArray(placesData?.data) ? placesData.data : [];

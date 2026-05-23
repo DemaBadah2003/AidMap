@@ -111,6 +111,7 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async jwt({ token, user, trigger, session }) {
+      // تحديث البيانات في الجلسة عند الطلب
       if (trigger === "update" && session?.user && typeof session.user === "object") {
         const s = session.user as Record<string, unknown>;
         if (typeof s.avatar === "string") {
@@ -121,8 +122,11 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
+      // إضافة بيانات المستخدم للـ Token
       if (user) {
-        const u = user as Record<string, unknown>;
+        // التحويل الآمن لتجنب أخطاء TypeScript
+        const u = user as unknown as Record<string, any>;
+        
         token.id = (u.id as string) ?? token.sub;
         (token as any).roleId = u.roleId;
         (token as any).roleName = u.roleName;
@@ -133,6 +137,8 @@ export const authOptions: NextAuthOptions = {
 
         const remember = parseRememberMe(u.rememberMe);
         (token as any).rememberMe = remember;
+        
+        // تعديل مدة صلاحية الـ Token بناءً على خيار Remember Me
         const seconds = remember ? 30 * 24 * 60 * 60 : 24 * 60 * 60;
         token.exp = Math.floor(Date.now() / 1000) + seconds;
       }

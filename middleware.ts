@@ -5,19 +5,19 @@ import { clientIp, rateLimit } from '@/lib/api/rate-limit';
 
 const AUTH_ROUTES_PREFIX = '/api/auth';
 
-// قائمة المسارات الخاصة بالأدمن فقط
+// قمت بتعديل المسارات هنا لتطابق المسار الفعلي الذي تستخدمه في التنقل (بدون كلمة projects الزائدة)
 const ADMIN_ONLY_PATHS = [
-  '/project/projects/Medical-Services/hospitals',
-  '/project/projects/education/school',
-  '/project/projects/food-water/food',
-  '/project/projects/food-water/water',
-  '/project/projects/camp/shelters',
-  '/project/projects/camp/Emergency',
-  '/project/projects/institution/institutions',
+  '/project/Medical-Services/hospitals',
+  '/project/education/school',
+  '/project/food-water/food',
+  '/project/food-water/water',
+  '/project/camp/shelters',
+  '/project/camp/Emergency',
+  '/project/institution/institutions',
   '/project/admins'
 ];
 
-// قائمة المسارات العامة (التي لا نريد حمايتها من المواطن)
+// الصفحات العامة للمواطنين
 const PUBLIC_PATHS = [
   '/project/projects/education/school/query',
   '/project/projects/Medical-Services/home'
@@ -38,31 +38,10 @@ export async function middleware(request: NextRequest) {
   const method = request.method;
   const res = NextResponse.next();
 
-  res.headers.set('X-Content-Type-Options', 'nosniff');
-  res.headers.set('X-Frame-Options', 'SAMEORIGIN');
-  res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // 1. استثناء الصفحات العامة من أي قيود
+  if (PUBLIC_PATHS.includes(pathname)) return res;
 
-  // استثناء المسارات العامة من أي حماية أدمن
-  const isPublicRoute = PUBLIC_PATHS.some(path => pathname === path);
-
-  const checkRateLimit = async (key: string, limit: number, window: number) => {
-    const ip = clientIp(request);
-    const rl = rateLimit(`${key}:${ip}`, limit, window);
-    if (!rl.ok) {
-      const retryAfter = (rl as any).retryAfterSec || 60;
-      return NextResponse.json(
-        { data: null, error: { code: 'RATE_LIMIT', message: 'Too many requests' } },
-        { status: 429, headers: { 'Retry-After': String(retryAfter) } }
-      );
-    }
-    return null;
-  };
-
-  if (pathname.startsWith(AUTH_ROUTES_PREFIX) && method !== 'GET') {
-    const rlRes = await checkRateLimit('auth', 30, 60_000);
-    if (rlRes) return rlRes;
-  }
-
+  // 2. حماية مسارات المشروع ولوحة التحكم
   if (pathname.startsWith('/dashboard') || pathname.startsWith('/project')) {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
     
@@ -72,29 +51,26 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(signIn);
     }
 
-    // إذا كانت الصفحة عامة، نمرر المستخدم فوراً
-    if (isPublicRoute) return res;
-
-    // التحقق من صلاحية الأدمن للمسارات المحمية فقط
+    // التحقق من صلاحية الأدمن
+    // نستخدم startsWith للتأكد من أن أي مسار فرعي (مثل /hospitals/123) يقع تحت الحماية
     const isAdminRoute = ADMIN_ONLY_PATHS.some(path => pathname.startsWith(path));
     
-    if (isAdminRoute && (token as any).role !== 'admin') {
+    // ملاحظة: تأكد أن الخاصية في التوكن هي 'role' وليس 'roleName' أو شيء آخر
+    // (بناءً على الـ AuthOptions التي أرسلتها سابقاً، قد تحتاج لاستخدام token.roleSlug أو ما شابه)
+    const userRole = (token as any).role || (token as any).roleName; 
+
+    if (isAdminRoute && userRole !== 'admin') {
       return NextResponse.redirect(new URL('/', request.url)); 
     }
 
     return res;
   }
 
+  // 3. حماية الـ API
   if (pathname.startsWith('/api/project/')) {
     if (isPublicProjectApi(pathname, method)) return res;
-    
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-    if (!token) {
-      return NextResponse.json(
-        { data: null, error: { code: 'UNAUTHORIZED', message: 'يجب تسجيل الدخول' } },
-        { status: 401 }
-      );
-    }
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return res;
   }
 

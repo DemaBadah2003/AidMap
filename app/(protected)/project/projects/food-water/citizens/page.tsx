@@ -37,7 +37,7 @@ type CampOption = {
   area: string
 }
 
-const BASE_URL = '/api/project/projects/beneficiaries'
+const BASE_URL = '/api/project/projects/citizens'
 const CAMPS_OPTIONS_URL = '/api/project/projects/camps?forBeneficiary=true'
 const phoneRegex = /^(056|059)\d{7}$/
 
