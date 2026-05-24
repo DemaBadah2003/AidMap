@@ -9,33 +9,35 @@ function normalizeRole(roleSlug: string | null | undefined): 'admin' | 'user' | 
   return null;
 }
 
-async function getCurrentRole() {
-  // حاول أكثر من مرة عشان الـ session تتحمل
-  for (let i = 0; i < 3; i++) {
-    await new Promise(resolve => setTimeout(resolve, 500));
+async function getCurrentRole(): Promise<'admin' | 'user' | null> {
+  // ✅ محاولة واحدة أولاً بدون delay
+  const session = await getSession();
 
-    const session = await getSession();
-
-    console.log(`=== SESSION ATTEMPT ${i + 1}/3 ===`, JSON.stringify(session?.user, null, 2));
-
-    if (session?.user) {
-      const user = session.user as any;
-      const roleValue = user.roleSlug ?? user.role ?? user.userRole ?? user.type ?? null;
-      console.log('=== ROLE VALUE ===', roleValue);
-      return normalizeRole(roleValue);
-    }
-
-    console.log(`=== NO SESSION, retry ${i + 1}/3 ===`);
+  if (session?.user) {
+    const user = session.user as any;
+    // ✅ التصحيح: نقرأ roleSlug فقط لأنه الاسم الصحيح المعرّف في authOptions
+    const roleValue = user.roleSlug ?? null;
+    console.log('[route-guards] roleSlug:', roleValue);
+    return normalizeRole(roleValue);
   }
 
-  console.log('=== FAILED TO GET SESSION AFTER 3 ATTEMPTS ===');
+  // إذا فشلت المحاولة الأولى، نحاول مرة ثانية فقط مع تأخير بسيط
+  await new Promise(resolve => setTimeout(resolve, 300));
+  const retrySession = await getSession();
+
+  if (retrySession?.user) {
+    const user = retrySession.user as any;
+    const roleValue = user.roleSlug ?? null;
+    console.log('[route-guards] roleSlug (retry):', roleValue);
+    return normalizeRole(roleValue);
+  }
+
+  console.warn('[route-guards] لم يتم العثور على session بعد محاولتين');
   return null;
 }
 
 export async function requireAdmin(router?: AppRouterInstance): Promise<boolean> {
   const role = await getCurrentRole();
-  console.log('=== FINAL ROLE ===', role);
-
   const isAdmin = role === 'admin';
 
   if (!isAdmin && router) {
@@ -47,7 +49,6 @@ export async function requireAdmin(router?: AppRouterInstance): Promise<boolean>
 
 export async function requireCitizen(router?: AppRouterInstance): Promise<boolean> {
   const role = await getCurrentRole();
-
   const isAllowed = role === 'user' || role === 'admin';
 
   if (!isAllowed && router) {

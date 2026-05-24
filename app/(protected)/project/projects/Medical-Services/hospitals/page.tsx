@@ -276,7 +276,7 @@ export default function HospitalsPage() {
                     </td>
                     <td className="p-4 text-center">
                       <button 
-  onClick={() => router.push(`/project/Medical-Services/hospitals/${item.id}`)} 
+  onClick={() => router.push(`/project/projects/Medical-Services/hospitals/${item.id}`)} 
   className="rounded-md border p-2 text-muted-foreground hover:bg-emerald-50 hover:text-emerald-600"
 >
   <ChevronLeft className="w-4 h-4" />

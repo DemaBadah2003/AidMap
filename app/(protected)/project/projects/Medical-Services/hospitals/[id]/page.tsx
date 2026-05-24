@@ -71,7 +71,16 @@ function DoctorForm({ form, setForm, departments }: { form: any; setForm: (v: an
             </div>
             <div className="space-y-1.5 text-start">
                 <label className="text-sm font-semibold block">رقم الهاتف</label>
-                <Input className={`h-11 ${isPhoneInvalid ? 'border-red-500' : ''}`} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value.replace(/[^\d]/g, '').slice(0, 10) })} placeholder="05XXXXXXXX" />
+                <Input
+                    dir="ltr"
+                    className={`h-11 font-mono ${isPhoneInvalid ? 'border-red-500' : ''}`}
+                    value={form.phone}
+                    onChange={e => setForm({ ...form, phone: e.target.value.replace(/[^\d]/g, '').slice(0, 10) })}
+                    placeholder="0561234567"
+                />
+                {form.phone ? (
+                    <p className="text-sm font-mono text-slate-900 mt-1" dir="ltr">{form.phone}</p>
+                ) : null}
                 {isPhoneInvalid && <p className="text-[10px] text-red-500">يجب أن يبدأ بـ 056 أو 059 ويتكون من 10 أرقام</p>}
             </div>
             <div className="space-y-1.5 text-start">
@@ -410,13 +419,12 @@ export default function HospitalDetailPage() {
                                         <th className="p-4 font-semibold text-start">التخصص</th>
                                         <th className="p-4 font-semibold text-start">الهاتف</th>
                                         <th className="p-4 font-semibold text-start">جدول العمل</th>
-                                        <th className="p-4 font-semibold text-start">القسم</th>
                                         <th className="p-4 font-semibold text-center">تعديل</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
                                     {doctors.length === 0 ? (
-                                        <tr><td colSpan={6} className="p-12 text-center text-muted-foreground italic">لا يوجد أطباء مسجلون</td></tr>
+                                        <tr><td colSpan={5} className="p-12 text-center text-muted-foreground italic">لا يوجد أطباء مسجلون</td></tr>
                                     ) : doctors.map(doc => (
                                         <tr key={doc.id} className="hover:bg-muted/30 transition-colors">
                                             <td className="p-4 font-semibold">{doc.name}</td>
@@ -528,7 +536,7 @@ export default function HospitalDetailPage() {
                         <Button variant="outline" onClick={() => setSvcEditOpen(false)} className="flex-1">إلغاء</Button>
                     </DialogFooter>
                 </DialogContent>
-            </Dialog>
+            </Dialog>شش
         </div>
     )
 }

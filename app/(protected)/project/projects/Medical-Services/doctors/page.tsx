@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Pencil, Plus, Search, Loader2 } from 'lucide-react'
+import { Pencil, Plus, Loader2 } from 'lucide-react'
 
 // --- الإعدادات الثابتة ---
 const SPECIALIZATIONS = [
@@ -36,7 +36,6 @@ const selStyle = 'w-full rounded-lg border border-input bg-background px-3 h-11 
 const blankForm = { name: '', hospitalId: '', specialty: '', phone: '', workSchedule: '', description: '' }
 
 export default function DoctorsPage() {
-  const [q, setQ] = useState('')
   const [items, setItems] = useState<DoctorRecord[]>([])
   const [hospitals, setHospitals] = useState<{id: string, hospitalName: string}[]>([])
   const [loading, setLoading] = useState(true)
@@ -82,7 +81,6 @@ export default function DoctorsPage() {
   const canEdit = editForm.name.trim() !== '' && editForm.hospitalId !== '' && isPhoneValid(editForm.phone) && !isEditDuplicate
 
   const onAdd = async () => {
-    if (checkDuplicate(addForm.phone)) return alert("⚠️ خطأ: هذا الرقم مسجل مسبقاً لطبيب آخر!")
     setAddSub(true)
     try {
       const res = await fetch('/api/project/Medical-Services/doctors', {
@@ -95,7 +93,6 @@ export default function DoctorsPage() {
   }
 
   const onEdit = async () => {
-    if (checkDuplicate(editForm.phone, editId)) return alert("⚠️ خطأ: الرقم الجديد مكرر!")
     setEditSub(true)
     try {
       const res = await fetch('/api/project/Medical-Services/doctors', {
@@ -107,7 +104,7 @@ export default function DoctorsPage() {
     } finally { setEditSub(false) }
   }
 
-  const FormInputs = ({ data, setData, isDup }: { data: typeof blankForm, setData: any, isDup: boolean }) => (
+  const FormInputs = ({ data, setData }: { data: typeof blankForm, setData: any }) => (
     <div className="space-y-6 py-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1 text-start">
@@ -122,7 +119,6 @@ export default function DoctorsPage() {
           </select>
         </div>
       </div>
-
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1 text-start">
           <label className="text-sm font-bold text-slate-700">التخصص</label>
@@ -139,19 +135,9 @@ export default function DoctorsPage() {
           </select>
         </div>
       </div>
-
       <div className="space-y-2 text-start border-t pt-4">
-        <label className="text-sm font-bold text-blue-700 block">رقم التواصل المباشر (056/059)</label>
-        <Input 
-          dir="ltr"
-          type="text"
-          inputMode="numeric"
-          value={data.phone} 
-          onChange={e => setData({...data, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})} 
-          className={`w-full h-11 text-lg font-bold tracking-widest ${isDup || (data.phone && !isPhoneValid(data.phone)) ? 'border-red-500 bg-red-50' : 'border-blue-200'}`}
-          placeholder="05XXXXXXXX"
-        />
-        {isDup && <p className="text-[11px] text-red-600 font-bold mt-1">⚠️ هذا الرقم مسجل مسبقاً!</p>}
+        <label className="text-sm font-bold text-blue-700">رقم الهاتف</label>
+        <Input dir="ltr" value={data.phone} onChange={e => setData({...data, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})} />
       </div>
     </div>
   )
@@ -165,45 +151,41 @@ export default function DoctorsPage() {
         </Button>
       </div>
 
-      <Card className="shadow-xl border-none">
+      <Card className="shadow-sm border">
         <CardContent className="p-0">
-          <div className="p-4 border-b bg-slate-50/50">
-            <div className="relative w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input placeholder="بحث باسم الطبيب..." className="pl-10 bg-white" value={q} onChange={e => setQ(e.target.value)} />
-            </div>
-          </div>
-
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-100 text-slate-600 border-b">
-                <tr>
-                  <th className="p-4 text-start font-bold">اسم الطبيب</th>
-                  <th className="p-4 text-start font-bold">التخصص</th>
-                  <th className="p-4 text-start font-bold">الهاتف</th>
-                  <th className="p-4 text-start font-bold">جدول العمل</th>
-                  <th className="p-4 text-center font-bold">إجراءات</th>
+            <table className="w-full text-right border-collapse min-w-[600px]">
+              <thead>
+                <tr className="bg-slate-50 border-y text-slate-600 text-sm">
+                  <th className="p-4 font-semibold">اسم الطبيب</th>
+                  <th className="p-4 font-semibold">التخصص</th>
+                  <th className="p-4 font-semibold">الهاتف</th>
+                  <th className="p-4 font-semibold">جدول العمل</th>
+                  <th className="p-4 text-center font-semibold">الإجراءات</th>
                 </tr>
               </thead>
-              <tbody className="divide-y bg-white">
-                {loading ? (
-                  <tr><td colSpan={5} className="p-10 text-center"><Loader2 className="animate-spin mx-auto w-8 h-8 text-blue-600" /></td></tr>
-                ) : items.filter(i => i.name.includes(q)).length === 0 ? (
-                  <tr><td colSpan={5} className="p-10 text-center text-slate-400">لا توجد نتائج مطابقة</td></tr>
-                ) : items.filter(i => i.name.includes(q)).map(doc => (
-                  <tr key={doc.id} className="hover:bg-blue-50/30 transition-colors">
-                    <td className="p-4 font-bold text-slate-700 text-start">{doc.name}</td>
-                    <td className="p-4 text-slate-600 text-start">{doc.specialty}</td>
-                    <td className="p-4 font-mono text-blue-700 font-bold text-start" dir="ltr">{doc.phone}</td>
-                    <td className="p-4 text-slate-600 text-start">{doc.workSchedule}</td>
-                    <td className="p-4 text-center">
-                      <Button variant="ghost" size="sm" onClick={() => {
-                        setEditId(doc.id)
-                        setEditForm({ name: doc.name, hospitalId: doc.hospitalId, specialty: doc.specialty, phone: doc.phone, workSchedule: doc.workSchedule, description: doc.description || '' })
-                        setEditOpen(true)
-                      }}>
-                        <Pencil className="w-4 h-4 text-slate-500" />
-                      </Button>
+              <tbody className="divide-y">
+                {items.map((doc) => (
+                  <tr key={doc.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-4 text-sm font-medium text-slate-800">{doc.name}</td>
+                    <td className="p-4 text-sm text-slate-600">{doc.specialty}</td>
+                    <td className="p-4 text-sm font-mono text-slate-600" dir="ltr">{doc.phone}</td>
+                    <td className="p-4 text-sm text-slate-600">{doc.workSchedule}</td>
+                    <td className="p-4">
+                      <div className="flex justify-center">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 border border-slate-200 hover:bg-slate-100"
+                          onClick={() => {
+                            setEditId(doc.id);
+                            setEditForm({...doc});
+                            setEditOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4 text-slate-500" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -212,26 +194,28 @@ export default function DoctorsPage() {
           </div>
         </CardContent>
       </Card>
-
+      
+      {/* حوار الإضافة */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle className="text-start border-b pb-2">إضافة طبيب جديد</DialogTitle></DialogHeader>
-          <FormInputs data={addForm} setData={setAddForm} isDup={isAddDuplicate} />
-          <DialogFooter className="gap-2 border-t pt-4">
-            <Button className="flex-1 bg-blue-600 hover:bg-blue-700" disabled={!canAdd || addSub} onClick={onAdd}>
-              {addSub ? "جاري الحفظ..." : "حفظ البيانات"}
+          <FormInputs data={addForm} setData={setAddForm} />
+          <DialogFooter className="border-t pt-4">
+            <Button className="w-full bg-blue-600 hover:bg-blue-700" disabled={!canAdd || addSub} onClick={onAdd}>
+              {addSub ? <Loader2 className="animate-spin w-4 h-4 ml-2" /> : "حفظ البيانات"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* حوار التعديل */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle className="text-start border-b pb-2">تعديل بيانات الطبيب</DialogTitle></DialogHeader>
-          <FormInputs data={editForm} setData={setEditForm} isDup={isEditDuplicate} />
-          <DialogFooter className="gap-2 border-t pt-4">
-            <Button className="flex-1 bg-blue-600 hover:bg-blue-700" disabled={!canEdit || editSub} onClick={onEdit}>
-              {editSub ? "جاري التحديث..." : "تحديث البيانات"}
+          <FormInputs data={editForm} setData={setEditForm} />
+          <DialogFooter className="border-t pt-4">
+            <Button className="w-full bg-blue-600 hover:bg-blue-700" disabled={!canEdit || editSub} onClick={onEdit}>
+              {editSub ? <Loader2 className="animate-spin w-4 h-4 ml-2" /> : "تحديث البيانات"}
             </Button>
           </DialogFooter>
         </DialogContent>
