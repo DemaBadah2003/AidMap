@@ -67,26 +67,17 @@ export default function DoctorsPage() {
 
   useEffect(() => { fetchAll() }, [])
 
-  // --- 🛠️ منطق التحقق الصارم جداً ---
-
-  // دالة تنظيف: تحول " 059-123 4567 " إلى "0591234567"
   const normalize = (p: string) => p?.replace(/\D/g, '').trim() || '';
-
-  // التحقق من التنسيق (يبدأ بـ 056 أو 059 وطوله 10)
   const isPhoneValid = (p: string) => /^(056|059)\d{7}$/.test(normalize(p))
-
-  // فحص التكرار: يقارن الأرقام المنظفة فقط لضمان دقة 100%
   const checkDuplicate = (phone: string, excludeId?: string) => {
     const rawNewPhone = normalize(phone);
     if (!rawNewPhone) return false;
     return items.some(item => normalize(item.phone) === rawNewPhone && item.id !== excludeId);
   }
 
-  // استخدام useMemo لضمان تحديث حالة "التكرار" فور الكتابة
   const isAddDuplicate = useMemo(() => checkDuplicate(addForm.phone), [items, addForm.phone])
   const isEditDuplicate = useMemo(() => checkDuplicate(editForm.phone, editId), [items, editForm.phone, editId])
 
-  // شروط تفعيل الأزرار (لن يفتح الزر إلا إذا كان التنسيق صح والاسم موجود وليس مكرراً)
   const canAdd = addForm.name.trim() !== '' && addForm.hospitalId !== '' && isPhoneValid(addForm.phone) && !isAddDuplicate
   const canEdit = editForm.name.trim() !== '' && editForm.hospitalId !== '' && isPhoneValid(editForm.phone) && !isEditDuplicate
 
@@ -117,48 +108,50 @@ export default function DoctorsPage() {
   }
 
   const FormInputs = ({ data, setData, isDup }: { data: typeof blankForm, setData: any, isDup: boolean }) => (
-    <div className="space-y-4 py-4">
-      <div className="space-y-1 text-start">
-        <label className="text-sm font-bold">اسم الطبيب</label>
-        <Input value={data.name} onChange={e => setData({...data, name: e.target.value})} placeholder="الاسم الرباعي" />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
+    <div className="space-y-6 py-4">
+      <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1 text-start">
-          <label className="text-sm font-bold">المستشفى</label>
+          <label className="text-sm font-bold text-slate-700">اسم الطبيب</label>
+          <Input value={data.name} onChange={e => setData({...data, name: e.target.value})} placeholder="الاسم الرباعي" />
+        </div>
+        <div className="space-y-1 text-start">
+          <label className="text-sm font-bold text-slate-700">المستشفى</label>
           <select className={selStyle} value={data.hospitalId} onChange={e => setData({...data, hospitalId: e.target.value})}>
             <option value="">اختر..</option>
             {hospitals.map(h => <option key={h.id} value={h.id}>{h.hospitalName}</option>)}
           </select>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1 text-start">
-          <label className="text-sm font-bold">التخصص</label>
+          <label className="text-sm font-bold text-slate-700">التخصص</label>
           <select className={selStyle} value={data.specialty} onChange={e => setData({...data, specialty: e.target.value})}>
             <option value="">اختر..</option>
             {SPECIALIZATIONS.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
+        <div className="space-y-1 text-start">
+          <label className="text-sm font-bold text-slate-700">مواعيد الدوام</label>
+          <select className={selStyle} value={data.workSchedule} onChange={e => setData({...data, workSchedule: e.target.value})}>
+            <option value="">اختر الموعد..</option>
+            {SCHEDULES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
       </div>
 
-      <div className="space-y-1 text-start">
-        <label className="text-sm font-bold">رقم التواصل (056/059)</label>
+      <div className="space-y-2 text-start border-t pt-4">
+        <label className="text-sm font-bold text-blue-700 block">رقم التواصل المباشر (056/059)</label>
         <Input 
           dir="ltr"
+          type="text"
+          inputMode="numeric"
           value={data.phone} 
           onChange={e => setData({...data, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})} 
-          className={isDup || (data.phone && !isPhoneValid(data.phone)) ? 'border-red-500 bg-red-50 focus-visible:ring-red-500' : ''}
+          className={`w-full h-11 text-lg font-bold tracking-widest ${isDup || (data.phone && !isPhoneValid(data.phone)) ? 'border-red-500 bg-red-50' : 'border-blue-200'}`}
           placeholder="05XXXXXXXX"
         />
-        {isDup && <p className="text-[11px] text-red-600 font-bold mt-1 animate-pulse">⚠️ هذا الرقم موجود مسبقاً في النظام!</p>}
-        {data.phone && !isPhoneValid(data.phone) && <p className="text-[10px] text-amber-600 mt-1 italic">يجب أن يبدأ بـ 056 أو 059 ويتكون من 10 أرقام</p>}
-      </div>
-
-      <div className="space-y-1 text-start">
-        <label className="text-sm font-bold">مواعيد الدوام</label>
-        <select className={selStyle} value={data.workSchedule} onChange={e => setData({...data, workSchedule: e.target.value})}>
-          <option value="">اختر الموعد..</option>
-          {SCHEDULES.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
+        {isDup && <p className="text-[11px] text-red-600 font-bold mt-1">⚠️ هذا الرقم مسجل مسبقاً!</p>}
       </div>
     </div>
   )
@@ -185,36 +178,31 @@ export default function DoctorsPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-100 text-slate-600 border-b">
                 <tr>
-                  <th className="p-4 text-start font-bold">الاسم</th>
-                  <th className="p-4 text-center font-bold">المستشفى</th>
-                  <th className="p-4 text-center font-bold">رقم التواصل</th>
+                  <th className="p-4 text-start font-bold">اسم الطبيب</th>
+                  <th className="p-4 text-start font-bold">التخصص</th>
+                  <th className="p-4 text-start font-bold">الهاتف</th>
+                  <th className="p-4 text-start font-bold">جدول العمل</th>
                   <th className="p-4 text-center font-bold">إجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y bg-white">
                 {loading ? (
-                  <tr><td colSpan={4} className="p-10 text-center"><Loader2 className="animate-spin mx-auto w-8 h-8 text-blue-600" /></td></tr>
+                  <tr><td colSpan={5} className="p-10 text-center"><Loader2 className="animate-spin mx-auto w-8 h-8 text-blue-600" /></td></tr>
                 ) : items.filter(i => i.name.includes(q)).length === 0 ? (
-                    <tr><td colSpan={4} className="p-10 text-center text-slate-400">لا توجد نتائج مطابقة</td></tr>
+                  <tr><td colSpan={5} className="p-10 text-center text-slate-400">لا توجد نتائج مطابقة</td></tr>
                 ) : items.filter(i => i.name.includes(q)).map(doc => (
                   <tr key={doc.id} className="hover:bg-blue-50/30 transition-colors">
                     <td className="p-4 font-bold text-slate-700 text-start">{doc.name}</td>
-                    <td className="p-4 text-center text-blue-600 font-medium">{doc.hospitalName}</td>
-                    <td className="p-4 text-center font-mono text-slate-600" dir="ltr">{doc.phone}</td>
+                    <td className="p-4 text-slate-600 text-start">{doc.specialty}</td>
+                    <td className="p-4 font-mono text-blue-700 font-bold text-start" dir="ltr">{doc.phone}</td>
+                    <td className="p-4 text-slate-600 text-start">{doc.workSchedule}</td>
                     <td className="p-4 text-center">
-                      <Button variant="ghost" size="sm" className="hover:bg-blue-100 hover:text-blue-600" onClick={() => {
+                      <Button variant="ghost" size="sm" onClick={() => {
                         setEditId(doc.id)
-                        setEditForm({
-                          name: doc.name,
-                          hospitalId: doc.hospitalId,
-                          specialty: doc.specialty,
-                          phone: doc.phone,
-                          workSchedule: doc.workSchedule,
-                          description: doc.description || ''
-                        })
+                        setEditForm({ name: doc.name, hospitalId: doc.hospitalId, specialty: doc.specialty, phone: doc.phone, workSchedule: doc.workSchedule, description: doc.description || '' })
                         setEditOpen(true)
                       }}>
-                        <Pencil className="w-4 h-4" />
+                        <Pencil className="w-4 h-4 text-slate-500" />
                       </Button>
                     </td>
                   </tr>
@@ -233,7 +221,6 @@ export default function DoctorsPage() {
             <Button className="flex-1 bg-blue-600 hover:bg-blue-700" disabled={!canAdd || addSub} onClick={onAdd}>
               {addSub ? "جاري الحفظ..." : "حفظ البيانات"}
             </Button>
-            <Button variant="outline" className="flex-1" onClick={() => setAddOpen(false)}>إلغاء</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -246,7 +233,6 @@ export default function DoctorsPage() {
             <Button className="flex-1 bg-blue-600 hover:bg-blue-700" disabled={!canEdit || editSub} onClick={onEdit}>
               {editSub ? "جاري التحديث..." : "تحديث البيانات"}
             </Button>
-            <Button variant="outline" className="flex-1" onClick={() => setEditOpen(false)}>إلغاء</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
