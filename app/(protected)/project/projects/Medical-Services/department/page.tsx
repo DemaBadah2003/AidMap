@@ -40,40 +40,64 @@ export default function DepartmentsPage() {
   const [editForm, setEditForm] = useState(blank)
   const [editSub, setEditSub] = useState(false)
 
+  const isValid = (f: typeof blank) => f.name.trim() !== '' && f.deptType !== '' && f.hospitalId !== ''
+
   const fetchAll = async () => {
     setLoading(true)
     try {
       const [dRes, hRes] = await Promise.all([
-        fetch('/api/project/Medical-Services/departments'),
-        fetch('/api/project/Medical-Services/hospitals'),
+        fetch('/api/project/Medical-Service/department'), 
+        fetch('/api/project/Medical-Service/hospitals') 
       ])
       const dData = await dRes.json()
       const hData = await hRes.json()
       setItems(Array.isArray(dData) ? dData : [])
-      setHospitals(Array.isArray(hData.hospitals) ? hData.hospitals : [])
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
+      setHospitals(Array.isArray(hData) ? hData : [])
+    } catch (e) { 
+      console.error('Error fetching data:', e) 
+    } finally { 
+      setLoading(false) 
+    }
   }
-
-  useEffect(() => { fetchAll() }, [])
-
-  const isValid = (f: typeof blank) => f.name.trim() !== '' && f.deptType !== '' && f.hospitalId !== ''
-
-  const onAdd = async () => {
-    if (!isValid(addForm)) return
-    setAddSub(true)
-    try {
-      const res = await fetch('/api/project/Medical-Services/departments', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(addForm),
-      })
-      if (res.ok) { await fetchAll(); setAddOpen(false); setAddForm(blank) }
-    } finally { setAddSub(false) }
+const onAdd = async () => {
+  if (!addForm.hospitalId || !addForm.name || !addForm.deptType) {
+    alert("يرجى اختيار المستشفى وتعبئة الحقول");
+    return;
   }
+  
+  setAddSub(true);
+  try {
+    const res = await fetch(`/api/project/Medical-Services/hospitals/${addForm.hospitalId}/departments`, {
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(addForm),
+    });
+
+    if (res.ok) { 
+      await fetchAll(); // تحديث الجدول
+      setAddOpen(false); // إغلاق النافذة
+      setAddForm(blank); 
+    } else {
+      const err = await res.json();
+      console.error("خطأ من السيرفر:", err);
+      alert("فشل الإضافة: تأكد من اختيار المستشفى");
+    }
+  } catch (e) { 
+    console.error(e);
+  } finally { 
+    setAddSub(false); 
+  }
+}
 
   const openEdit = (item: DeptRecord) => {
     setEditId(item.id)
-    setEditForm({ name: item.name, deptType: item.deptType, status: item.status, description: item.description || '', hospitalId: item.hospitalId })
+    setEditForm({ 
+      name: item.name, 
+      deptType: item.deptType, 
+      status: item.status, 
+      description: item.description || '', 
+      hospitalId: item.hospitalId 
+    })
     setEditOpen(true)
   }
 
@@ -81,13 +105,21 @@ export default function DepartmentsPage() {
     if (!isValid(editForm)) return
     setEditSub(true)
     try {
-      const res = await fetch('/api/project/Medical-Services/departments', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      const res = await fetch('/api/project/Medical-Service/department', {
+        method: 'PATCH', 
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: editId, ...editForm }),
       })
-      if (res.ok) { await fetchAll(); setEditOpen(false) }
-    } finally { setEditSub(false) }
+      if (res.ok) { 
+        await fetchAll()
+        setEditOpen(false) 
+      }
+    } finally { 
+      setEditSub(false) 
+    }
   }
+
+  useEffect(() => { fetchAll() }, [])
 
   const filtered = useMemo(() =>
     items.filter(i => i.name?.toLowerCase().includes(q.toLowerCase()) || i.hospitalName?.toLowerCase().includes(q.toLowerCase())),
@@ -183,7 +215,6 @@ export default function DepartmentsPage() {
         </CardContent>
       </Card>
 
-      {/* Add */}
       <Dialog open={addOpen} onOpenChange={open => { setAddOpen(open); if (!open) setAddForm(blank) }}>
         <DialogContent className="max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="text-start text-lg font-bold">إضافة قسم جديد</DialogTitle></DialogHeader>
@@ -198,7 +229,6 @@ export default function DepartmentsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="text-start text-lg font-bold">تعديل القسم</DialogTitle></DialogHeader>

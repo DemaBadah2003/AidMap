@@ -48,7 +48,6 @@ export const MENU_SIDEBAR: MenuConfig = [
             children: [
               { title: 'نقاط توزيع المياه', path: '/project/projects/food-water/water' },
               { title: 'نقاط توزيع المساعدات', path: '/project/projects/food-water/food' },
-              { title: 'التوزيعات المؤسساتية', path: '/project/projects/food-water/Distributions' },
             ],
           },
 
@@ -70,7 +69,6 @@ export const MENU_SIDEBAR: MenuConfig = [
             roles: ['admin'],
             children: [
               { title: 'المؤسسات', path: '/project/projects/institution/institutions' },
-              { title: 'منتجات المؤسسات', path: '/project/projects/institution/Enterprise-Products' },
             ],
           },
         ],

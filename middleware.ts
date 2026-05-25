@@ -4,13 +4,13 @@ import { getToken } from 'next-auth/jwt';
 import { clientIp, rateLimit } from '@/lib/api/rate-limit';
 
 const ADMIN_ONLY_PATHS = [
-  '/project/Medical-Services/hospitals',
-  '/project/education/school',
-  '/project/food-water/food',
-  '/project/food-water/water',
-  '/project/camp/shelters',
-  '/project/camp/Emergency',
-  '/project/institution/institutions',
+  '/project/projects/Medical-Services/hospitals',
+  '/project/projects/education/school',
+  '/project/projects/food-water/food',
+  '/project/projects/food-water/water',
+  '/project/projects/camp/shelters',
+  '/project/projects/camp/Emergency',
+  '/project/projects/institution/institutions',
   '/project/admins'
 ];
 

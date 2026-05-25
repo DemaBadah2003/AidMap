@@ -1,105 +1,130 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
-import { GeneralStatus } from '@prisma/client'
 import prisma from '@/lib/prisma'
 
-type FrontServiceStatus = 'نشط' | 'مغلق'
-
-const serviceSchema = z.object({
-  serviceType: z.string().trim().min(1, 'نوع الخدمة مطلوب'),
-  status: z.enum(['نشط', 'مغلق']).default('نشط'),
-})
-
-// محولات الحالة
-function toDbStatus(status: FrontServiceStatus): GeneralStatus {
-  return status === 'نشط' ? 'ACTIVE' : 'INACTIVE'
-}
-
-function fromDbStatus(status: GeneralStatus): FrontServiceStatus {
-  return status === 'ACTIVE' ? 'نشط' : 'مغلق'
-}
-
-export async function GET(req: NextRequest) {
+// GET - جلب جميع الخدمات لمستشفى معين
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    const services = await prisma.service.findMany({ orderBy: { id: 'desc' } })
-    return NextResponse.json(services.map(s => ({
+    const services = await prisma.service.findMany({
+      where: {
+        department: {
+          hospitalId: params.id,
+        },
+      },
+      include: {
+        department: {
+          select: { name: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    const formatted = services.map(s => ({
       id: s.id,
-      serviceType: s.serviceType,
-      status: fromDbStatus(s.status)
-    })))
+      name: s.name,
+      price: s.price,
+      isAvailable: s.isAvailable,
+      departmentId: s.departmentId,
+      departmentName: s.department.name,
+    }))
+
+    return NextResponse.json(formatted)
   } catch (e) {
-    return NextResponse.json({ message: 'خطأ في الخادم' }, { status: 500 })
+    console.error('GET services error:', e)
+    return NextResponse.json({ error: 'Failed to fetch services' }, { status: 500 })
   }
 }
 
-export async function POST(req: NextRequest) {
+// POST - إضافة خدمة جديدة
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    const body = serviceSchema.parse(await req.json())
+    const body = await req.json()
 
-    // التحقق من التكرار مع تجاهل المسافات الزائدة
-    const exists = await prisma.service.findFirst({
-      where: { serviceType: body.serviceType.trim() }
-    })
-
-    if (exists) {
+    if (!body.name?.trim() || !body.departmentId || body.price === undefined) {
       return NextResponse.json(
-        { message: `الخدمة "${body.serviceType}" موجودة بالفعل في النظام.` },
-        { status: 409 }
+        { error: 'name, departmentId, and price are required' },
+        { status: 400 }
       )
     }
 
-    const created = await prisma.service.create({
-      data: {
-        serviceType: body.serviceType,
-        status: toDbStatus(body.status),
+    // التحقق أن القسم تابع للمستشفى
+    const department = await prisma.department.findFirst({
+      where: {
+        id: body.departmentId,
+        hospitalId: params.id,
       },
     })
 
-    return NextResponse.json({
-      id: created.id,
-      serviceType: created.serviceType,
-      status: fromDbStatus(created.status)
-    }, { status: 201 })
+    if (!department) {
+      return NextResponse.json(
+        { error: 'Department not found or does not belong to this hospital' },
+        { status: 404 }
+      )
+    }
 
-  } catch (e: any) {
-    if (e instanceof z.ZodError) return NextResponse.json({ message: e.issues[0].message }, { status: 400 })
-    return NextResponse.json({ message: e.message || 'خطأ في الخادم' }, { status: 500 })
+    const service = await prisma.service.create({
+      data: {
+        name: body.name.trim(),
+        price: Number(body.price),
+        isAvailable: body.isAvailable ?? true,
+        departmentId: body.departmentId,
+      },
+    })
+
+    return NextResponse.json(service, { status: 201 })
+  } catch (e) {
+    console.error('POST service error:', e)
+    return NextResponse.json({ error: 'Failed to create service' }, { status: 400 })
   }
 }
 
-export async function PUT(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get('id')
-  if (!id) return NextResponse.json({ message: 'المعرف مفقود' }, { status: 400 })
-
+// PATCH - تعديل خدمة
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    const body = serviceSchema.parse(await req.json())
+    const body = await req.json()
 
-    // التأكد أن الاسم الجديد لا يخص خدمة أخرى
-    const duplicate = await prisma.service.findFirst({
+    if (!body.id) {
+      return NextResponse.json({ error: 'service id is required' }, { status: 400 })
+    }
+
+    // التحقق من وجود الخدمة وأنها تابعة للمستشفى
+    const existingService = await prisma.service.findFirst({
       where: {
-        serviceType: body.serviceType,
-        NOT: { id: id }
-      }
+        id: body.id,
+        department: {
+          hospitalId: params.id,
+        },
+      },
     })
 
-    if (duplicate) {
-      return NextResponse.json({ message: 'الاسم مكرر لخدمة أخرى' }, { status: 409 })
+    if (!existingService) {
+      return NextResponse.json(
+        { error: 'Service not found' },
+        { status: 404 }
+      )
     }
 
     const updated = await prisma.service.update({
-      where: { id },
+      where: { id: body.id },
       data: {
-        serviceType: body.serviceType,
-        status: toDbStatus(body.status)
-      }
+        name: body.name?.trim(),
+        price: body.price !== undefined ? Number(body.price) : undefined,
+        isAvailable: body.isAvailable,
+        departmentId: body.departmentId,
+      },
     })
 
-    return NextResponse.json({
-      id: updated.id,
-      serviceType: updated.serviceType,
-      status: fromDbStatus(updated.status)
-    })
-  } catch (e: any) {
-    return NextResponse.json({ message: e.message }, { status: 500 })
+    return NextResponse.json(updated)
+  } catch (e) {
+    console.error('PATCH service error:', e)
+    return NextResponse.json({ error: 'Failed to update service' }, { status: 400 })
   }
 }
