@@ -5,8 +5,22 @@ import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { ArrowRight, Stethoscope, Activity, Users, Plus, Pencil, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Loader2, Plus, ArrowRight, Pencil } from 'lucide-react'
 import { requireAdmin } from '@/app/(protected)/project/helpers/route-guards'
 
 // ─── الأنواع (Types) ──────────────────────────────────────────────────────────
@@ -15,34 +29,26 @@ type Department = { id: string; name: string; deptType: string; status: string; 
 type Doctor = { id: string; name: string; specialty: string; phone: string; workSchedule: string; description: string | null; departmentId: string | null }
 type Service = { id: string; name: string; price: number; isAvailable: boolean; departmentId: string; departmentName: string }
 
-// ─── الثوابت ────────────────────────────────────────────────────────────────
-const DEPT_TYPES = ['الاستقبال والطوارئ', 'الجراحة العامة', 'طب الأطفال', 'النسائية والتوليد', 'العناية المركزة والتخدير', 'الأمراض الباطنية', 'العظام والكسور', 'المختبر الطبي', 'الأشعة والتصوير الطبي', 'الأنف والأذن والحنجرة', 'العيون (الرمد)', 'العلاج الطبيعي والتأهيل', 'القلب والأوعية الدموية', 'الأعصاب وجراحة المخ']
-const DEPT_STATUSES = ['يعمل بكفاءة', 'مزدحم', 'خارج الخدمة']
-const SPECIALIZATIONS = ['طب باطني', 'طب أطفال', 'جراحة عامة', 'نسائية وتوليد', 'طب طوارئ', 'طب عظام', 'طب أعصاب', 'طب قلب', 'طب عيون', 'أنف وأذن وحنجرة', 'تخدير وعناية مركزة', 'أشعة', 'مختبر طبي', 'علاج الطبيعي']
-const SCHEDULES = ['السبت، الاثنين، الأربعاء', 'الأحد، الثلاثاء، الخميس', 'يومياً (السبت - الخميس)', 'طوارئ 24 ساعة']
-const sel = 'w-full rounded-lg border border-input bg-background px-3 h-11 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
-const phoneValid = (p: string) => /^(056|059)\d{7}$/.test(p)
-
-// ─── الصفحة الرئيسية ──────────────────────────────────────────────────────────
 export default function HospitalDetailPage() {
     const { id } = useParams<{ id: string }>()
     const router = useRouter()
 
+    // ─── States ───────────────────────────────────────────────────────────────
     const [loading, setLoading] = useState(true)
     const [tab, setTab] = useState<'departments' | 'services' | 'doctors'>('doctors')
     const [hospital, setHospital] = useState<Hospital | null>(null)
     const [departments, setDepartments] = useState<Department[]>([])
     const [doctors, setDoctors] = useState<Doctor[]>([])
     const [services, setServices] = useState<Service[]>([])
+    
+    // States الخاصة بإضافة طبيب
+    const [isDoctorDialogOpen, setIsDoctorDialogOpen] = useState(false)
+    const [submitting, setSubmitting] = useState(false)
+    const [newDoctor, setNewDoctor] = useState({ 
+        name: '', specialty: '', phone: '', workSchedule: '', departmentId: '' 
+    })
 
-    // Doctor State
-    const emptyDoctor = { name: '', specialty: '', phone: '', workSchedule: '', departmentId: null }
-    const [docAddOpen, setDocAddOpen] = useState(false)
-    const [docAddForm, setDocAddForm] = useState(emptyDoctor)
-    const [docEditOpen, setDocEditOpen] = useState(false)
-    const [docEditId, setDocEditId] = useState('')
-    const [docEditForm, setDocEditForm] = useState(emptyDoctor)
-
+    // ─── العمليات ─────────────────────────────────────────────────────────────
     const fetchHospital = useCallback(async () => {
         if (!id) return
         try {
@@ -58,6 +64,30 @@ export default function HospitalDetailPage() {
     }, [id])
 
     useEffect(() => { fetchHospital() }, [fetchHospital])
+
+    const handleAddDoctor = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newDoctor.name.trim() || !newDoctor.departmentId) return
+        setSubmitting(true)
+        try {
+            const res = await fetch(`/api/project/Medical-Services/hospitals/${id}/doctors`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newDoctor),
+            })
+
+            if (res.ok) {
+                const createdDoctor = await res.json()
+                setDoctors((prev) => [createdDoctor, ...prev])
+                setNewDoctor({ name: '', specialty: '', phone: '', workSchedule: '', departmentId: '' })
+                setIsDoctorDialogOpen(false)
+            }
+        } catch (error) {
+            console.error('Error adding doctor:', error)
+        } finally {
+            setSubmitting(false)
+        }
+    }
 
     if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin w-8 h-8 text-blue-600" /></div>
 
@@ -76,98 +106,71 @@ export default function HospitalDetailPage() {
                 ))}
             </div>
 
-            {/* TAB: الأطباء - الجزء المطلوب */}
+            {/* TAB: الأطباء */}
             {tab === 'doctors' && (
                 <Card className="rounded-xl border shadow-sm">
                     <CardContent className="p-0">
-                        <div className="p-4 flex items-center justify-between border-b">
+                        <div className="p-4 flex items-center justify-between border-b bg-slate-50/50">
                             <p className="font-semibold text-sm text-muted-foreground">إجمالي الأطباء: {doctors.length}</p>
-                            <Button onClick={() => setDocAddOpen(true)} className="bg-blue-600 h-9 px-3 gap-2 text-sm"><Plus className="w-4 h-4" /> إضافة طبيب</Button>
+                            
+                            <Dialog open={isDoctorDialogOpen} onOpenChange={setIsDoctorDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2 text-xs font-bold rounded-lg px-4 py-2">
+                                        <Plus className="w-4 h-4" /> إضافة طبيب
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[425px]" dir="rtl">
+                                    <DialogHeader><DialogTitle>إضافة طبيب جديد</DialogTitle></DialogHeader>
+                                    <form onSubmit={handleAddDoctor} className="space-y-4 py-4 text-right">
+                                        <Input placeholder="اسم الطبيب" value={newDoctor.name} onChange={(e) => setNewDoctor({...newDoctor, name: e.target.value})} required />
+                                        <Input placeholder="التخصص" value={newDoctor.specialty} onChange={(e) => setNewDoctor({...newDoctor, specialty: e.target.value})} />
+                                        <Input placeholder="رقم الهاتف" value={newDoctor.phone} onChange={(e) => setNewDoctor({...newDoctor, phone: e.target.value})} />
+                                        <Input placeholder="جدول العمل" value={newDoctor.workSchedule} onChange={(e) => setNewDoctor({...newDoctor, workSchedule: e.target.value})} />
+                                        
+                                        <Select onValueChange={(val) => setNewDoctor({...newDoctor, departmentId: val})}>
+                                            <SelectTrigger><SelectValue placeholder="اختر القسم" /></SelectTrigger>
+                                            <SelectContent>
+                                                {departments.map(dept => (
+                                                    <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+
+                                        <DialogFooter>
+                                            <Button type="submit" disabled={submitting} className="w-full bg-blue-600">
+                                                {submitting ? <Loader2 className="animate-spin w-4 h-4 ml-2" /> : 'حفظ بيانات الطبيب'}
+                                            </Button>
+                                        </DialogFooter>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
                         </div>
+
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-start">
                                 <thead className="bg-muted/40 border-b">
                                     <tr>
-                                        <th className="p-4 font-semibold text-start">اسم الطبيب</th>
-                                        <th className="p-4 font-semibold text-start">التخصص</th>
-                                        <th className="p-4 font-semibold text-start">الهاتف</th>
-                                        <th className="p-4 font-semibold text-start">جدول العمل</th>
-                                        <th className="p-4 font-semibold text-center">تعديل</th>
+                                        <th className="p-4 font-semibold">اسم الطبيب</th>
+                                        <th className="p-4 font-semibold">التخصص</th>
+                                        <th className="p-4 font-semibold">الهاتف</th>
+                                        <th className="p-4 font-semibold">جدول العمل</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
-                                    {doctors.length === 0 ? (
-                                        <tr><td colSpan={5} className="p-12 text-center text-muted-foreground italic">لا يوجد أطباء مسجلون</td></tr>
-                                    ) : (
-                                        doctors.map(doc => (
-                                            <tr key={doc.id} className="hover:bg-muted/30 transition-colors">
-                                                <td className="p-4 font-semibold text-slate-800">{doc.name}</td>
-                                                <td className="p-4 text-slate-600">{doc.specialty}</td>
-                                                <td className="p-4 font-mono text-blue-600 font-bold" dir="ltr">{doc.phone}</td>
-                                                <td className="p-4 text-slate-600">{doc.workSchedule}</td>
-                                                <td className="p-4 text-center">
-                                                    <button 
-                                                        onClick={() => { setDocEditId(doc.id); setDocEditForm(doc); setDocEditOpen(true) }} 
-                                                        className="border p-2 rounded-md hover:bg-blue-50 text-slate-500 hover:text-blue-600"
-                                                    >
-                                                        <Pencil className="w-4 h-4" />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
+                                    {doctors.map(doc => (
+                                        <tr key={doc.id} className="hover:bg-muted/30">
+                                            <td className="p-4">{doc.name}</td>
+                                            <td className="p-4">{doc.specialty}</td>
+                                            <td className="p-4" dir="ltr">{doc.phone}</td>
+                                            <td className="p-4">{doc.workSchedule}</td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
                     </CardContent>
                 </Card>
-      {/* نافذة الإضافة */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle className="text-right">إضافة خدمة جديدة</DialogTitle>
-            <DialogDescription className="text-right">أدخل تفاصيل الخدمة أدناه ليتم حفظها في النظام.</DialogDescription>
-          </DialogHeader>
-
-          {dialogError && (
-            <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-md flex items-center gap-2 text-sm">
-              <AlertCircle className="h-4 w-4" />
-              {dialogError}
-            </div>
-          )}
-
-          <div className="grid gap-5 py-6 text-right">
-            <div className="grid gap-2">
-              <label className="text-sm font-semibold text-slate-700">نوع الخدمة *</label>
-              <select 
-                className="h-11 px-3 border rounded-md border-slate-200 bg-white outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm" 
-                value={serviceType} 
-                onChange={(e) => setServiceType(e.target.value)}
-              >
-                {SERVICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div className="grid gap-2">
-              <label className="text-sm font-semibold text-slate-700">حالة الخدمة *</label>
-              <select 
-                className="h-11 px-3 border rounded-md border-slate-200 bg-white outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm" 
-                value={status} 
-                onChange={(e) => setStatus(e.target.value as any)}
-              >
-                <option value="نشط">نشط</option>
-                <option value="مغلق">مغلق</option>
-              </select>
-            </div>
-          </div>
-
-          <DialogFooter className="flex flex-row-reverse gap-3 border-t pt-4">
-            <Button onClick={onAdd} disabled={submitting} className="bg-blue-600 hover:bg-blue-700 text-white px-8 h-10">
-              {submitting ? 'جارٍ الحفظ...' : 'حفظ الخدمة'}
-            </Button>
-            <Button variant="outline" onClick={() => setAddOpen(false)} className="border-slate-200 text-slate-600 h-10 px-6">إلغاء</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  )
+            )}
+        </div>
+    )
 }

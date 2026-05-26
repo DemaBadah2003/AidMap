@@ -7,28 +7,28 @@ datasource db {
 }
 
 model User {
-  id              String      @id @default(uuid())
-  email           String      @unique
+  id              String         @id @default(uuid())
+  email           String         @unique
   password        String?
   country         String?
   timezone        String?
   name            String?
   roleId          String
-  status          UserStatus  @default(INACTIVE)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  status          UserStatus     @default(INACTIVE)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
   lastSignInAt    DateTime?
   emailVerifiedAt DateTime?
-  isTrashed       Boolean     @default(false)
+  isTrashed       Boolean        @default(false)
   avatar          String?
   invitedByUserId String?
-  isProtected     Boolean     @default(false)
-  language        String?     @default("en")
-  theme           String?     @default("light")
+  isProtected     Boolean        @default(false)
+  language        String?        @default("en")
+  theme           String?        @default("light")
   accounts        Account[]
   Session         Session[]
   systemLog       SystemLog[]
-  role            UserRole    @relation(fields: [roleId], references: [id])
+  role            UserRole       @relation(fields: [roleId], references: [id])
 
   @@index([invitedByUserId])
   @@index([roleId])
@@ -145,33 +145,32 @@ model Supervisor {
 }
 
 model Hospital {
-  id            String         @id @default(uuid())
-  type          HospitalType
-  name          String
-  region        Region
-  phone         String
-  latitude      Decimal?       @db.Decimal(10, 7)
-  longitude     Decimal?       @db.Decimal(10, 7)
-  placeId       String?        @unique
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  addressId     String
-  departments   Department[]
-  distributions Distribution[]
-  doctors       Doctor[]
-  Address       Address        @relation(fields: [addressId], references: [id])
-  place         Place?         @relation("HospitalPlace", fields: [placeId], references: [id])
+  id          String       @id @default(uuid())
+  type        HospitalType
+  name        String
+  region      Region
+  phone       String
+  latitude    Decimal?     @db.Decimal(10, 7)
+  longitude   Decimal?     @db.Decimal(10, 7)
+  placeId     String?      @unique
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  addressId   String
+  departments Department[]
+  doctors     Doctor[]
+  Address     Address      @relation(fields: [addressId], references: [id])
+  place       Place?       @relation("HospitalPlace", fields: [placeId], references: [id])
 }
 
 model Department {
-  id          String    @id @default(uuid())
+  id          String     @id @default(uuid())
   name        String
   hospitalId  String
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime   @default(now())
   deptType    String
   description String?
-  status      String    @default("يعمل بكفاءة")
-  hospital    Hospital  @relation(fields: [hospitalId], references: [id])
+  status      String     @default("يعمل بكفاءة")
+  hospital    Hospital   @relation(fields: [hospitalId], references: [id])
   doctors     Doctor[]
   services    Service[]
 }
@@ -184,7 +183,9 @@ model Service {
   departmentId        String
   createdAt           DateTime             @default(now())
   institutionServices InstitutionService[]
-  department          Department           @relation(fields: [departmentId], references: [id])
+  
+  // 👈 إضافة الحذف المتتالي للعلاقة مع القسم هنا
+  department          Department           @relation(fields: [departmentId], references: [id], onDelete: Cascade)
 }
 
 model Doctor {
@@ -197,8 +198,10 @@ model Doctor {
   departmentId String?
   createdAt    DateTime    @default(now())
   workSchedule String
-  department   Department? @relation(fields: [departmentId], references: [id])
   hospital     Hospital    @relation(fields: [hospitalId], references: [id])
+  
+  // 👈 إضافة الحذف المتتالي للعلاقة مع القسم هنا
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: Cascade)
 }
 
 model Address {
@@ -227,53 +230,30 @@ model Institution {
   isTrashed           Boolean              @default(false)
   isProtected         Boolean              @default(false)
   contacts            Contact[]
-  distributions       Distribution[]
   enterpriseProducts  EnterpriseProduct[]
   place               Place?               @relation("InstitutionPlace", fields: [placeId], references: [id])
-  institutionProducts InstitutionProduct[]
   institutionServices InstitutionService[]
 }
 
 model Aid {
-  id            String         @id @default(uuid())
-  aidType       String
-  aidName       String
-  quantity      Int
-  dateReceived  DateTime
-  donor         String?
-  status        String
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  distributions Distribution[]
-}
-
-model Distribution {
-  id            String             @id @default(uuid())
-  institutionId String
-  productId     String?
-  quantity      Int                @default(0)
-  status        DistributionStatus @default(PENDING)
-  aidId         String?
-  hospitalId    String?
-  placeId       String?
-  citizenId     String?
-  aid           Aid?               @relation(fields: [aidId], references: [id])
-  Citizens      Citizens?          @relation(fields: [citizenId], references: [id])
-  hospital      Hospital?          @relation(fields: [hospitalId], references: [id])
-  institution   Institution        @relation(fields: [institutionId], references: [id])
-  place         Place?             @relation("PlaceDistribution", fields: [placeId], references: [id])
-  product       Product?           @relation(fields: [productId], references: [id])
+  id           String   @id @default(uuid())
+  aidType      String
+  aidName      String
+  quantity     Int
+  dateReceived DateTime
+  donor        String?
+  status       String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Product {
-  id                  String               @id @default(uuid())
-  nameAr              String
-  price               Float                @default(0)
-  quantity            Int                  @default(0)
-  status              ProductStatus        @default(GHAIR_MOJOUD)
-  distributions       Distribution[]
-  enterpriseProducts  EnterpriseProduct[]
-  institutionProducts InstitutionProduct[]
+  id                 String              @id @default(uuid())
+  nameAr             String
+  price              Float               @default(0)
+  quantity           Int                 @default(0)
+  status             ProductStatus       @default(GHAIR_MOJOUD)
+  enterpriseProducts EnterpriseProduct[]
 }
 
 model InstitutionService {
@@ -285,16 +265,6 @@ model InstitutionService {
   service       Service     @relation(fields: [serviceId], references: [id])
 
   @@unique([institutionId, serviceId])
-}
-
-model InstitutionProduct {
-  id            String      @id @default(uuid())
-  institutionId String
-  productId     String
-  institution   Institution @relation(fields: [institutionId], references: [id])
-  product       Product     @relation(fields: [productId], references: [id])
-
-  @@unique([institutionId, productId])
 }
 
 model Place {
@@ -316,7 +286,6 @@ model Place {
   availableBeds Int?
   statusText    String?
   camp          Camps?         @relation("CampPlace")
-  distributions Distribution[] @relation("PlaceDistribution")
   FoodPoint     FoodPoint?
   hospital      Hospital?      @relation("HospitalPlace")
   institution   Institution?   @relation("InstitutionPlace")
@@ -346,15 +315,15 @@ model SystemLog {
 }
 
 model Contact {
-  id            String        @id @default(uuid())
+  id            String      @id @default(uuid())
   institutionId String
   type          String?
-  date          DateTime      @default(now())
+  date          DateTime    @default(now())
   notes         String?
   status        ContactStatus @default(NOT_DONE)
   citizenId     String
-  Citizens      Citizens      @relation(fields: [citizenId], references: [id], onDelete: Cascade)
-  institution   Institution   @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  Citizens      Citizens    @relation(fields: [citizenId], references: [id], onDelete: Cascade)
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
 }
 
 model Emergency {
@@ -468,7 +437,6 @@ model Citizens {
   isProtected    Boolean             @default(false)
   Camps          Camps?              @relation(fields: [campId], references: [id])
   Contact        Contact[]
-  Distribution   Distribution[]
 }
 
 model FoodPoint {
@@ -484,26 +452,24 @@ model FoodPoint {
   Place       Place?          @relation(fields: [placeId], references: [id])
 }
 
-
 model School {
-  id           String   @id
-  name         String
-  location     String?
-  region       String?
-  level        String?
-  studyDays    String?
-  timing       String?
-  fees         Float    @default(0)
-  schoolType   String?
-  gender       String?
-  totalCount   Int      @default(0)
-  latitude     Float?
-  longitude    Float?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  isTrashed    Boolean  @default(false)
+  id         String   @id
+  name       String
+  location   String?
+  region     String?
+  level      String?
+  studyDays  String?
+  timing     String?
+  fees       Float    @default(0)
+  schoolType String?
+  gender     String?
+  totalCount Int      @default(0)
+  latitude   Float?
+  longitude  Float?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  isTrashed  Boolean  @default(false)
 }
-
 
 model WaterPoint {
   id        String           @id

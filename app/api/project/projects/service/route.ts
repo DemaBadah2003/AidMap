@@ -4,13 +4,15 @@ import prisma from '@/lib/prisma'
 // GET - جلب جميع الخدمات لمستشفى معين
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
+
     const services = await prisma.service.findMany({
       where: {
         department: {
-          hospitalId: params.id,
+          hospitalId: id,
         },
       },
       include: {
@@ -40,9 +42,10 @@ export async function GET(
 // POST - إضافة خدمة جديدة
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const body = await req.json()
 
     if (!body.name?.trim() || !body.departmentId || body.price === undefined) {
@@ -56,7 +59,7 @@ export async function POST(
     const department = await prisma.department.findFirst({
       where: {
         id: body.departmentId,
-        hospitalId: params.id,
+        hospitalId: id,
       },
     })
 
@@ -86,9 +89,10 @@ export async function POST(
 // PATCH - تعديل خدمة
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const body = await req.json()
 
     if (!body.id) {
@@ -100,7 +104,7 @@ export async function PATCH(
       where: {
         id: body.id,
         department: {
-          hospitalId: params.id,
+          hospitalId: id,
         },
       },
     })
