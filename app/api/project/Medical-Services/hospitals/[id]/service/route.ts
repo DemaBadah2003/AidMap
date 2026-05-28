@@ -55,7 +55,6 @@ export async function POST(
       )
     }
 
-    // التحقق أن القسم تابع للمستشفى
     const department = await prisma.department.findFirst({
       where: {
         id: body.departmentId,
@@ -77,9 +76,22 @@ export async function POST(
         isAvailable: body.isAvailable ?? true,
         departmentId: body.departmentId,
       },
+      include: {
+        department: {
+          select: { name: true },
+        },
+      },
     })
 
-    return NextResponse.json(service, { status: 201 })
+    return NextResponse.json({
+      id: service.id,
+      name: service.name,
+      price: service.price,
+      isAvailable: service.isAvailable,
+      departmentId: service.departmentId,
+      departmentName: service.department.name,
+    }, { status: 201 })
+
   } catch (e) {
     console.error('POST service error:', e)
     return NextResponse.json({ error: 'Failed to create service' }, { status: 400 })
@@ -99,7 +111,6 @@ export async function PATCH(
       return NextResponse.json({ error: 'service id is required' }, { status: 400 })
     }
 
-    // التحقق من وجود الخدمة وأنها تابعة للمستشفى
     const existingService = await prisma.service.findFirst({
       where: {
         id: body.id,
@@ -124,9 +135,22 @@ export async function PATCH(
         isAvailable: body.isAvailable,
         departmentId: body.departmentId,
       },
+      include: {
+        department: {
+          select: { name: true },
+        },
+      },
     })
 
-    return NextResponse.json(updated)
+    return NextResponse.json({
+      id: updated.id,
+      name: updated.name,
+      price: updated.price,
+      isAvailable: updated.isAvailable,
+      departmentId: updated.departmentId,
+      departmentName: updated.department.name,
+    })
+
   } catch (e) {
     console.error('PATCH service error:', e)
     return NextResponse.json({ error: 'Failed to update service' }, { status: 400 })

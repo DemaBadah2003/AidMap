@@ -6,6 +6,10 @@ const regionMap: Record<string, any> = { 'شمال': 'NORTH', 'جنوب': 'SOUTH
 const typeRevMap: Record<string, string> = Object.fromEntries(Object.entries(typeMap).map(([k, v]) => [v, k]));
 const regionRevMap: Record<string, string> = Object.fromEntries(Object.entries(regionMap).map(([k, v]) => [v, k]));
 
+function parseNullableValue(value: any) {
+  return value === null || value === undefined || value === '' ? undefined : value;
+}
+
 export async function GET() {
   try {
     const [hospitals, allDoctors] = await Promise.all([
@@ -21,9 +25,10 @@ export async function GET() {
       hospitalName: h.name,
       hospitalType: typeRevMap[h.type] || h.type,
       region: regionRevMap[h.region] || h.region,
-      location: h.location,
+      latitude: h.latitude,
+      longitude: h.longitude,
       phone: h.phone,
-      doctorNames: h.doctors.map(d => d.name).join('، ') 
+      doctorNames: h.doctors.map(d => d.name).join('، ')
     }));
 
     return NextResponse.json({ hospitals: formattedHospitals, allDoctors });
@@ -35,19 +40,31 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+
+    const address = await prisma.address.create({
+      data: {
+        title: body.hospitalName || 'مستشفى',
+        region: regionMap[body.region] || 'NORTH',
+        description: body.location || '',
+      }
+    });
+
     const newHospital = await prisma.hospital.create({
       data: {
         name: body.hospitalName,
         type: typeMap[body.hospitalType] || 'GOVERNMENT',
         region: regionMap[body.region] || 'NORTH',
-        location: body.location,
         phone: body.phone,
+        latitude: parseNullableValue(body.latitude),
+        longitude: parseNullableValue(body.longitude),
+        addressId: address.id,
         doctors: body.doctorId ? { connect: { id: body.doctorId } } : undefined
       }
     });
     return NextResponse.json(newHospital, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to create' }, { status: 400 });
+    console.error('POST /hospitals error:', error);
+    return NextResponse.json({ error: 'Failed to create' }, { status: 500 });
   }
 }
 
@@ -55,7 +72,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, hospitalName, hospitalType, region, location, phone, doctorId } = body;
+    const { id, hospitalName, hospitalType, region, phone, doctorId } = body;
 
     const updated = await prisma.hospital.update({
       where: { id },
@@ -63,8 +80,9 @@ export async function PATCH(req: NextRequest) {
         name: hospitalName,
         type: typeMap[hospitalType],
         region: regionMap[region],
-        location: location,
         phone: phone,
+        latitude: parseNullableValue(body.latitude),
+        longitude: parseNullableValue(body.longitude),
         // تحديث الطبيب إذا تم إرسال ID جديد
         doctors: doctorId ? {
           set: [{ id: doctorId }] // استبدال الأطباء القدامى بالطبيب الجديد

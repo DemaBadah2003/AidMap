@@ -8,12 +8,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-
+import { Pencil } from 'lucide-react'; // أو المكتبة التي تستخدمها للأيقونات
 // ─── الأنواع (Types) ──────────────────────────────────────────────────────────
 type Hospital = { id: string; hospitalName: string; hospitalType: string; region: string; phone: string }
 type Department = { id: string; name: string; deptType: string; status: string; description: string | null }
 type Service = { id: string; name: string; price: number; isAvailable: boolean; departmentId: string; departmentName: string }
 type Doctor = { id: string; name: string; specialty: string; phone: string; workSchedule: string; departmentId: string | null }
+
+// دالة تنسيق رقم الهاتف
+const formatPhoneNumber = (phone: string) => {
+  if (!phone) return ''
+  const cleaned = phone.replace(/\D/g, '')
+  if (cleaned.length === 10) {
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 7)}-${cleaned.slice(7)}`
+  }
+  return phone
+}
 
 export default function HospitalDetailPage() {
     const { id } = useParams<{ id: string }>()
@@ -35,13 +45,20 @@ export default function HospitalDetailPage() {
     // State لإضافة خدمة جديدة
 const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false)
 const [newService, setNewService] = useState({ name: '', price: '', departmentId: '', isAvailable: true })
+    // States للتعديل السطري على الخدمات
+    const [editingServiceId, setEditingServiceId] = useState<string | null>(null)
+    const [editServiceData, setEditServiceData] = useState<{ name: string; price: string; departmentId: string; isAvailable: boolean } | null>(null)
     // State الخاصة بحفظ البيانات المؤقتة للسطر الذي يتم تعديله حالياً (Inline Edit)
     const [editRowData, setEditRowData] = useState<{ name: string; deptType: string; status: string } | null>(null)
      const [isDoctorDialogOpen, setIsDoctorDialogOpen] = useState(false);
 const [newDoctor, setNewDoctor] = useState({ 
     name: '', specialty: '', phone: '', workSchedule: '', departmentId: '' 
 });
+// حالة لتتبع الطبيب الذي يتم تعديله
+const [editingDoctorId, setEditingDoctorId] = useState<string | null>(null);
+const [editDoctorData, setEditDoctorData] = useState<{ name: string; specialty: string; phone: string; workSchedule: string;departmentId: string | null; } | null>(null);
     // قائمة التخصصات الطبية المتاحة للاختيار منها (Droplist)
+    
     const deptTypesList = [
         "الجراحة العامة",
         "طب الأطفال",
@@ -54,6 +71,21 @@ const [newDoctor, setNewDoctor] = useState({
         "العيون",
         "الأنف والأذن والحنجرة"
     ]
+    
+    const SPECIALIZATIONS = [
+  'جراحة عامة', 'طب أطفال', 'الاستقبال والطوارئ', 'الأمراض الباطنية', 
+  'النساء والتوليد', 'العناية المكثفة', 'القلب والأوعية الدموية', 
+  'العظام والمفاصل', 'العيون', 'الأنف والأذن والحنجرة'
+];
+
+const SCHEDULES = [
+  'السبت، الاثنين، الأربعاء',
+  'الأحد، الثلاثاء، الخميس',
+  'يومياً (السبت - الخميس)'
+];
+
+// دالة التحقق من الهاتف
+const isPhoneValid = (phone: string) => /^(056|059)\d{7}$/.test(phone);
 
     // دالة جلب كافة البيانات بشكل منفصل وفوري عند تحميل الصفحة
     const fetchAllData = useCallback(async () => {
@@ -72,10 +104,16 @@ const [newDoctor, setNewDoctor] = useState({
                 setDepartments(deptsData || [])
             }
 
-            const servicesRes = await fetch(`/api/project/Medical-Services/hospitals/${id}/services`)
+            const servicesRes = await fetch(`/api/project/Medical-Services/hospitals/${id}/service`)
             if (servicesRes.ok) {
                 const servicesData = await servicesRes.json()
                 setServices(servicesData || [])
+            }
+
+            const doctorsRes = await fetch(`/api/project/Medical-Services/hospitals/${id}/doctors`)
+            if (doctorsRes.ok) {
+                const doctorsData = await doctorsRes.json()
+                setDoctors(doctorsData || [])
             }
 
         } catch (error) {
@@ -125,7 +163,7 @@ const [newDoctor, setNewDoctor] = useState({
 
     setSubmitting(true)
     try {
-        const res = await fetch(`/api/project/Medical-Services/hospitals/${id}/services`, {
+        const res = await fetch(`/api/project/Medical-Services/hospitals/${id}/service`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newService),
@@ -144,8 +182,71 @@ const [newDoctor, setNewDoctor] = useState({
     }
 }
 
-    
+const handleAddDoctor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDoctor.name.trim() || !newDoctor.departmentId) {
+        alert("يرجى تعبئة الحقول الأساسية");
+        return;
+    }
 
+    setSubmitting(true);
+    try {
+        const res = await fetch(`/api/project/Medical-Services/hospitals/${id}/doctors`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...newDoctor, hospitalId: id }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            // تحديث الجدول فوراً
+            setDoctors((prev) => [data, ...prev]);
+            setNewDoctor({ name: '', specialty: '', phone: '', workSchedule: '', departmentId: '' });
+            setIsDoctorDialogOpen(false);
+        } else {
+            console.error('API Error:', data);
+            alert(`خطأ: ${data.error || 'فشلت عملية الإضافة'}`);
+        }
+    } catch (error) {
+        console.error('Fetch error:', error);
+        alert('حدث خطأ في الاتصال بالسيرفر');
+    } finally {
+        setSubmitting(false);
+    }
+};
+
+const handleSaveDoctorEdit = async (docId: string) => {
+    if (!editDoctorData) return;
+
+    try {
+        const res = await fetch(`/api/project/Medical-Services/hospitals/${id}/doctors`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                id: docId, 
+                ...editDoctorData // ستشمل الآن name, specialty, phone, workSchedule, departmentId
+            }),
+        });
+
+        if (res.ok) {
+            const updatedDoctor = await res.json();
+            
+            // تحديث الجدول فوراً بعد الحفظ
+            setDoctors(prev => prev.map(d => d.id === docId ? updatedDoctor : d));
+            
+            // إغلاق النافذة وتصفير البيانات
+            setEditingDoctorId(null);
+            setEditDoctorData(null);
+        } else {
+            const err = await res.json();
+            alert("فشل التعديل: " + (err.error || "خطأ غير معروف"));
+        }
+    } catch (err) { 
+        console.error("خطأ في التعديل:", err);
+        alert("حدث خطأ أثناء الاتصال بالسيرفر");
+    }
+};
     // تفعيل وضع التعديل الفوري لسطر معين وتعبئة بياناته تلقائياً
     const startInlineEdit = (dept: Department) => {
         setUpdatingId(dept.id)
@@ -192,6 +293,53 @@ const [newDoctor, setNewDoctor] = useState({
             }
         } catch (error) {
             console.error('Error updating department:', error)
+        }
+    }
+
+    // ─── دوال التعديل السطري للخدمات ───────────────────────────────────────
+    const startEditService = (srv: Service) => {
+        setEditingServiceId(srv.id)
+        setEditServiceData({
+            name: srv.name,
+            price: String(srv.price),
+            departmentId: srv.departmentId,
+            isAvailable: srv.isAvailable
+        })
+    }
+
+    const cancelEditService = () => {
+        setEditingServiceId(null)
+        setEditServiceData(null)
+    }
+
+    const handleSaveServiceEdit = async (srvId: string) => {
+        if (!editServiceData || !editServiceData.name.trim() || !editServiceData.price) return
+
+        try {
+            const res = await fetch(`/api/project/Medical-Services/hospitals/${id}/service`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: srvId,
+                    name: editServiceData.name,
+                    price: Number(editServiceData.price),
+                    departmentId: editServiceData.departmentId,
+                    isAvailable: editServiceData.isAvailable
+                }),
+            })
+
+            if (res.ok) {
+                const updatedService = await res.json()
+                setServices((prev) =>
+                    prev.map((s) => (s.id === srvId ? updatedService : s))
+                )
+                cancelEditService()
+            } else {
+                const errData = await res.json()
+                alert(errData.error || 'فشلت عملية تعديل الخدمة')
+            }
+        } catch (error) {
+            console.error('Error updating service:', error)
         }
     }
 
@@ -511,126 +659,286 @@ const [newDoctor, setNewDoctor] = useState({
             {/* الجدول الخاص بالخدمات */}
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-start">
-                    <thead className="bg-muted/40 border-b">
+                    <thead className="bg-muted/40 border-b sticky top-0 bg-white z-10">
                         <tr>
                             <th className="p-4 font-semibold text-start">اسم الخدمة</th>
                             <th className="p-4 font-semibold text-start">القسم التابع له</th>
                             <th className="p-4 font-semibold text-start">السعر</th>
                             <th className="p-4 font-semibold text-center">الحالة</th>
+                            <th className="p-4 font-semibold text-center w-24">تعديل</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
                         {services.length === 0 ? (
-                            <tr><td colSpan={4} className="p-12 text-center text-muted-foreground italic">لا توجد خدمات مسجلة</td></tr>
+                            <tr><td colSpan={5} className="p-12 text-center text-muted-foreground italic">لا توجد خدمات مسجلة</td></tr>
                         ) : (
-                            services.map(srv => (
-                                <tr key={srv.id} className="hover:bg-muted/30 transition-colors">
-                                    <td className="p-4 font-semibold text-slate-800">{srv.name}</td>
-                                    <td className="p-4 text-slate-600">{srv.departmentName}</td>
-                                    <td className="p-4 font-mono text-blue-600 font-bold">{srv.price} ₪</td>
-                                    <td className="p-4 text-center">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${srv.isAvailable ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                                            {srv.isAvailable ? 'متوفرة' : 'غير متوفرة'}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))
+                            services.map(srv => {
+                                const isEditing = editingServiceId === srv.id
+                                return (
+                                    <tr key={srv.id} className={`transition-colors ${isEditing ? 'bg-blue-50/40 hover:bg-blue-50/50' : 'hover:bg-muted/30'}`}>
+                                        <td className="p-4">
+                                            {isEditing && editServiceData ? (
+                                                <Input
+                                                    value={editServiceData.name}
+                                                    onChange={(e) => setEditServiceData({ ...editServiceData, name: e.target.value })}
+                                                    className="h-8 max-w-[180px] bg-white font-semibold"
+                                                />
+                                            ) : (
+                                                <span className="font-semibold text-slate-800">{srv.name}</span>
+                                            )}
+                                        </td>
+                                        <td className="p-4">
+                                            {isEditing && editServiceData ? (
+                                                <div className="w-44">
+                                                    <Select value={editServiceData.departmentId} onValueChange={(val) => setEditServiceData({ ...editServiceData, departmentId: val })}>
+                                                        <SelectTrigger className="h-8 bg-white"><SelectValue /></SelectTrigger>
+                                                        <SelectContent>{departments.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+                                                    </Select>
+                                                </div>
+                                            ) : (
+                                                <span className="text-slate-600">{srv.departmentName}</span>
+                                            )}
+                                        </td>
+                                        <td className="p-4">
+                                            {isEditing && editServiceData ? (
+                                                <Input
+                                                    type="number"
+                                                    value={editServiceData.price}
+                                                    onChange={(e) => setEditServiceData({ ...editServiceData, price: e.target.value })}
+                                                    className="h-8 w-24 bg-white"
+                                                />
+                                            ) : (
+                                                <span className="font-mono text-blue-600 font-bold">{srv.price} ₪</span>
+                                            )}
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            {isEditing && editServiceData ? (
+                                                <div className="w-32 mx-auto">
+                                                    <Select value={editServiceData.isAvailable ? 'true' : 'false'} onValueChange={(val) => setEditServiceData({ ...editServiceData, isAvailable: val === 'true' })}>
+                                                        <SelectTrigger className="h-8 bg-white"><SelectValue /></SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="true">متوفرة</SelectItem>
+                                                            <SelectItem value="false">غير متوفرة</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            ) : (
+                                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${srv.isAvailable ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                                                    {srv.isAvailable ? 'متوفرة' : 'غير متوفرة'}
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            {isEditing ? (
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <button onClick={() => handleSaveServiceEdit(srv.id)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-md"><Check className="w-4 h-4" /></button>
+                                                    <button onClick={cancelEditService} className="p-1.5 text-red-500 hover:bg-red-50 rounded-md"><X className="w-4 h-4" /></button>
+                                                </div>
+                                            ) : (
+                                                <button onClick={() => startEditService(srv)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-md"><Edit2 className="w-4 h-4" /></button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                )
+                            })
                         )}
                     </tbody>
                 </table>
             </div>
         </CardContent>
     </Card>
-)}{tab === 'doctors' && (
-    <Card className="rounded-xl border shadow-sm">
-        <CardContent className="p-0">
-            {/* رأس التبويب مع زر إضافة طبيب */}
-            <div className="p-4 flex items-center justify-between border-b bg-slate-50/50">
-                <p className="font-semibold text-sm text-muted-foreground">إجمالي الأطباء: {doctors.length}</p>
-                
-                <Dialog open={isDoctorDialogOpen} onOpenChange={setIsDoctorDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2 text-xs font-bold rounded-lg px-4 py-2">
-                            <Plus className="w-4 h-4" /> إضافة طبيب
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]" dir="rtl">
-                        <DialogHeader>
-                            <DialogTitle>إضافة طبيب جديد</DialogTitle>
-                        </DialogHeader>
-
-
-                        
-                        <form onSubmit={handleAddDoctor} className="space-y-4 py-4 text-right">
-                            <Input 
-                                placeholder="اسم الطبيب" 
-                                value={newDoctor.name} 
-                                onChange={(e) => setNewDoctor({...newDoctor, name: e.target.value})} 
-                                required 
-                            />
-                            <Input 
-                                placeholder="التخصص" 
-                                value={newDoctor.specialty} 
-                                onChange={(e) => setNewDoctor({...newDoctor, specialty: e.target.value})} 
-                            />
-                            <Input 
-                                placeholder="رقم الهاتف" 
-                                value={newDoctor.phone} 
-                                onChange={(e) => setNewDoctor({...newDoctor, phone: e.target.value})} 
-                            />
-                            <Input 
-                                placeholder="جدول العمل" 
-                                value={newDoctor.workSchedule} 
-                                onChange={(e) => setNewDoctor({...newDoctor, workSchedule: e.target.value})} 
-                            />
-                            
-                            <Select onValueChange={(val) => setNewDoctor({...newDoctor, departmentId: val})}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="اختر القسم" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {departments.map(dept => (
-                                        <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-
-                            <DialogFooter>
-                                <Button type="submit" disabled={submitting} className="w-full bg-blue-600">
-                                    {submitting ? <Loader2 className="animate-spin w-4 h-4 ml-2" /> : 'حفظ بيانات الطبيب'}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
-            </div>
-
-            {/* جدول الأطباء */}
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-start">
-                    <thead className="bg-muted/40 border-b">
-                        <tr>
-                            <th className="p-4 font-semibold">اسم الطبيب</th>
-                            <th className="p-4 font-semibold">التخصص</th>
-                            <th className="p-4 font-semibold">الهاتف</th>
-                            <th className="p-4 font-semibold">جدول العمل</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                        {doctors.map(doc => (
-                            <tr key={doc.id} className="hover:bg-muted/30">
-                                <td className="p-4">{doc.name}</td>
-                                <td className="p-4">{doc.specialty}</td>
-                                <td className="p-4" dir="ltr">{doc.phone}</td>
-                                <td className="p-4">{doc.workSchedule}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </CardContent>
-    </Card>
 )}
-        </div>
-    )
-}
+
+{tab === 'doctors' && (
+  <Card className="rounded-xl border shadow-sm">
+    <CardContent className="p-0">
+      <div className="p-4 flex items-center justify-between border-b bg-slate-50/50">
+        <p className="font-semibold text-sm text-muted-foreground">إجمالي الأطباء: {doctors.length}</p>
+
+        <Dialog open={isDoctorDialogOpen} onOpenChange={setIsDoctorDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2 text-xs font-bold rounded-lg px-4 py-2">
+              <Plus className="w-4 h-4" /> إضافة طبيب
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]" dir="rtl">
+            <DialogHeader><DialogTitle>إضافة طبيب جديد</DialogTitle></DialogHeader>
+            <form onSubmit={handleAddDoctor} className="space-y-4 py-4 text-right">
+              <Input placeholder="اسم الطبيب" value={newDoctor.name} onChange={(e) => setNewDoctor({...newDoctor, name: e.target.value})} required />
+              
+              <Select value={newDoctor.specialty} onValueChange={(val) => setNewDoctor({...newDoctor, specialty: val})}>
+                <SelectTrigger><SelectValue placeholder="اختر التخصص" /></SelectTrigger>
+                <SelectContent>{SPECIALIZATIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              </Select>
+
+              <div className="space-y-1">
+                <Input 
+                  placeholder="رقم الهاتف (059xxxxxxx)" 
+                  value={newDoctor.phone} 
+                  onChange={(e) => setNewDoctor({...newDoctor, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})} 
+                  className={newDoctor.phone && !isPhoneValid(newDoctor.phone) ? "border-red-500" : ""}
+                  required 
+                />
+                {newDoctor.phone && !isPhoneValid(newDoctor.phone) && (
+                  <p className="text-[11px] text-red-500 font-bold pr-1">يجب أن يبدأ الرقم بـ 056 أو 059 وأن يتكون من 10 أرقام</p>
+                )}
+                {newDoctor.phone && isPhoneValid(newDoctor.phone) && (
+                  <p className="text-sm text-slate-500 font-mono pr-1" dir="ltr">التنسيق: {formatPhoneNumber(newDoctor.phone)}</p>
+                )}
+              </div>
+              
+              <Select value={newDoctor.workSchedule} onValueChange={(val) => setNewDoctor({...newDoctor, workSchedule: val})}>
+                <SelectTrigger><SelectValue placeholder="اختر جدول العمل" /></SelectTrigger>
+                <SelectContent>{SCHEDULES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              </Select>
+
+              <Select value={newDoctor.departmentId} onValueChange={(val) => setNewDoctor({...newDoctor, departmentId: val})}>
+                <SelectTrigger><SelectValue placeholder="اختر القسم" /></SelectTrigger>
+                <SelectContent>{departments.map(dept => <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>)}</SelectContent>
+              </Select>
+
+              <DialogFooter>
+                <Button type="submit" disabled={submitting || !newDoctor.name || !isPhoneValid(newDoctor.phone) || !newDoctor.departmentId} className="w-full bg-blue-600">
+                  {submitting ? <Loader2 className="animate-spin w-4 h-4 ml-2" /> : 'حفظ بيانات الطبيب'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 border-b sticky top-0 bg-white z-10">
+            <tr>
+              <th className="p-4 font-semibold text-right" style={{width: '25%'}}>اسم الطبيب</th>
+              <th className="p-4 font-semibold text-right" style={{width: '22%'}}>التخصص</th>
+              <th className="p-4 font-semibold text-right" style={{width: '15%'}}>الهاتف</th>
+              <th className="p-4 font-semibold text-right" style={{width: '25%'}}>جدول العمل</th>
+              <th className="p-4 font-semibold text-center" style={{width: '13%'}}>تعديل</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {doctors.length === 0 ? (
+              <tr><td colSpan={5} className="p-12 text-center text-muted-foreground italic">لا توجد أطباء مسجلين</td></tr>
+            ) : (
+              doctors.map(doc => (
+                <tr key={doc.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="p-4 text-slate-800 font-medium">{doc.name}</td>
+                  <td className="p-4 text-slate-700">{doc.specialty}</td>
+                  <td className="p-4 text-slate-700 font-mono whitespace-nowrap" dir="ltr">{formatPhoneNumber(doc.phone)}</td>
+                  <td className="p-4 text-slate-700">{doc.workSchedule}</td>
+                  <td className="p-4 text-center">
+                    <button
+                      onClick={() => {
+                        setEditingDoctorId(doc.id)
+                        setEditDoctorData({
+                            name: doc.name,
+                            specialty: doc.specialty,
+                            phone: doc.phone,
+                            workSchedule: doc.workSchedule,
+                            departmentId: doc.departmentId || ""
+                        })
+                      }}
+                      className="inline-flex items-center justify-center p-2 rounded-lg border border-slate-300 text-slate-500 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 transition-all"
+                      title="تعديل"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <Dialog open={editingDoctorId !== null} onOpenChange={(open) => {
+        if (!open) {
+          setEditingDoctorId(null)
+          setEditDoctorData(null)
+        }
+      }}>
+        <DialogContent className="sm:max-w-[425px]" dir="rtl">
+          <DialogHeader><DialogTitle>تعديل بيانات الطبيب</DialogTitle></DialogHeader>
+          {editDoctorData && (
+            <div className="space-y-4 py-4 text-right">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-600">اسم الطبيب</label>
+                <Input
+                  placeholder="اسم الطبيب"
+                  value={editDoctorData.name}
+                  onChange={(e) => setEditDoctorData({...editDoctorData, name: e.target.value})}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-600">التخصص</label>
+                <Select value={editDoctorData.specialty} onValueChange={(val) => setEditDoctorData({...editDoctorData, specialty: val})}>
+                  <SelectTrigger><SelectValue placeholder="اختر التخصص" /></SelectTrigger>
+                  <SelectContent>{SPECIALIZATIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-600">رقم الهاتف</label>
+                <Input
+                  placeholder="رقم الهاتف (059xxxxxxx)"
+                  value={editDoctorData.phone}
+                  onChange={(e) => setEditDoctorData({...editDoctorData, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})}
+                  className={editDoctorData.phone && !isPhoneValid(editDoctorData.phone) ? "border-red-500" : ""}
+                />
+                {editDoctorData.phone && !isPhoneValid(editDoctorData.phone) && (
+                  <p className="text-[11px] text-red-500 font-bold pr-1">يجب أن يبدأ الرقم بـ 056 أو 059 وأن يتكون من 10 أرقام</p>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-600">جدول العمل</label>
+                <Select value={editDoctorData.workSchedule} onValueChange={(val) => setEditDoctorData({...editDoctorData, workSchedule: val})}>
+                  <SelectTrigger><SelectValue placeholder="اختر جدول العمل" /></SelectTrigger>
+                  <SelectContent>{SCHEDULES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-600">القسم</label>
+                <Select value={editDoctorData.departmentId} onValueChange={(val) => setEditDoctorData({...editDoctorData, departmentId: val})}>
+                  <SelectTrigger><SelectValue placeholder="اختر القسم" /></SelectTrigger>
+                  <SelectContent>{departments.map(dept => <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setEditingDoctorId(null)
+                setEditDoctorData(null)
+              }}
+            >
+              إلغاء
+            </Button>
+            <Button
+              disabled={!editDoctorData || !editDoctorData.name.trim() || !isPhoneValid(editDoctorData.phone) || !editDoctorData.departmentId || submitting}
+              onClick={() => editingDoctorId && handleSaveDoctorEdit(editingDoctorId)}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {submitting ? <Loader2 className="animate-spin w-4 h-4 ml-2" /> : 'حفظ التعديلات'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </CardContent>
+  </Card>
+)}
+
+
+
+
+
+</div>
+    )}

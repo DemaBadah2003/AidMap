@@ -222,6 +222,27 @@ export async function POST(req: NextRequest) {
 
     const supervisor = await findOrCreateSupervisorByName(body.supervisorAr)
 
+    // التحقق من رقم الهاتف المكرر
+    const phoneDuplicate = await prisma.shelter.findFirst({
+      where: {
+        phone: body.phone,
+        isTrashed: false,
+      },
+      select: { id: true },
+    })
+
+    if (phoneDuplicate) {
+      return NextResponse.json(
+        {
+          message: 'رقم الهاتف مستخدم من قبل',
+          fieldErrors: {
+            phone: 'رقم الهاتف مكرر',
+          },
+        },
+        { status: 409 }
+      )
+    }
+
     const duplicate = await prisma.shelter.findFirst({
       where: {
         name: {
@@ -356,6 +377,30 @@ export async function PUT(req: NextRequest) {
     if (body.supervisorAr !== undefined) {
       const supervisor = await findOrCreateSupervisorByName(body.supervisorAr)
       supervisorId = supervisor.id
+    }
+
+    // التحقق من رقم الهاتف المكرر
+    if (body.phone !== undefined) {
+      const phoneAlreadyUsed = await prisma.shelter.findFirst({
+        where: {
+          phone: body.phone,
+          NOT: { id },
+          isTrashed: false,
+        },
+        select: { id: true },
+      })
+
+      if (phoneAlreadyUsed) {
+        return NextResponse.json(
+          {
+            message: 'رقم الهاتف مستخدم من قبل',
+            fieldErrors: {
+              phone: 'رقم الهاتف مكرر',
+            },
+          },
+          { status: 409 }
+        )
+      }
     }
 
     if (

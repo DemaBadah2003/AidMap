@@ -2,12 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Globe, Moon, Sun } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 import { toAbsoluteUrl } from '@/lib/helpers';
 import { Button } from '@/components/ui/button';
 
 export function HeaderTopbar() {
-  const [language, setLanguage] = useState('ar');
   const [darkMode, setDarkMode] = useState(false);
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -41,18 +40,7 @@ export function HeaderTopbar() {
 
   return (
     <div className="flex items-center gap-2 lg:gap-3">
-      <div className="flex items-center gap-2 border rounded-md px-2 py-1.5 bg-background">
-        <Globe className="size-4 text-muted-foreground" />
-        <select
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          className="bg-transparent text-sm outline-none"
-          aria-label="Change language"
-        >
-          <option value="ar">AR</option>
-          <option value="en">EN</option>
-        </select>
-      </div>
+      {/* تم إزالة خيار اللغة من هنا */}
 
       <Button
         variant="outline"
@@ -108,23 +96,11 @@ export function HeaderTopbar() {
             >
               {darkMode ? 'الوضع الفاتح' : 'الوضع الداكن'}
             </button>
-
-            <div className="px-4 py-3 border-t">
-              <label className="block text-xs text-muted-foreground mb-2">
-                تغيير اللغة
-              </label>
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="w-full border rounded-md px-2 py-2 text-sm bg-transparent outline-none"
-              >
-                <option value="ar">العربية</option>
-                <option value="en">English</option>
-              </select>
-            </div>
+            
+            {/* تم إزالة قسم تغيير اللغة من القائمة المنسدلة */}
           </div>
         )}
       </div>
     </div>
   );
-}
+}سس

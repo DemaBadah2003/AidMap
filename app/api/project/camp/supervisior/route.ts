@@ -85,6 +85,21 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const phoneDuplicate = await prisma.supervisor.findFirst({
+      where: {
+        phone: body.phone,
+        isTrashed: false,
+      },
+      select: { id: true },
+    })
+
+    if (phoneDuplicate) {
+      return NextResponse.json(
+        { message: 'رقم الهاتف مستخدم من قبل', fieldErrors: { phone: 'رقم الهاتف مكرر' } },
+        { status: 409 }
+      )
+    }
+
     const created = await prisma.supervisor.create({
       data: {
         name: body.nameAr,
@@ -138,6 +153,24 @@ export async function PUT(req: NextRequest) {
       if (exists) {
         return NextResponse.json(
           { message: 'المشرف موجود بالفعل (اسم مكرر).' },
+          { status: 409 }
+        )
+      }
+    }
+
+    if (body.phone) {
+      const phoneAlreadyUsed = await prisma.supervisor.findFirst({
+        where: {
+          phone: body.phone,
+          NOT: { id },
+          isTrashed: false,
+        },
+        select: { id: true },
+      })
+
+      if (phoneAlreadyUsed) {
+        return NextResponse.json(
+          { message: 'رقم الهاتف مستخدم من قبل', fieldErrors: { phone: 'رقم الهاتف مكرر' } },
           { status: 409 }
         )
       }

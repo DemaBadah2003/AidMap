@@ -119,7 +119,8 @@ function SheltersTab() {
     if (!validate(formData)) return
     setSubmitting(true)
     try {
-      const res = await fetch(SHELTER_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) })
+      const { fillStatus, ...payload } = formData
+      const res = await fetch(SHELTER_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       const data = await res.json()
       if (!res.ok) { setErrors({ _: data.message ?? 'خطأ' }); return }
       setItems(prev => [data, ...prev])
@@ -131,7 +132,8 @@ function SheltersTab() {
     if (!editItem || !validate(formData)) return
     setSubmitting(true)
     try {
-      const res = await fetch(`${SHELTER_API}?id=${editItem.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) })
+      const { fillStatus, ...payload } = formData
+      const res = await fetch(`${SHELTER_API}?id=${editItem.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       const data = await res.json()
       if (!res.ok) { setErrors({ _: data.message ?? 'خطأ' }); return }
       setItems(prev => prev.map(s => s.id === editItem.id ? data : s))
