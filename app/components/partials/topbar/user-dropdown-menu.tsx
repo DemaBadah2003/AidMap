@@ -3,14 +3,12 @@
 import { ReactNode } from 'react';
 import Link from 'next/link';
 import {
-  Moon,
   Lock,
   Pencil,
   UserCircle,
   LogOut,
 } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
-import { useTheme } from 'next-themes';
 import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
@@ -20,7 +18,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Switch } from '@/components/ui/switch';
 
 // تم الاكتفاء بالنصوص العربية فقط
 const t = {
@@ -37,11 +34,6 @@ const t = {
 
 export function UserDropdownMenu({ trigger }: { trigger: ReactNode }) {
   const { data: session } = useSession();
-  const { theme, setTheme } = useTheme();
-
-  const handleThemeToggle = (checked: boolean) => {
-    setTheme(checked ? 'dark' : 'light');
-  };
 
   return (
     <DropdownMenu>
@@ -96,28 +88,6 @@ export function UserDropdownMenu({ trigger }: { trigger: ReactNode }) {
             <Pencil className="h-4 w-4" />
             {t.editProfile}
           </Link>
-        </DropdownMenuItem>
-
-        <DropdownMenuSeparator />
-
-        {/* Preferences */}
-        <DropdownMenuLabel className="font-semibold">
-          {t.preferences}
-        </DropdownMenuLabel>
-
-        <DropdownMenuItem
-          className="flex items-center gap-2"
-          onSelect={(event) => event.preventDefault()}
-        >
-          <Moon className="h-4 w-4" />
-          <div className="flex grow items-center justify-between gap-2">
-            {t.theme}
-            <Switch
-              size="sm"
-              checked={theme === 'dark'}
-              onCheckedChange={handleThemeToggle}
-            />
-          </div>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />

@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function ChangePasswordPage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -19,10 +21,45 @@ export default function ChangePasswordPage() {
     }));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Saved:', formData);
-    alert('تم تحديث كلمة المرور بنجاح');
+
+    if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) {
+      alert('الرجاء ملء جميع الحقول المطلوبة.');
+      return;
+    }
+
+    if (formData.newPassword !== formData.confirmPassword) {
+      alert('كلمة المرور الجديدة وتأكيدها غير متطابقتين.');
+      return;
+    }
+
+    if (formData.newPassword.length < 6) {
+      alert('يجب أن تكون كلمة المرور الجديدة 6 أحرف على الأقل.');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/profile-page/change-password', {
+        method: 'PUT',
+        body: JSON.stringify({
+          currentPassword: formData.currentPassword,
+          newPassword: formData.newPassword,
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'فشل تحديث كلمة المرور.');
+      }
+
+      alert('تم تحديث كلمة المرور بنجاح.');
+      router.push('/profile-page');
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message || 'حدث خطأ أثناء تغيير كلمة المرور.');
+    }
   };
 
   return (

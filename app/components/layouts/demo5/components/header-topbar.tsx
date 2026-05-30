@@ -2,19 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Moon, Sun } from 'lucide-react';
 import { toAbsoluteUrl } from '@/lib/helpers';
-import { Button } from '@/components/ui/button';
 
 export function HeaderTopbar() {
-  const [darkMode, setDarkMode] = useState(false);
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const isDark = document.documentElement.classList.contains('dark');
-    setDarkMode(isDark);
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -27,30 +19,13 @@ export function HeaderTopbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const toggleTheme = () => {
-    const next = !darkMode;
-    setDarkMode(next);
 
-    if (next) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  };
 
   return (
     <div className="flex items-center gap-2 lg:gap-3">
       {/* تم إزالة خيار اللغة من هنا */}
 
-      <Button
-        variant="outline"
-        mode="icon"
-        shape="circle"
-        onClick={toggleTheme}
-        title="Change theme"
-      >
-        {darkMode ? <Sun className="size-4.5" /> : <Moon className="size-4.5" />}
-      </Button>
+
 
       <div className="relative" ref={menuRef}>
         <button
@@ -89,13 +64,7 @@ export function HeaderTopbar() {
               تغيير كلمة المرور
             </Link>
 
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="w-full text-right px-4 py-3 text-sm hover:bg-muted transition-colors"
-            >
-              {darkMode ? 'الوضع الفاتح' : 'الوضع الداكن'}
-            </button>
+
             
             {/* تم إزالة قسم تغيير اللغة من القائمة المنسدلة */}
           </div>
@@ -103,4 +72,4 @@ export function HeaderTopbar() {
       </div>
     </div>
   );
-}سس
+}

@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { I18N_LANGUAGES, Language } from '@/i18n/config';
 import {
   Globe,
-  Moon,
   Settings,
   User,
   UserCircle,
@@ -13,7 +12,6 @@ import {
   LogOut,
 } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
-import { useTheme } from 'next-themes';
 import { toAbsoluteUrl } from '@/lib/helpers';
 import { useLanguage } from '@/providers/i18n-provider'; 
 import { Badge } from '@/components/ui/badge';
@@ -30,12 +28,10 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Switch } from '@/components/ui/switch';
 
 export function DropdownMenuUser({ trigger }: { trigger: ReactNode }) {
   const { data: session } = useSession();
-  const { theme, setTheme } = useTheme();
-  const { language, changeLanguage } = useLanguage(); 
+  const { language, changeLanguage } = useLanguage();
 
   const t = (key: string) => {
     const translations: any = {
@@ -55,9 +51,7 @@ export function DropdownMenuUser({ trigger }: { trigger: ReactNode }) {
     changeLanguage(lang.code);
   };
 
-  const handleThemeToggle = (checked: boolean) => {
-    setTheme(checked ? 'dark' : 'light');
-  };
+
 
   return (
     <DropdownMenu dir={language.direction}>
@@ -145,13 +139,7 @@ export function DropdownMenuUser({ trigger }: { trigger: ReactNode }) {
           </DropdownMenuSubContent>
         </DropdownMenuSub>
 
-        <DropdownMenuItem className="gap-2 justify-start" onSelect={(e) => e.preventDefault()}>
-          <Moon className="size-4" />
-          <div className="flex grow items-center justify-between">
-            <span>{t('theme')}</span>
-            <Switch size="sm" checked={theme === 'dark'} onCheckedChange={handleThemeToggle} />
-          </div>
-        </DropdownMenuItem>
+
 
         <DropdownMenuSeparator />
         

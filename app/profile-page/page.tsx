@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Mail, User, Lock } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 type UserProfile = {
   name: string;
@@ -11,6 +12,7 @@ type UserProfile = {
 };
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -20,41 +22,42 @@ export default function ProfilePage() {
     password: '',
   });
 
+  // ✅ دالة منفصلة لجلب البيانات نستخدمها في أكثر من مكان
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/profile-page', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      if (!res.ok) throw new Error('Failed to fetch profile');
+
+      const data = await res.json();
+      setUser(data);
+      setForm({
+        name: data.name,
+        email: data.email,
+        password: '',
+      });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ جلب البيانات عند تحميل الصفحة
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await fetch('/api/user/profile');
-        if (!res.ok) throw new Error('Failed to fetch profile');
-
-        const data = await res.json();
-        setUser(data);
-
-        setForm({
-          name: data.name,
-          email: data.email,
-          password: '',
-        });
-      } catch (error) {
-        console.error(error);
-
-        const fallback = {
-          name: 'أحمد',
-          email: 'ahmed4@gmail.com',
-          image: '/media/avatars/300-2.png',
-        };
-
-        setUser(fallback);
-        setForm({
-          name: fallback.name,
-          email: fallback.email,
-          password: '',
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchProfile();
+  }, []);
+
+  // ✅ إعادة جلب البيانات عند العودة للصفحة (focus)
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchProfile();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -66,16 +69,30 @@ export default function ProfilePage() {
 
   const handleSave = async () => {
     try {
-      await fetch('/api/user/profile', {
+      const payload = {
+        name: form.name,
+        email: form.email,
+        ...(form.password.trim() !== '' && { password: form.password }),
+      };
+
+      const res = await fetch('/api/profile-page/edit', {
         method: 'PUT',
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
         headers: { 'Content-Type': 'application/json' },
       });
 
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'خطأ في تحديث الملف الشخصي');
+      }
+
+      // ✅ تحديث البيانات مباشرة بدون إعادة تحميل
+      setUser((prev) => prev ? { ...prev, name: form.name, email: form.email } : null);
+      setForm((prev) => ({ ...prev, password: '' }));
       alert('تم تحديث الملف الشخصي بنجاح');
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert('خطأ في تحديث الملف الشخصي');
+      alert(error.message || 'خطأ في تحديث الملف الشخصي');
     }
   };
 
@@ -102,7 +119,7 @@ export default function ProfilePage() {
   return (
     <div className="w-full py-10" dir="rtl">
       <div className="mx-auto w-full max-w-[800px] px-6 space-y-6">
-        
+
         {/* Title */}
         <div className="text-center">
           <h1 className="text-2xl font-bold">ملفي الشخصي</h1>
@@ -114,7 +131,7 @@ export default function ProfilePage() {
         {/* Profile Card */}
         <div className="rounded-2xl border bg-background p-6 shadow-sm">
           <div className="flex flex-col gap-6 md:flex-row md:items-center">
-            
+
             <img
               src={user.image || '/media/avatars/300-2.png'}
               alt={user.name}
@@ -122,8 +139,8 @@ export default function ProfilePage() {
             />
 
             <div className="flex-1 text-center md:text-right">
+              {/* ✅ يعرض الاسم والإيميل المحدثين */}
               <h2 className="text-xl font-semibold">{user.name}</h2>
-
               <div className="mt-1 flex items-center justify-center gap-2 text-sm text-muted-foreground md:justify-start">
                 <Mail className="h-4 w-4" />
                 <span>{user.email}</span>
@@ -149,7 +166,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Account Info (Editable) */}
+        {/* Account Info */}
         <div className="rounded-2xl border bg-background p-5 shadow-sm">
           <div className="mb-4 flex items-center gap-2 text-right">
             <User className="h-5 w-5" />

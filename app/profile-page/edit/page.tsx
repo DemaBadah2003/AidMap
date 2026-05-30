@@ -1,29 +1,86 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function EditProfilePage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
-    name: 'Ahmed',
-    email: 'ahmed4@gmail.com',
+    name: '',
+    email: '',
     password: '',
   });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const res = await fetch('/api/profile-page', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' },
+        });
+        if (!res.ok) throw new Error('Failed to load user profile');
+        const data = await res.json();
+        setFormData({
+          name: data.name,
+          email: data.email,
+          password: '',
+        });
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUserData();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Saved:', formData);
-    alert('تم حفظ التغييرات بنجاح');
+    try {
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        ...(formData.password.trim() !== '' && { password: formData.password }),
+      };
+
+      const res = await fetch('/api/profile-page/edit', {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'خطأ في تحديث الملف الشخصي');
+      }
+
+      router.refresh();
+      router.push('/profile-page');
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message || 'خطأ في تحديث الملف الشخصي');
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="w-full py-10" dir="rtl">
+        <div className="mx-auto max-w-[800px] px-6 text-right">
+          <p className="text-sm text-muted-foreground">جاري تحميل البيانات الشخصية...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full py-10" dir="rtl">

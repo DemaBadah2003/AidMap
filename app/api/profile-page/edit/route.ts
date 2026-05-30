@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import bcrypt from 'bcrypt';
 import prisma from '@/lib/prisma';
 import authOptions from '@/app/api/auth/[...nextauth]/auth-options';
 
@@ -7,7 +8,9 @@ export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.email) {
+    const userId = (session?.user as any)?.id;
+
+    if (!userId) {
       return NextResponse.json(
         { message: 'Unauthorized' },
         { status: 401 },
@@ -15,7 +18,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, email, avatar, language, theme, country, timezone } = body;
+    const { name, email, avatar, language, theme, country, timezone, password } = body;
 
     if (!name || !email) {
       return NextResponse.json(
@@ -25,7 +28,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const existingUser = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: userId },
     });
 
     if (!existingUser) {
@@ -35,7 +38,8 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    if (email !== session.user.email) {
+    // تحقق إذا الإيميل الجديد مستخدم من شخص آخر
+    if (email !== existingUser.email) {
       const emailUsed = await prisma.user.findUnique({
         where: { email },
       });
@@ -48,17 +52,29 @@ export async function PUT(req: NextRequest) {
       }
     }
 
+    const updateData: any = {
+      name,
+      email,
+      avatar,
+      language,
+      theme,
+      country,
+      timezone,
+    };
+
+    if (password && password.trim() !== '') {
+      if (password.length < 6) {
+        return NextResponse.json(
+          { message: 'New password must be at least 6 characters.' },
+          { status: 400 },
+        );
+      }
+      updateData.password = await bcrypt.hash(password, 10);
+    }
+
     const updatedUser = await prisma.user.update({
-      where: { email: session.user.email },
-      data: {
-        name,
-        email,
-        avatar,
-        language,
-        theme,
-        country,
-        timezone,
-      },
+      where: { id: userId },
+      data: updateData,
       select: {
         id: true,
         name: true,

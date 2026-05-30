@@ -7,7 +7,9 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.email) {
+    const userId = (session?.user as any)?.id;
+
+    if (!userId) {
       return NextResponse.json(
         { message: 'Unauthorized' },
         { status: 401 },
@@ -15,7 +17,7 @@ export async function GET() {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: userId },
       select: {
         id: true,
         name: true,
