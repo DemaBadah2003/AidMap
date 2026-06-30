@@ -3,7 +3,7 @@
   "version": "9.3.5",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbo",
     "build": "prisma generate && next build",
     "start": "next start",
     "build:staging": "cp .env.staging .env.local && next build",
@@ -17,6 +17,9 @@
   "prisma": {
     "seed": "node prisma/seed.js",
     "setup": "node prisma/setup.js"
+  },
+  "overrides": {
+    "@aws-sdk/token-providers": "3.971.0"
   },
   "dependencies": {
     "@auth/core": "^0.34.3",
