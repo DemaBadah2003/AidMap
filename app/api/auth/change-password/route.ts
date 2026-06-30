@@ -6,7 +6,6 @@ import {
   ChangePasswordApiSchemaType,
   getChangePasswordApiSchema,
 } from '@/app/(auth)/forms/change-password-schema';
-import { VerificationTokenPurpose } from '@prisma/client';
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,7 +16,7 @@ export async function POST(req: NextRequest) {
     if (!parsedData.success) {
       return NextResponse.json(
         { message: 'Invalid input. Please check your data and try again.' },
-        { status: 400 }, // Bad Request
+        { status: 400 },
       );
     }
 
@@ -27,7 +26,6 @@ export async function POST(req: NextRequest) {
     const verificationToken = await prisma.verificationToken.findFirst({
       where: {
         token,
-        purpose: VerificationTokenPurpose.PASSWORD_RESET,
       },
     });
 
@@ -60,13 +58,12 @@ export async function POST(req: NextRequest) {
     await prisma.verificationToken.deleteMany({
       where: {
         token,
-        purpose: VerificationTokenPurpose.PASSWORD_RESET,
       },
     });
 
     // Send the email notification
     await sendEmail({
-      to: user.email, // Use the resolved email address
+      to: user.email,
       subject: 'Password Reset Successful',
       content: {
         title: `Hello, ${user.name}`,

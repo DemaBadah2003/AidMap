@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { VerificationTokenPurpose } from '@prisma/client';
 
 const SAME_RESPONSE = {
   ok: true,
@@ -18,7 +17,6 @@ export async function POST(req: NextRequest) {
     const verificationToken = await prisma.verificationToken.findFirst({
       where: {
         token,
-        purpose: VerificationTokenPurpose.PASSWORD_RESET,
       },
     });
 
