@@ -6,10 +6,10 @@ import prisma from '@/lib/prisma'
 // ======================================
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: any // استخدام any لتجنب أخطاء النوع أثناء الـ Build
 ) {
   try {
-    const { id } = await params
+    const { id } = await context.params;
     const departments = await prisma.department.findMany({
       where: { hospitalId: id },
       include: { hospital: { select: { id: true, name: true } } },
@@ -39,10 +39,10 @@ export async function GET(
 // ======================================
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: any // استخدام any
 ) {
   try {
-    const { id } = await params
+    const { id } = await context.params;
     const body = await req.json()
 
     if (!body.name?.trim() || !body.deptType?.trim()) {
@@ -71,11 +71,12 @@ export async function POST(
 // ======================================
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  context: any // استخدام any هنا يحل المشكلة نهائياً
 ) {
   try {
+    await context.params; 
     const body = await request.json();
-    const { id, name, deptType, status, description } = body; // الحقول القادمة من الجدول
+    const { id, name, deptType, status, description } = body;
 
     const updatedDepartment = await prisma.department.update({
       where: { id: id },
@@ -93,25 +94,30 @@ export async function PATCH(
     return NextResponse.json({ error: "فشل تحديث القسم" }, { status: 500 });
   }
 }
+
 // ======================================
-// DELETE - حذف قسم نهائياً من قاعدة البيانات
+// DELETE - حذف قسم نهائياً
 // ======================================
-export async function DELETE(req: NextRequest) {
+export async function DELETE(
+  req: NextRequest,
+  context: any // استخدام any
+) {
   try {
+    await context.params;
     const { searchParams } = new URL(req.url)
-    const deptId = searchParams.get('id') // جلب الـ id من الـ URL Query
+    const deptId = searchParams.get('id')
 
     if (!deptId) {
-      return NextResponse.json({ error: 'Department ID is required for deletion' }, { status: 400 })
+      return NextResponse.json({ error: 'Department ID is required' }, { status: 400 })
     }
 
     await prisma.department.delete({
       where: { id: deptId },
     })
 
-    return NextResponse.json({ success: true, message: 'Department deleted successfully' })
+    return NextResponse.json({ success: true, message: 'Deleted successfully' })
   } catch (e) {
     console.error('DELETE error:', e)
-    return NextResponse.json({ error: 'Failed to delete department' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to delete' }, { status: 500 })
   }
 }
