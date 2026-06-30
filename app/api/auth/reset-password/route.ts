@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyRecaptchaToken } from '@/lib/recaptcha';
 import { sendEmail } from '@/services/send-email';
-import { VerificationTokenPurpose } from '@prisma/client';
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,7 +45,6 @@ export async function POST(req: NextRequest) {
     await prisma.verificationToken.deleteMany({
       where: {
         identifier: user.id,
-        purpose: VerificationTokenPurpose.PASSWORD_RESET,
       },
     });
 
@@ -55,7 +53,6 @@ export async function POST(req: NextRequest) {
         identifier: user.id,
         token,
         expires: new Date(Date.now() + 60 * 60 * 1000),
-        purpose: VerificationTokenPurpose.PASSWORD_RESET,
       },
     });
 
