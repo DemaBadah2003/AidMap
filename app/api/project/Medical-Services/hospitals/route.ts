@@ -10,12 +10,7 @@ function parseNullableValue(value: any) {
   return value === null || value === undefined || value === '' ? undefined : value;
 }
 
-// تعديل الدوال لتقبل params كـ Promise حتى لو لم نستخدم id
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  await params; // فك الـ Promise
+export async function GET() {
   try {
     const [hospitals, allDoctors] = await Promise.all([
       prisma.hospital.findMany({
@@ -42,11 +37,7 @@ export async function GET(
   }
 }
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  await params;
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
@@ -77,11 +68,8 @@ export async function POST(
   }
 }
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  await params;
+// إضافة وظيفة التعديل (PATCH)
+export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
     const { id, hospitalName, hospitalType, region, phone, doctorId } = body;
@@ -95,8 +83,9 @@ export async function PATCH(
         phone: phone,
         latitude: parseNullableValue(body.latitude),
         longitude: parseNullableValue(body.longitude),
+        // تحديث الطبيب إذا تم إرسال ID جديد
         doctors: doctorId ? {
-          set: [{ id: doctorId }]
+          set: [{ id: doctorId }] // استبدال الأطباء القدامى بالطبيب الجديد
         } : undefined
       }
     });
