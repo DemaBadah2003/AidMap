@@ -15,13 +15,14 @@ export async function POST(req: NextRequest) {
     console.log('📝 [SIGNUP] Body received:', { email: body.email, name: body.name });
     
     const result = getSignupSchema().safeParse(body);
-    if (!result.success) {
-      console.warn('⚠️ [SIGNUP] Validation failed:', result.error.flatten());
-      return NextResponse.json(
-        { message: 'البيانات غير صالحة.', fieldErrors },
-        { status: 400 },
-      );
-    }
+   if (!result.success) {
+  const { fieldErrors } = result.error.flatten();
+  console.warn('⚠️ [SIGNUP] Validation failed:', fieldErrors);
+  return NextResponse.json(
+    { message: 'البيانات غير صالحة.', fieldErrors },
+    { status: 400 },
+  );
+}
 
     const { email, password, name }: SignupSchemaType = result.data;
     console.log('✅ [SIGNUP] Validation passed');
